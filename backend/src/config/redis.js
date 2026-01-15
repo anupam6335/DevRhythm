@@ -1,127 +1,145 @@
 const Redis = require('ioredis');
-const config = require('./environment');
 const logger = require('../utils/logger');
+const config = require('./environment');
 
 class RedisClient {
   constructor() {
     this.client = null;
-    this.pubClient = null;
-    this.subClient = null;
+    this.publisher = null;
+    this.subscriber = null;
     this.isConnected = false;
+    this.connectionAttempts = 0;
+    this.maxConnectionAttempts = 3;
   }
 
   async connect() {
-    if (!config.redis.enabled) {
-      logger.warn('Redis is disabled. Using in-memory fallback.');
+    if (this.isConnected) return;
+    
+    // If Redis URL is not configured or is localhost but Redis is not running
+    if (!config.REDIS_URL || config.REDIS_URL === 'redis://localhost:6379') {
+      logger.warn('Redis URL not configured or using default localhost. Redis functionality will be disabled.');
+      this.isConnected = false;
       return;
+    }
+    
+    const options = {
+      retryStrategy: (times) => {
+        this.connectionAttempts = times;
+        if (times > this.maxConnectionAttempts) {
+          logger.warn(`Redis connection failed after ${times} attempts. Disabling Redis.`);
+          this.isConnected = false;
+          return null; // Stop retrying
+        }
+        const delay = Math.min(times * 1000, 5000);
+        logger.info(`Redis connection attempt ${times}, retrying in ${delay}ms...`);
+        return delay;
+      },
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      connectTimeout: 5000,
+      lazyConnect: true,
+      showFriendlyErrorStack: true
+    };
+
+    if (config.REDIS_PASSWORD) {
+      options.password = config.REDIS_PASSWORD;
+    }
+    if (config.REDIS_DB) {
+      options.db = config.REDIS_DB;
     }
 
     try {
-      this.client = new Redis({
-        host: config.redis.host,
-        port: config.redis.port,
-        password: config.redis.password || undefined,
-        db: config.redis.db,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 100, 3000);
-          return delay;
-        },
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: true,
-        connectTimeout: 10000
-      });
+      this.client = new Redis(config.REDIS_URL, options);
+      this.publisher = new Redis(config.REDIS_URL, options);
+      this.subscriber = new Redis(config.REDIS_URL, options);
 
-      this.pubClient = new Redis({
-        host: config.redis.host,
-        port: config.redis.port,
-        password: config.redis.password || undefined,
-        db: config.redis.db
-      });
-
-      this.subClient = new Redis({
-        host: config.redis.host,
-        port: config.redis.port,
-        password: config.redis.password || undefined,
-        db: config.redis.db
-      });
-
+      // Test connection
       await this.client.ping();
       this.isConnected = true;
-      
-      logger.info(`Redis connected to ${config.redis.host}:${config.redis.port}`);
 
-      this.setupEventListeners();
-      
-      return this.client;
+      this.client.on('connect', () => {
+        logger.info('Redis client connected');
+      });
+
+      this.client.on('error', (err) => {
+        logger.warn('Redis client error:', err.message);
+        this.isConnected = false;
+      });
+
+      this.client.on('close', () => {
+        logger.warn('Redis connection closed');
+        this.isConnected = false;
+      });
+
+      this.client.on('reconnecting', () => {
+        logger.info('Redis reconnecting...');
+      });
+
+      logger.info('Redis connected successfully');
     } catch (error) {
-      logger.error(`Redis connection error: ${error.message}`);
+      logger.warn('Redis connection failed, disabling Redis:', error.message);
       this.isConnected = false;
-      
-      if (config.env === 'production') {
-        throw error;
-      }
-      
-      return null;
+      this.cleanup();
     }
   }
 
-  setupEventListeners() {
-    if (!this.client) return;
-
-    this.client.on('connect', () => {
-      logger.debug('Redis client connected');
-    });
-
-    this.client.on('ready', () => {
-      this.isConnected = true;
-      logger.debug('Redis client ready');
-    });
-
-    this.client.on('error', (error) => {
-      logger.error(`Redis client error: ${error.message}`);
+  async disconnect() {
+    if (!this.isConnected || !this.client) return;
+    
+    try {
+      await this.client.quit();
+      await this.publisher.quit();
+      await this.subscriber.quit();
       this.isConnected = false;
-    });
+      logger.info('Redis disconnected successfully');
+    } catch (error) {
+      logger.warn('Error disconnecting Redis:', error.message);
+    } finally {
+      this.cleanup();
+    }
+  }
 
-    this.client.on('close', () => {
-      logger.warn('Redis client connection closed');
-      this.isConnected = false;
-    });
-
-    this.client.on('reconnecting', () => {
-      logger.info('Redis client reconnecting...');
-    });
-
-    this.client.on('end', () => {
-      logger.warn('Redis client connection ended');
-      this.isConnected = false;
-    });
+  cleanup() {
+    if (this.client) {
+      this.client.disconnect();
+    }
+    if (this.publisher) {
+      this.publisher.disconnect();
+    }
+    if (this.subscriber) {
+      this.subscriber.disconnect();
+    }
+    this.client = null;
+    this.publisher = null;
+    this.subscriber = null;
+    this.isConnected = false;
   }
 
   async get(key) {
     if (!this.isConnected || !this.client) return null;
     
     try {
-      const value = await this.client.get(key);
-      return value ? JSON.parse(value) : null;
+      const data = await this.client.get(key);
+      return data ? JSON.parse(data) : null;
     } catch (error) {
-      logger.error(`Redis GET error for key ${key}: ${error.message}`);
+      logger.warn('Redis GET error:', error.message);
       return null;
     }
   }
 
-  async set(key, value, ttl = 3600) {
+  async set(key, value, ttl = null) {
     if (!this.isConnected || !this.client) return false;
     
     try {
-      const serializedValue = JSON.stringify(value);
-      if (ttl > 0) {
-        await this.client.setex(key, ttl, serializedValue);
+      const stringValue = JSON.stringify(value);
+      if (ttl) {
+        await this.client.setex(key, ttl, stringValue);
       } else {
-        await this.client.set(key, serializedValue);
+        await this.client.set(key, stringValue);
       }
       return true;
     } catch (error) {
-      logger.error(`Redis SET error for key ${key}: ${error.message}`);
+      logger.warn('Redis SET error:', error.message);
       return false;
     }
   }
@@ -133,44 +151,19 @@ class RedisClient {
       await this.client.del(key);
       return true;
     } catch (error) {
-      logger.error(`Redis DEL error for key ${key}: ${error.message}`);
+      logger.warn('Redis DEL error:', error.message);
       return false;
     }
   }
 
   async exists(key) {
-    if (!this.isConnected || !this.client) return false;
+    if (!this.isConnected || !this.client) return 0;
     
     try {
-      const result = await this.client.exists(key);
-      return result === 1;
+      return await this.client.exists(key);
     } catch (error) {
-      logger.error(`Redis EXISTS error for key ${key}: ${error.message}`);
-      return false;
-    }
-  }
-
-  async increment(key, by = 1) {
-    if (!this.isConnected || !this.client) return null;
-    
-    try {
-      const result = await this.client.incrby(key, by);
-      return result;
-    } catch (error) {
-      logger.error(`Redis INCR error for key ${key}: ${error.message}`);
-      return null;
-    }
-  }
-
-  async decrement(key, by = 1) {
-    if (!this.isConnected || !this.client) return null;
-    
-    try {
-      const result = await this.client.decrby(key, by);
-      return result;
-    } catch (error) {
-      logger.error(`Redis DECR error for key ${key}: ${error.message}`);
-      return null;
+      logger.warn('Redis EXISTS error:', error.message);
+      return 0;
     }
   }
 
@@ -181,20 +174,8 @@ class RedisClient {
       await this.client.expire(key, ttl);
       return true;
     } catch (error) {
-      logger.error(`Redis EXPIRE error for key ${key}: ${error.message}`);
+      logger.warn('Redis EXPIRE error:', error.message);
       return false;
-    }
-  }
-
-  async ttl(key) {
-    if (!this.isConnected || !this.client) return -2;
-    
-    try {
-      const result = await this.client.ttl(key);
-      return result;
-    } catch (error) {
-      logger.error(`Redis TTL error for key ${key}: ${error.message}`);
-      return -2;
     }
   }
 
@@ -202,105 +183,126 @@ class RedisClient {
     if (!this.isConnected || !this.client) return [];
     
     try {
-      const result = await this.client.keys(pattern);
-      return result;
+      return await this.client.keys(pattern);
     } catch (error) {
-      logger.error(`Redis KEYS error for pattern ${pattern}: ${error.message}`);
+      logger.warn('Redis KEYS error:', error.message);
       return [];
     }
   }
 
-  async flush(pattern = '*') {
+  async flush() {
     if (!this.isConnected || !this.client) return false;
     
     try {
-      const keys = await this.keys(pattern);
-      if (keys.length > 0) {
-        await this.client.del(...keys);
-      }
+      await this.client.flushdb();
       return true;
     } catch (error) {
-      logger.error(`Redis FLUSH error for pattern ${pattern}: ${error.message}`);
+      logger.warn('Redis FLUSHDB error:', error.message);
       return false;
     }
   }
 
   async publish(channel, message) {
-    if (!this.isConnected || !this.pubClient) return false;
+    if (!this.isConnected || !this.publisher) return false;
     
     try {
-      const result = await this.pubClient.publish(channel, JSON.stringify(message));
-      return result > 0;
+      await this.publisher.publish(channel, JSON.stringify(message));
+      return true;
     } catch (error) {
-      logger.error(`Redis PUBLISH error for channel ${channel}: ${error.message}`);
+      logger.warn('Redis PUBLISH error:', error.message);
       return false;
     }
   }
 
   async subscribe(channel, callback) {
-    if (!this.isConnected || !this.subClient) return false;
+    if (!this.isConnected || !this.subscriber) return false;
     
     try {
-      await this.subClient.subscribe(channel);
-      this.subClient.on('message', (msgChannel, message) => {
-        if (msgChannel === channel) {
-          callback(JSON.parse(message));
+      await this.subscriber.subscribe(channel);
+      this.subscriber.on('message', (ch, msg) => {
+        if (ch === channel) {
+          callback(JSON.parse(msg));
         }
       });
       return true;
     } catch (error) {
-      logger.error(`Redis SUBSCRIBE error for channel ${channel}: ${error.message}`);
+      logger.warn('Redis SUBSCRIBE error:', error.message);
       return false;
     }
   }
 
-  async healthCheck() {
-    if (!config.redis.enabled) {
-      return { status: 'disabled', connected: false };
-    }
-    
-    if (!this.client || !this.isConnected) {
-      return { status: 'unhealthy', connected: false };
-    }
+  async unsubscribe(channel) {
+    if (!this.isConnected || !this.subscriber) return false;
     
     try {
-      await this.client.ping();
-      return {
-        status: 'healthy',
-        connected: true,
-        ready: this.client.status === 'ready',
-        host: config.redis.host,
-        port: config.redis.port
-      };
+      await this.subscriber.unsubscribe(channel);
+      return true;
     } catch (error) {
-      return {
-        status: 'unhealthy',
-        connected: false,
-        error: error.message
-      };
+      logger.warn('Redis UNSUBSCRIBE error:', error.message);
+      return false;
     }
   }
 
-  async disconnect() {
-    if (this.client) {
-      await this.client.quit();
-      this.client = null;
-    }
+  async hset(key, field, value) {
+    if (!this.isConnected || !this.client) return false;
     
-    if (this.pubClient) {
-      await this.pubClient.quit();
-      this.pubClient = null;
+    try {
+      await this.client.hset(key, field, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      logger.warn('Redis HSET error:', error.message);
+      return false;
     }
+  }
+
+  async hget(key, field) {
+    if (!this.isConnected || !this.client) return null;
     
-    if (this.subClient) {
-      await this.subClient.quit();
-      this.subClient = null;
+    try {
+      const data = await this.client.hget(key, field);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      logger.warn('Redis HGET error:', error.message);
+      return null;
     }
+  }
+
+  async hdel(key, field) {
+    if (!this.isConnected || !this.client) return false;
     
-    this.isConnected = false;
-    logger.info('Redis connections closed');
+    try {
+      await this.client.hdel(key, field);
+      return true;
+    } catch (error) {
+      logger.warn('Redis HDEL error:', error.message);
+      return false;
+    }
+  }
+
+  async hgetall(key) {
+    if (!this.isConnected || !this.client) return {};
+    
+    try {
+      const data = await this.client.hgetall(key);
+      const result = {};
+      for (const [field, value] of Object.entries(data)) {
+        result[field] = JSON.parse(value);
+      }
+      return result;
+    } catch (error) {
+      logger.warn('Redis HGETALL error:', error.message);
+      return {};
+    }
+  }
+
+  getStatus() {
+    return {
+      status: this.isConnected ? 'connected' : 'disconnected',
+      isConnected: this.isConnected,
+      url: config.REDIS_URL || 'not_configured',
+      attempts: this.connectionAttempts
+    };
   }
 }
 
-const redisClient = new RedisClient();
-module.exports = redisClient;
+module.exports = new RedisClient();

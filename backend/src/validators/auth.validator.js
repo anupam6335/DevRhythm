@@ -1,64 +1,105 @@
 const Joi = require('joi');
-const validation = require('../middleware/validation.middleware');
 const constants = require('../config/constants');
 
-class AuthValidator {
-  constructor() {
-    this.schemas = this.initializeSchemas();
+const authValidator = {
+  oauthCallback: Joi.object({
+    code: Joi.string().required(),
+    state: Joi.string().optional()
+  }),
+
+  refreshToken: Joi.object({
+    refreshToken: Joi.string().required()
+  }),
+
+  logout: Joi.object({
+    allDevices: Joi.boolean().default(false)
+  }),
+
+  session: Joi.object({
+    deviceInfo: Joi.string().optional(),
+    ipAddress: Joi.string().ip().optional()
+  }),
+
+  providerLink: Joi.object({
+    provider: Joi.string().valid(...Object.values(constants.AUTH.PROVIDERS)).required(),
+    code: Joi.string().required(),
+    state: Joi.string().optional()
+  }),
+
+  validateOAuthCallback(req, res, next) {
+    const { error } = this.oauthCallback.validate(req.query);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid OAuth callback parameters',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
+
+  validateRefreshToken(req, res, next) {
+    const { error } = this.refreshToken.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid refresh token request',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
+
+  validateLogout(req, res, next) {
+    const { error } = this.logout.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid logout request',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
+
+  validateSession(req, res, next) {
+    const { error } = this.session.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid session data',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
+
+  validateProviderLink(req, res, next) {
+    const { error } = this.providerLink.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid provider link request',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
   }
+};
 
-  initializeSchemas() {
-    return {
-      oauthCallback: Joi.object({
-        code: Joi.string().required(),
-        state: Joi.string().required(),
-        error: Joi.string(),
-        error_description: Joi.string()
-      }),
-
-      refreshToken: Joi.object({
-        refreshToken: Joi.string().required()
-      }),
-
-      logout: Joi.object({
-        allDevices: Joi.boolean().default(false)
-      }),
-
-      sessionInfo: Joi.object({
-        deviceInfo: Joi.string().max(255),
-        ipAddress: Joi.string().ip()
-      }),
-
-      validateToken: Joi.object({
-        token: Joi.string().required()
-      })
-    };
-  }
-
-  validateOAuthCallback() {
-    return validation.validateQuery(this.schemas.oauthCallback);
-  }
-
-  validateRefreshToken() {
-    return validation.validateBody(this.schemas.refreshToken);
-  }
-
-  validateLogout() {
-    return validation.validateBody(this.schemas.logout);
-  }
-
-  validateSessionInfo() {
-    return validation.validateBody(this.schemas.sessionInfo);
-  }
-
-  validateToken() {
-    return validation.validateBody(this.schemas.validateToken);
-  }
-
-  getSchema(name) {
-    return this.schemas[name];
-  }
-}
-
-const authValidator = new AuthValidator();
 module.exports = authValidator;

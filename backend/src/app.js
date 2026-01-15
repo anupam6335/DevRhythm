@@ -1,272 +1,217 @@
+// Load environment variables FIRST
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const swaggerUi = require('swagger-ui-express');
-const config = require('./config/environment');
-const constants = require('./config/constants');
-const logger = require('./utils/logger');
-const database = require('./config/database');
-const redisClient = require('./config/redis');
-const passportConfig = require('./config/passport');
+const config = require('./config');
 const middleware = require('./middleware');
-const errorHandler = require('./utils/errorHandler');
 const routes = require('./routes');
-const swaggerSpec = require('../swagger.json');
+const logger = require('./utils/logger');
 
 class App {
   constructor() {
     this.app = express();
-    this.setupMiddleware();
-    this.setupRoutes();
-    this.setupErrorHandling();
-    this.setupHealthChecks();
+    this.initializeMiddlewares();
+    this.initializeRoutes();
+    this.initializeErrorHandling();
   }
 
-  setupMiddleware() {
-    this.app.set('trust proxy', 1);
-    
-    this.app.use(compression());
-    
+  initializeMiddlewares() {
+    // CORS
     this.app.use(cors({
-      origin: config.security.corsOrigin,
+      origin: config.environment.CORS_ORIGIN,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With'],
-      exposedHeaders: ['X-Total-Count', 'X-Total-Pages', 'X-Current-Page']
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
     }));
+
+    // Compression
+    if (config.environment.COMPRESSION_ENABLED) {
+      this.app.use(compression({
+        threshold: config.environment.COMPRESSION_THRESHOLD,
+        filter: (req, res) => {
+          if (req.headers['x-no-compression']) return false;
+          return compression.filter(req, res);
+        }
+      }));
+    }
+
+    // Body parsing
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    // Session
+    if (config.environment.MONGODB_URI) {
+      this.app.use(session({
+        secret: config.environment.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        store: MongoStore.create({
+          mongoUrl: config.environment.MONGODB_URI,
+          ttl: config.environment.SESSION_MAX_AGE / 1000
+        }),
+        cookie: {
+          secure: config.environment.isProduction,
+          httpOnly: true,
+          maxAge: config.environment.SESSION_MAX_AGE,
+          sameSite: 'strict'
+        }
+      }));
+    } else {
+      logger.warn('MongoDB URI not configured, using memory session store');
+      this.app.use(session({
+        secret: config.environment.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          secure: config.environment.isProduction,
+          httpOnly: true,
+          maxAge: config.environment.SESSION_MAX_AGE,
+          sameSite: 'strict'
+        }
+      }));
+    }
+
+    // Passport
+    config.passport.initialize();
     
-    this.app.use(express.json({
-      limit: '10mb',
-      verify: (req, res, buf) => {
-        req.rawBody = buf.toString();
-      }
-    }));
-    
-    this.app.use(express.urlencoded({
-      extended: true,
-      limit: '10mb'
-    }));
-    
-    this.app.use(middleware.sanitize.getMiddleware());
-    
-    this.app.use(middleware.rateLimit.global());
-    
-    this.app.use(middleware.logger.getMiddleware());
-    
-    const sessionStore = MongoStore.create({
-      mongoUrl: config.mongodb.uri,
-      collectionName: 'sessions',
-      ttl: config.session.maxAge / 1000,
-      autoRemove: 'native'
-    });
-    
-    this.app.use(session({
-      secret: config.session.secret,
-      resave: false,
-      saveUninitialized: false,
-      store: sessionStore,
-      cookie: {
-        secure: config.env === 'production',
-        httpOnly: true,
-        maxAge: config.session.maxAge,
-        sameSite: 'lax'
-      },
-      name: 'devrhythm.sid'
-    }));
-    
-    this.app.use(passportConfig.getMiddleware());
-    this.app.use(passportConfig.getSessionMiddleware());
-    
-    this.app.use(middleware.cache.cacheUserData());
-    
-    this.app.use((req, res, next) => {
-      req._startTime = Date.now();
-      res.header('X-Powered-By', 'DevRhythm');
-      res.header('X-API-Version', config.api.version);
-      res.header('X-Environment', config.env);
-      
-      if (config.env === 'development') {
-        res.header('X-Response-Time', `${Date.now() - req._startTime}ms`);
-      }
-      
-      next();
-    });
+    // Initialize other middleware
+    middleware.initialize(this.app);
   }
 
-  setupRoutes() {
-    this.app.get('/', (req, res) => {
-      res.json({
-        name: 'DevRhythm API',
-        version: config.api.version,
-        environment: config.env,
-        documentation: '/api-docs',
-        status: 'operational',
-        timestamp: new Date().toISOString()
-      });
-    });
-    
-    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-      explorer: true,
-      customSiteTitle: 'DevRhythm API Documentation',
-      customCss: '.swagger-ui .topbar { display: none }',
-      swaggerOptions: {
-        persistAuthorization: true,
-        displayRequestDuration: true,
-        docExpansion: 'list'
-      }
-    }));
-    
-    this.app.use(config.api.baseUrl, routes);
-    
-    this.app.use(middleware.error.handleNotFound);
-  }
-
-  setupErrorHandling() {
-    this.app.use(middleware.error.handleError);
-    
-    this.app.use(errorHandler.middleware());
-  }
-
-  setupHealthChecks() {
-    this.app.get('/health', async (req, res) => {
+  initializeRoutes() {
+    // Health check
+    this.app.get('/health', (req, res) => {
       const health = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        environment: config.env,
-        version: config.api.version
-      };
-      
-      try {
-        const dbHealth = await database.healthCheck();
-        health.database = dbHealth;
-        
-        const redisHealth = await redisClient.healthCheck();
-        health.redis = redisHealth;
-        
-        const cacheHealth = middleware.cache.healthCheck();
-        health.cache = cacheHealth;
-        
-        if (dbHealth.status !== 'healthy' || 
-            (redisHealth.enabled && redisHealth.status !== 'healthy')) {
-          health.status = 'unhealthy';
-          res.status(503);
-        }
-      } catch (error) {
-        health.status = 'unhealthy';
-        health.error = error.message;
-        res.status(503);
-      }
-      
-      res.json(health);
-    });
-    
-    this.app.get('/health/detailed', async (req, res) => {
-      const detailedHealth = {
-        timestamp: new Date().toISOString(),
-        system: {
-          node: process.version,
-          platform: process.platform,
-          memory: process.memoryUsage(),
-          uptime: process.uptime(),
-          pid: process.pid
-        },
-        services: {}
-      };
-      
-      try {
-        detailedHealth.services.database = await database.getStats();
-        detailedHealth.services.redis = await redisClient.healthCheck();
-        detailedHealth.services.cache = middleware.cache.getStats();
-        
-        const { modelManager } = require('./models');
-        const modelStats = await modelManager.getModelStats();
-        detailedHealth.services.models = modelStats;
-        
-        res.json(detailedHealth);
-      } catch (error) {
-        res.status(500).json({
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
-    
-    this.app.get('/metrics', middleware.auth.authenticateJWT(), (req, res) => {
-      const metrics = {
-        timestamp: new Date().toISOString(),
-        requests: {
-          total: req.app.locals.requestCount || 0,
-          byMethod: req.app.locals.requestsByMethod || {},
-          byRoute: req.app.locals.requestsByRoute || {}
-        },
         memory: process.memoryUsage(),
-        uptime: process.uptime()
+        database: config.database ? config.database.getStatus() : { status: 'not_configured' },
+        redis: config.redis ? config.redis.getStatus() : { status: 'not_configured' }
       };
       
-      res.json(metrics);
+      res.status(200).json(health);
+    });
+
+    // Metrics
+    if (config.environment.METRICS_ENABLED) {
+      this.app.get(config.environment.METRICS_PATH, (req, res) => {
+        const metrics = {
+          timestamp: new Date().toISOString(),
+          requests: req.app.get('requestCount') || 0,
+          errors: req.app.get('errorCount') || 0,
+          memory: process.memoryUsage(),
+          cpu: process.cpuUsage()
+        };
+        
+        res.status(200).json(metrics);
+      });
+    }
+
+    // API routes
+    this.app.use(config.environment.API_BASE_URL, routes);
+
+    // Root route
+    this.app.get('/', (req, res) => {
+      res.json({
+        message: 'DevRhythm API',
+        version: '1.0.0',
+        documentation: `${config.environment.BACKEND_URL}${config.environment.API_BASE_URL}/docs`,
+        health: `${config.environment.BACKEND_URL}/health`,
+        status: 'operational'
+      });
     });
   }
 
-  async initialize() {
-    try {
-      await database.connect();
-      
-      if (config.redis.enabled) {
-        await redisClient.connect();
-      }
-      
-      logger.logStartup('DevRhythm API', config.api.version, config.port);
-      
-      this.app.locals.requestCount = 0;
-      this.app.locals.requestsByMethod = {};
-      this.app.locals.requestsByRoute = {};
-      
-      this.app.use((req, res, next) => {
-        this.app.locals.requestCount = (this.app.locals.requestCount || 0) + 1;
-        
-        const method = req.method;
-        this.app.locals.requestsByMethod[method] = 
-          (this.app.locals.requestsByMethod[method] || 0) + 1;
-        
-        const route = req.path.split('/')[1] || 'root';
-        this.app.locals.requestsByRoute[route] = 
-          (this.app.locals.requestsByRoute[route] || 0) + 1;
-        
-        next();
-      });
-      
-      return this.app;
-    } catch (error) {
-      logger.error('Failed to initialize application:', error);
-      throw error;
-    }
+  initializeErrorHandling() {
+    // 404 handler
+    this.app.use(middleware.error.handleNotFound);
+    
+    // Error logger
+    this.app.use(middleware.logger.errorLogger());
+    
+    // Error handler
+    this.app.use(middleware.error.handleError);
   }
 
   getApp() {
     return this.app;
   }
 
-  async gracefulShutdown() {
-    logger.logShutdown('DevRhythm API', 'Graceful shutdown requested');
-    
+  async start(port = config.environment.PORT) {
     try {
-      await database.disconnect();
+      await config.initialize();
       
-      if (config.redis.enabled) {
-        await redisClient.disconnect();
-      }
-      
-      logger.info('All connections closed gracefully');
-      process.exit(0);
+      this.server = this.app.listen(port, () => {
+        logger.info(`Server running on port ${port}`);
+        logger.info(`Environment: ${config.environment.NODE_ENV}`);
+        logger.info(`API Base URL: ${config.environment.API_BASE_URL}`);
+        logger.info(`Frontend URL: ${config.environment.FRONTEND_URL}`);
+      });
+
+      this.setupGracefulShutdown();
     } catch (error) {
-      logger.error('Error during graceful shutdown:', error);
+      logger.error('Failed to start server:', error);
       process.exit(1);
     }
   }
+
+  setupGracefulShutdown() {
+    const shutdown = async (signal) => {
+      logger.info(`${signal} received, starting graceful shutdown`);
+      
+      try {
+        await config.shutdown();
+        
+        if (this.server) {
+          this.server.close(() => {
+            logger.info('HTTP server closed');
+            process.exit(0);
+          });
+          
+          setTimeout(() => {
+            logger.error('Could not close connections in time, forcefully shutting down');
+            process.exit(1);
+          }, 10000);
+        } else {
+          process.exit(0);
+        }
+      } catch (error) {
+        logger.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught Exception:', error);
+      shutdown('uncaughtException');
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      shutdown('unhandledRejection');
+    });
+  }
+
+  async stop() {
+    if (this.server) {
+      await new Promise((resolve) => {
+        this.server.close(() => {
+          logger.info('Server stopped');
+          resolve();
+        });
+      });
+    }
+    
+    await config.shutdown();
+  }
 }
 
-const app = new App();
-module.exports = app;
+module.exports = new App();

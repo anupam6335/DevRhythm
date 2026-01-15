@@ -1,158 +1,197 @@
 const Joi = require('joi');
-const validation = require('../middleware/validation.middleware');
 const constants = require('../config/constants');
 
-class StudyPlanValidator {
-  constructor() {
-    this.schemas = this.initializeSchemas();
-  }
-
-  initializeSchemas() {
-    return {
-      createStudyPlan: Joi.object({
-        name: Joi.string().max(255).required(),
-        description: Joi.string().max(2000),
-        planType: Joi.string().valid(...Object.values(constants.STUDY_PLAN.TYPES)).required(),
-        goal: Joi.object({
-          type: Joi.string().valid(...Object.values(constants.STUDY_PLAN.GOAL_TYPES)).required(),
-          targetCompanies: Joi.array().items(Joi.string().max(100)),
-          timeframe: Joi.string().valid(...Object.values(constants.STUDY_PLAN.TIMEFRAMES)).required(),
-          customDays: Joi.number().integer().min(1).max(365),
-          difficultyProgression: Joi.string().valid('sequential', 'mixed').default('sequential')
-        }).required(),
-        structure: Joi.object({
-          totalDays: Joi.number().integer().min(1).max(365).required(),
-          questionsPerDay: Joi.number().integer().min(1).max(50).default(5),
-          revisionDays: Joi.array().items(Joi.number().integer().min(1)),
-          assessmentDays: Joi.array().items(Joi.number().integer().min(1)),
-          restDays: Joi.array().items(Joi.number().integer().min(1))
-        }).required(),
-        days: Joi.array().items(
-          Joi.object({
-            dayNumber: Joi.number().integer().min(1).required(),
-            dayType: Joi.string().valid(...Object.values(constants.DAY.TYPES)).default('learning'),
-            focusTopics: Joi.array().items(Joi.string().max(100)),
-            difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed').default('mixed'),
-            targetQuestionCount: Joi.number().integer().min(0).max(50),
-            prerequisites: Joi.array().items(Joi.string().max(100)),
-            notes: Joi.string().max(1000)
-          })
-        ).max(365),
-        questionAssignments: Joi.array().items(
-          Joi.object({
-            dayNumber: Joi.number().integer().min(1).required(),
-            questionType: Joi.string().valid('specific', 'category', 'adaptive').default('category'),
-            specificQuestions: Joi.array().items(validation.getSchema('objectId')),
-            categories: Joi.object({
-              topics: Joi.array().items(Joi.string().max(100)),
-              difficulty: Joi.string().valid('easy', 'medium', 'hard', 'mixed'),
-              companies: Joi.array().items(Joi.string().max(100)),
-              problemPatterns: Joi.array().items(Joi.string().max(100))
-            }),
-            count: Joi.number().integer().min(1).max(50)
-          })
-        ),
-        adaptiveSettings: Joi.object({
-          enabled: Joi.boolean().default(false),
-          adjustmentFrequency: Joi.string().valid('weekly', 'bi-weekly', 'monthly').default('weekly'),
-          performanceThresholds: Joi.object({
-            accuracyLow: Joi.number().min(0).max(100).default(60),
-            accuracyHigh: Joi.number().min(0).max(100).default(90),
-            timeSlow: Joi.number().integer().min(0).default(1800)
-          })
-        }),
-        tags: Joi.array().items(Joi.string().max(50)),
-        isPublic: Joi.boolean().default(false)
-      }),
-
-      updateStudyPlan: Joi.object({
-        name: Joi.string().max(255),
-        description: Joi.string().max(2000),
-        structure: Joi.object({
-          totalDays: Joi.number().integer().min(1).max(365),
-          questionsPerDay: Joi.number().integer().min(1).max(50),
-          revisionDays: Joi.array().items(Joi.number().integer().min(1)),
-          assessmentDays: Joi.array().items(Joi.number().integer().min(1)),
-          restDays: Joi.array().items(Joi.number().integer().min(1))
-        }),
-        adaptiveSettings: Joi.object({
-          enabled: Joi.boolean(),
-          adjustmentFrequency: Joi.string().valid('weekly', 'bi-weekly', 'monthly'),
-          performanceThresholds: Joi.object({
-            accuracyLow: Joi.number().min(0).max(100),
-            accuracyHigh: Joi.number().min(0).max(100),
-            timeSlow: Joi.number().integer().min(0)
-          })
-        }),
-        tags: Joi.array().items(Joi.string().max(50)),
-        isPublic: Joi.boolean()
-      }),
-
-      studyPlanQuery: validation.getSchema('pagination').append({
-        planType: Joi.array().items(Joi.string().valid(...Object.values(constants.STUDY_PLAN.TYPES))),
-        goalType: Joi.array().items(Joi.string().valid(...Object.values(constants.STUDY_PLAN.GOAL_TYPES))),
-        timeframe: Joi.array().items(Joi.string().valid(...Object.values(constants.STUDY_PLAN.TIMEFRAMES))),
-        tags: Joi.array().items(Joi.string().max(50)),
-        isPublic: Joi.boolean(),
-        isArchived: Joi.boolean(),
-        createdBy: validation.getSchema('objectId'),
-        sortBy: Joi.string().valid('createdAt', 'updatedAt', 'popularityScore', 'totalDays').default('createdAt'),
-        order: Joi.string().valid('asc', 'desc').default('desc')
-      }),
-
-      assignStudyPlan: Joi.object({
-        userId: validation.getSchema('objectId'),
-        startDay: Joi.number().integer().min(1).default(1),
-        customizations: Joi.object({
-          questionsPerDay: Joi.number().integer().min(1).max(50),
-          difficultyAdjustment: Joi.string().valid('easier', 'harder', 'same'),
-          paceAdjustment: Joi.string().valid('slower', 'faster', 'same')
-        })
-      }),
-
-      studyPlanProgress: Joi.object({
-        dayCompleted: Joi.boolean().default(false),
-        questionsCompleted: Joi.number().integer().min(0),
-        accuracy: Joi.number().min(0).max(100),
-        timePerQuestion: Joi.number().integer().min(0),
-        weakAreas: Joi.array().items(Joi.string().max(100))
-      }),
-
-      studyPlanShare: Joi.object({
-        userIds: Joi.array().items(validation.getSchema('objectId')).min(1).max(100).required(),
-        canEdit: Joi.boolean().default(false)
+const studyPlanValidator = {
+  createStudyPlan: Joi.object({
+    name: Joi.string().required(),
+    description: Joi.string().optional(),
+    planType: Joi.string().valid('predefined', 'custom', 'company-specific', 'topic-based', 'adaptive').required(),
+    goal: Joi.object({
+      type: Joi.string().valid('interview', 'competition', 'skill', 'promotion').required(),
+      targetCompanies: Joi.array().items(Joi.string()).optional(),
+      timeframe: Joi.string().valid('30-day', '60-day', '90-day', 'custom').required(),
+      customDays: Joi.number().integer().min(1).optional(),
+      difficultyProgression: Joi.string().valid('sequential', 'mixed').default('sequential')
+    }).required(),
+    structure: Joi.object({
+      totalDays: Joi.number().integer().min(1).required(),
+      questionsPerDay: Joi.number().integer().min(1).default(5),
+      revisionDays: Joi.array().items(Joi.number().integer().min(1)).optional(),
+      assessmentDays: Joi.array().items(Joi.number().integer().min(1)).optional(),
+      restDays: Joi.array().items(Joi.number().integer().min(1)).optional()
+    }).required(),
+    days: Joi.array().items(
+      Joi.object({
+        dayNumber: Joi.number().integer().min(1).required(),
+        dayType: Joi.string().valid('learning', 'revision', 'mock', 'rest', 'assessment').required(),
+        focusTopics: Joi.array().items(Joi.string()).optional(),
+        difficultyLevel: Joi.string().valid('easy', 'medium', 'hard', 'mixed').optional(),
+        targetQuestionCount: Joi.number().integer().min(0).optional(),
+        prerequisites: Joi.array().items(Joi.string()).optional(),
+        notes: Joi.string().optional()
       })
-    };
-  }
+    ).optional(),
+    questionAssignments: Joi.array().items(
+      Joi.object({
+        dayNumber: Joi.number().integer().min(1).required(),
+        questionType: Joi.string().valid('specific', 'category', 'adaptive').required(),
+        specificQuestions: Joi.array().items(Joi.string().pattern(constants.PATTERNS.OBJECT_ID)).optional(),
+        categories: Joi.object({
+          topics: Joi.array().items(Joi.string()).optional(),
+          difficulty: Joi.string().valid('easy', 'medium', 'hard', 'mixed').optional(),
+          companies: Joi.array().items(Joi.string()).optional(),
+          problemPatterns: Joi.array().items(Joi.string()).optional()
+        }).optional(),
+        count: Joi.number().integer().min(1).optional()
+      })
+    ).optional(),
+    adaptiveSettings: Joi.object({
+      enabled: Joi.boolean().default(false),
+      adjustmentFrequency: Joi.string().valid('weekly', 'bi-weekly', 'monthly').optional(),
+      performanceThresholds: Joi.object({
+        accuracyLow: Joi.number().min(0).max(100).default(60),
+        accuracyHigh: Joi.number().min(0).max(100).default(90),
+        timeSlow: Joi.number().integer().min(0).default(1800)
+      }).optional()
+    }).optional(),
+    tags: Joi.array().items(Joi.string()).optional(),
+    isPublic: Joi.boolean().default(false)
+  }),
 
-  validateCreateStudyPlan() {
-    return validation.validateBody(this.schemas.createStudyPlan);
-  }
+  updateStudyPlan: Joi.object({
+    name: Joi.string().optional(),
+    description: Joi.string().optional(),
+    goal: Joi.object({
+      type: Joi.string().valid('interview', 'competition', 'skill', 'promotion').optional(),
+      targetCompanies: Joi.array().items(Joi.string()).optional(),
+      timeframe: Joi.string().valid('30-day', '60-day', '90-day', 'custom').optional(),
+      customDays: Joi.number().integer().min(1).optional(),
+      difficultyProgression: Joi.string().valid('sequential', 'mixed').optional()
+    }).optional(),
+    structure: Joi.object({
+      totalDays: Joi.number().integer().min(1).optional(),
+      questionsPerDay: Joi.number().integer().min(1).optional(),
+      revisionDays: Joi.array().items(Joi.number().integer().min(1)).optional(),
+      assessmentDays: Joi.array().items(Joi.number().integer().min(1)).optional(),
+      restDays: Joi.array().items(Joi.number().integer().min(1)).optional()
+    }).optional(),
+    adaptiveSettings: Joi.object({
+      enabled: Joi.boolean().optional(),
+      adjustmentFrequency: Joi.string().valid('weekly', 'bi-weekly', 'monthly').optional(),
+      performanceThresholds: Joi.object({
+        accuracyLow: Joi.number().min(0).max(100).optional(),
+        accuracyHigh: Joi.number().min(0).max(100).optional(),
+        timeSlow: Joi.number().integer().min(0).optional()
+      }).optional()
+    }).optional(),
+    tags: Joi.array().items(Joi.string()).optional(),
+    isPublic: Joi.boolean().optional()
+  }).min(1),
 
-  validateUpdateStudyPlan() {
-    return validation.validateBody(this.schemas.updateStudyPlan);
-  }
+  studyPlanQuery: Joi.object({
+    planType: Joi.string().valid('predefined', 'custom', 'company-specific', 'topic-based', 'adaptive').optional(),
+    goalType: Joi.string().valid('interview', 'competition', 'skill', 'promotion').optional(),
+    timeframe: Joi.string().valid('30-day', '60-day', '90-day', 'custom').optional(),
+    tags: Joi.string().optional(),
+    isPublic: Joi.boolean().optional(),
+    search: Joi.string().optional(),
+    sortBy: Joi.string().valid('createdAt', 'updatedAt', 'popularityScore', 'totalDays').default('createdAt'),
+    sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+  }),
 
-  validateStudyPlanQuery() {
-    return validation.validateQuery(this.schemas.studyPlanQuery);
-  }
+  assignPlan: Joi.object({
+    userId: Joi.string().pattern(constants.PATTERNS.OBJECT_ID).optional(),
+    startDate: Joi.date().iso().optional(),
+    adjustments: Joi.object({
+      difficultyAdjusted: Joi.boolean().default(false),
+      paceAdjusted: Joi.boolean().default(false),
+      topicsAdded: Joi.array().items(Joi.string()).optional(),
+      topicsRemoved: Joi.array().items(Joi.string()).optional()
+    }).optional()
+  }),
 
-  validateAssignStudyPlan() {
-    return validation.validateBody(this.schemas.assignStudyPlan);
-  }
+  progressUpdate: Joi.object({
+    dayCompleted: Joi.boolean().default(false),
+    questionsCompleted: Joi.number().integer().min(0).default(0),
+    accuracy: Joi.number().min(0).max(100).optional(),
+    timePerQuestion: Joi.number().integer().min(0).optional(),
+    weakAreas: Joi.array().items(Joi.string()).optional()
+  }),
 
-  validateStudyPlanProgress() {
-    return validation.validateBody(this.schemas.studyPlanProgress);
-  }
+  validateCreateStudyPlan(req, res, next) {
+    const { error } = this.createStudyPlan.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid study plan creation data',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
 
-  validateStudyPlanShare() {
-    return validation.validateBody(this.schemas.studyPlanShare);
-  }
+  validateUpdateStudyPlan(req, res, next) {
+    const { error } = this.updateStudyPlan.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid study plan update data',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
 
-  getSchema(name) {
-    return this.schemas[name];
-  }
-}
+  validateStudyPlanQuery(req, res, next) {
+    const { error } = this.studyPlanQuery.validate(req.query);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid study plan query parameters',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
 
-const studyPlanValidator = new StudyPlanValidator();
+  validateAssignPlan(req, res, next) {
+    const { error } = this.assignPlan.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid plan assignment data',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  },
+
+  validateProgressUpdate(req, res, next) {
+    const { error } = this.progressUpdate.validate(req.body);
+    if (error) {
+      return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: {
+          message: 'Invalid progress update data',
+          code: constants.ERROR_CODES.VALIDATION_ERROR,
+          details: error.details
+        }
+      });
+    }
+    next();
+  }
+};
+
 module.exports = studyPlanValidator;

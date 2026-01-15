@@ -1,391 +1,185 @@
-const logger = require('./logger');
-const config = require('../config/environment');
-const constants = require('../config/constants');
-
 class AnalyticsUtils {
-  constructor() {
-    this.metrics = new Map();
-    this.analyticsEnabled = config.features.analytics;
+  static calculateAccuracy(totalQuestions, solvedQuestions) {
+    if (totalQuestions === 0) return 0;
+    return Math.round((solvedQuestions / totalQuestions) * 100);
   }
 
-  trackEvent(userId, eventName, properties = {}) {
-    if (!this.analyticsEnabled) return;
+  static calculateEfficiency(totalTime, questionsSolved) {
+    if (questionsSolved === 0) return 0;
+    const hours = totalTime / 60;
+    return Math.round((questionsSolved / hours) * 100) / 100;
+  }
 
-    const event = {
-      userId,
-      eventName,
-      properties,
-      timestamp: new Date().toISOString(),
-      ip: 'server'
-    };
+  static calculateConsistency(daysActive, totalDays) {
+    if (totalDays === 0) return 0;
+    return Math.round((daysActive / totalDays) * 100);
+  }
 
-    logger.info('Analytics Event', event);
+  static calculateRetentionRate(revisionsCompleted, revisionsScheduled) {
+    if (revisionsScheduled === 0) return 0;
+    return Math.round((revisionsCompleted / revisionsScheduled) * 100);
+  }
+
+  static calculateMasteryLevel(accuracy, confidence, completeness) {
+    const score = (accuracy * 0.4) + (confidence * 0.3) + (completeness * 0.3);
     
-    this.recordMetric(eventName);
+    if (score >= 90) return 'master';
+    if (score >= 75) return 'advanced';
+    if (score >= 60) return 'intermediate';
+    if (score >= 40) return 'beginner';
+    return 'novice';
+  }
+
+  static calculateProductivityScore(questionsCompleted, timeSpent, targetQuestions) {
+    const completionRatio = targetQuestions > 0 ? questionsCompleted / targetQuestions : 0;
+    const timeEfficiency = timeSpent > 0 ? questionsCompleted / (timeSpent / 60) : 0;
     
-    if (config.env === 'production') {
-      this.sendToExternalAnalytics(event);
-    }
+    return Math.min(100, Math.round((completionRatio * 60) + (timeEfficiency * 40)));
   }
 
-  trackPageView(userId, pageName, properties = {}) {
-    this.trackEvent(userId, `page_view_${pageName}`, {
-      ...properties,
-      page: pageName
-    });
-  }
-
-  trackApiCall(userId, endpoint, method, duration, statusCode, properties = {}) {
-    this.trackEvent(userId, 'api_call', {
-      endpoint,
-      method,
-      duration,
-      statusCode,
-      ...properties
-    });
-
-    if (duration > 1000) {
-      logger.warn('Slow API call', {
-        endpoint,
-        method,
-        duration,
-        userId,
-        statusCode
-      });
-    }
-  }
-
-  trackError(userId, errorType, errorMessage, context = {}) {
-    this.trackEvent(userId, 'error', {
-      errorType,
-      errorMessage,
-      ...context
-    });
-  }
-
-  trackUserAction(userId, action, resourceType, resourceId, metadata = {}) {
-    this.trackEvent(userId, 'user_action', {
-      action,
-      resourceType,
-      resourceId,
-      ...metadata
-    });
-  }
-
-  trackPerformance(metricName, value, tags = {}) {
-    if (!this.metrics.has(metricName)) {
-      this.metrics.set(metricName, []);
-    }
-
-    const metricData = this.metrics.get(metricName);
-    metricData.push({
-      value,
-      tags,
-      timestamp: Date.now()
-    });
-
-    if (metricData.length > 1000) {
-      metricData.splice(0, metricData.length - 1000);
-    }
-  }
-
-  recordMetric(eventName) {
-    const now = Date.now();
-    const minuteKey = Math.floor(now / 60000);
-
-    if (!this.metrics.has(eventName)) {
-      this.metrics.set(eventName, new Map());
-    }
-
-    const eventMetrics = this.metrics.get(eventName);
-    if (!eventMetrics.has(minuteKey)) {
-      eventMetrics.set(minuteKey, 0);
-    }
-
-    eventMetrics.set(minuteKey, eventMetrics.get(minuteKey) + 1);
-  }
-
-  getMetrics(eventName, timeRange = 'hour') {
-    if (!this.metrics.has(eventName)) {
-      return [];
-    }
-
-    const eventMetrics = this.metrics.get(eventName);
-    const now = Date.now();
-    let rangeMs;
-
-    switch (timeRange) {
-      case 'minute': rangeMs = 60000; break;
-      case 'hour': rangeMs = 3600000; break;
-      case 'day': rangeMs = 86400000; break;
-      case 'week': rangeMs = 604800000; break;
-      default: rangeMs = 3600000;
-    }
-
-    const cutoff = now - rangeMs;
-    const minuteCutoff = Math.floor(cutoff / 60000);
-
-    const result = [];
-    for (const [minuteKey, count] of eventMetrics.entries()) {
-      if (minuteKey >= minuteCutoff) {
-        result.push({
-          timestamp: new Date(minuteKey * 60000).toISOString(),
-          count
-        });
-      }
-    }
-
-    return result.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }
-
-  calculateStats(data, field) {
-    if (!data || data.length === 0) {
-      return {
-        count: 0,
-        sum: 0,
-        average: 0,
-        min: 0,
-        max: 0,
-        median: 0
-      };
-    }
-
-    const values = data.map(item => item[field]).filter(val => typeof val === 'number');
+  static calculateWeaknessScore(accuracy, confidence, frequency) {
+    const accuracyScore = (100 - accuracy) * 0.5;
+    const confidenceScore = (5 - confidence) * 10;
+    const frequencyScore = frequency === 'high' ? 30 : frequency === 'medium' ? 20 : 10;
     
-    if (values.length === 0) {
-      return {
-        count: 0,
-        sum: 0,
-        average: 0,
-        min: 0,
-        max: 0,
-        median: 0
-      };
-    }
-
-    values.sort((a, b) => a - b);
-    
-    const sum = values.reduce((acc, val) => acc + val, 0);
-    const average = sum / values.length;
-    const min = values[0];
-    const max = values[values.length - 1];
-    
-    let median;
-    const mid = Math.floor(values.length / 2);
-    if (values.length % 2 === 0) {
-      median = (values[mid - 1] + values[mid]) / 2;
-    } else {
-      median = values[mid];
-    }
-
-    const variance = values.reduce((acc, val) => acc + Math.pow(val - average, 2), 0) / values.length;
-    const stdDev = Math.sqrt(variance);
-
-    return {
-      count: values.length,
-      sum,
-      average: Number(average.toFixed(2)),
-      min,
-      max,
-      median: Number(median.toFixed(2)),
-      variance: Number(variance.toFixed(2)),
-      stdDev: Number(stdDev.toFixed(2))
-    };
+    return Math.min(100, accuracyScore + confidenceScore + frequencyScore);
   }
 
-  generateHeatmapData(data, dateField, valueField, startDate, endDate) {
-    const heatmap = {};
-    const currentDate = new Date(startDate);
+  static calculateStreakBonus(currentStreak) {
+    if (currentStreak >= 30) return 1.3;
+    if (currentStreak >= 7) return 1.2;
+    if (currentStreak >= 3) return 1.1;
+    return 1;
+  }
+
+  static calculateDifficultyMultiplier(difficulty) {
+    switch (difficulty) {
+      case 'hard': return 1.5;
+      case 'medium': return 1.2;
+      case 'easy': return 1;
+      default: return 1;
+    }
+  }
+
+  static aggregateDailyData(dailyStats) {
+    return dailyStats.reduce((acc, day) => {
+      acc.totalQuestions += day.questions || 0;
+      acc.solvedQuestions += day.solved || 0;
+      acc.totalTime += day.timeSpent || 0;
+      acc.daysActive += day.questions > 0 ? 1 : 0;
+      return acc;
+    }, { totalQuestions: 0, solvedQuestions: 0, totalTime: 0, daysActive: 0 });
+  }
+
+  static calculateTrend(currentValue, previousValue) {
+    if (previousValue === 0) return currentValue > 0 ? 100 : 0;
     
-    while (currentDate <= endDate) {
+    const change = ((currentValue - previousValue) / previousValue) * 100;
+    return Math.round(change * 10) / 10;
+  }
+
+  static generateHeatmapData(days, periodStart, periodEnd) {
+    const heatmap = [];
+    const currentDate = new Date(periodStart);
+    
+    while (currentDate <= periodEnd) {
       const dateStr = currentDate.toISOString().split('T')[0];
-      heatmap[dateStr] = {
+      const day = days.find(d => d.date.toISOString().split('T')[0] === dateStr);
+      
+      let activityLevel = 0;
+      if (day) {
+        const solvedRatio = day.questionStats?.solved / day.questionStats?.total || 0;
+        if (solvedRatio >= 0.8) activityLevel = 4;
+        else if (solvedRatio >= 0.6) activityLevel = 3;
+        else if (solvedRatio >= 0.4) activityLevel = 2;
+        else if (solvedRatio > 0) activityLevel = 1;
+      }
+      
+      heatmap.push({
         date: new Date(currentDate),
-        value: 0,
-        count: 0
-      };
+        activityLevel,
+        count: day?.questionStats?.total || 0,
+        solved: day?.questionStats?.solved || 0
+      });
+      
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
-    data.forEach(item => {
-      const date = new Date(item[dateField]);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      if (heatmap[dateStr]) {
-        heatmap[dateStr].value += item[valueField] || 0;
-        heatmap[dateStr].count += 1;
-      }
-    });
-
-    const maxValue = Math.max(...Object.values(heatmap).map(h => h.value));
     
-    return Object.values(heatmap).map(entry => ({
-      date: entry.date,
-      value: entry.value,
-      count: entry.count,
-      intensity: maxValue > 0 ? Math.round((entry.value / maxValue) * 4) : 0
-    }));
+    return heatmap;
   }
 
-  calculateTrend(data, valueField) {
-    if (!data || data.length < 2) {
-      return {
-        trend: 'stable',
-        slope: 0,
-        rSquared: 0
-      };
-    }
+  static calculatePercentileRank(userValue, peerValues) {
+    if (!peerValues || peerValues.length === 0) return 50;
+    
+    const sorted = [...peerValues].sort((a, b) => a - b);
+    const lowerCount = sorted.filter(v => v < userValue).length;
+    const sameCount = sorted.filter(v => v === userValue).length;
+    
+    return Math.round(((lowerCount + (0.5 * sameCount)) / sorted.length) * 100);
+  }
 
-    const x = data.map((_, index) => index);
-    const y = data.map(item => item[valueField] || 0);
+  static predictNextMilestone(currentProgress, rate) {
+    if (rate <= 0) return null;
     
-    const n = x.length;
-    const sumX = x.reduce((a, b) => a + b, 0);
-    const sumY = y.reduce((a, b) => a + b, 0);
-    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
-    const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+    const milestones = [10, 25, 50, 100, 250, 500, 1000];
+    const nextMilestone = milestones.find(m => m > currentProgress);
     
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
+    if (!nextMilestone) return null;
     
-    const yMean = sumY / n;
-    const ssTot = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0);
-    const ssRes = y.reduce((sum, yi, i) => sum + Math.pow(yi - (slope * x[i] + intercept), 2), 0);
-    const rSquared = ssTot > 0 ? 1 - (ssRes / ssTot) : 0;
+    const remaining = nextMilestone - currentProgress;
+    const daysNeeded = Math.ceil(remaining / rate);
+    const predictedDate = new Date();
+    predictedDate.setDate(predictedDate.getDate() + daysNeeded);
     
-    let trend;
-    if (Math.abs(slope) < 0.01) {
-      trend = 'stable';
-    } else if (slope > 0) {
-      trend = 'increasing';
-    } else {
-      trend = 'decreasing';
-    }
-
     return {
-      trend,
-      slope: Number(slope.toFixed(4)),
-      intercept: Number(intercept.toFixed(2)),
-      rSquared: Number(rSquared.toFixed(4))
+      milestone: nextMilestone,
+      remaining,
+      daysNeeded,
+      predictedDate
     };
   }
 
-  identifyPatterns(data, windowSize = 7) {
-    if (!data || data.length < windowSize * 2) {
-      return [];
-    }
-
-    const patterns = [];
-    const values = data.map(item => item.value || 0);
+  static generateRecommendations(analytics) {
+    const recommendations = [];
     
-    for (let i = 0; i <= values.length - windowSize; i++) {
-      const window = values.slice(i, i + windowSize);
-      const nextWindow = values.slice(i + windowSize, i + windowSize * 2);
-      
-      if (nextWindow.length === windowSize) {
-        const windowAvg = window.reduce((a, b) => a + b, 0) / windowSize;
-        const nextAvg = nextWindow.reduce((a, b) => a + b, 0) / windowSize;
-        
-        const changePercent = ((nextAvg - windowAvg) / windowAvg) * 100;
-        
-        if (Math.abs(changePercent) > 20) {
-          patterns.push({
-            startIndex: i,
-            endIndex: i + windowSize - 1,
-            windowAvg: Number(windowAvg.toFixed(2)),
-            nextAvg: Number(nextAvg.toFixed(2)),
-            changePercent: Number(changePercent.toFixed(2)),
-            trend: changePercent > 0 ? 'increasing' : 'decreasing'
-          });
-        }
-      }
-    }
-    
-    return patterns;
-  }
-
-  generateInsights(metrics, userData) {
-    const insights = [];
-    
-    if (metrics.questionsSolved && metrics.questionsSolved.daily > 10) {
-      insights.push({
-        type: 'high_activity',
-        message: 'Great job! You solved more than 10 questions today.',
+    if (analytics.accuracy < 60) {
+      recommendations.push({
+        type: 'focus-area',
         priority: 'high',
-        suggestion: 'Consider taking a short break to avoid burnout.'
+        description: 'Focus on improving accuracy',
+        action: 'Review incorrect solutions and understand mistakes'
       });
     }
     
-    if (metrics.accuracy && metrics.accuracy.average < 60) {
-      insights.push({
-        type: 'low_accuracy',
-        message: 'Your accuracy is below 60%. Consider reviewing topics you find challenging.',
+    if (analytics.consistency < 50) {
+      recommendations.push({
+        type: 'consistency',
         priority: 'medium',
-        suggestion: 'Focus on easier problems first to build confidence.'
+        description: 'Improve study consistency',
+        action: 'Set daily reminders and establish a routine'
       });
     }
     
-    if (metrics.timeSpent && metrics.timeSpent.average > 180) {
-      insights.push({
-        type: 'long_sessions',
-        message: 'Your average session length is over 3 hours.',
-        priority: 'low',
-        suggestion: 'Try breaking your study sessions into smaller, focused blocks.'
+    if (analytics.timeSpent > 300 && analytics.efficiency < 2) {
+      recommendations.push({
+        type: 'efficiency',
+        priority: 'medium',
+        description: 'Improve time efficiency',
+        action: 'Use timer and focus on problem-solving techniques'
       });
     }
     
-    if (metrics.streak && metrics.streak.current >= 7) {
-      insights.push({
-        type: 'streak_milestone',
-        message: `You're on a ${metrics.streak.current}-day streak! Keep up the great work!`,
+    if (analytics.weakAreas && analytics.weakAreas.length > 0) {
+      recommendations.push({
+        type: 'weakness',
         priority: 'high',
-        suggestion: 'Maintain your consistency for long-term improvement.'
+        description: `Focus on: ${analytics.weakAreas.slice(0, 2).join(', ')}`,
+        action: 'Practice more problems in weak areas'
       });
     }
     
-    if (userData.weakTopics && userData.weakTopics.length > 0) {
-      insights.push({
-        type: 'weak_topics',
-        message: `You have ${userData.weakTopics.length} topics that need more attention.`,
-        priority: 'medium',
-        suggestion: `Focus on: ${userData.weakTopics.slice(0, 3).join(', ')}`,
-        data: userData.weakTopics.slice(0, 5)
-      });
-    }
-    
-    return insights;
-  }
-
-  sendToExternalAnalytics(event) {
-    if (config.monitoring.sentryDsn && (event.eventName === 'error' || event.properties.errorType)) {
-      const Sentry = require('@sentry/node');
-      Sentry.captureMessage(event.eventName, {
-        extra: event.properties,
-        user: { id: event.userId }
-      });
-    }
-  }
-
-  cleanupOldMetrics() {
-    const now = Date.now();
-    const hourAgo = now - 3600000;
-    const minuteCutoff = Math.floor(hourAgo / 60000);
-    
-    for (const [eventName, eventMetrics] of this.metrics.entries()) {
-      for (const [minuteKey] of eventMetrics.entries()) {
-        if (minuteKey < minuteCutoff) {
-          eventMetrics.delete(minuteKey);
-        }
-      }
-      
-      if (eventMetrics.size === 0) {
-        this.metrics.delete(eventName);
-      }
-    }
+    return recommendations;
   }
 }
 
-const analyticsUtils = new AnalyticsUtils();
-setInterval(() => analyticsUtils.cleanupOldMetrics(), 5 * 60 * 1000);
-
-module.exports = analyticsUtils;
+module.exports = AnalyticsUtils;

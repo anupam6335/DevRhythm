@@ -1,21 +1,45 @@
-const analyticsUtils = require('./analyticsUtils');
-const apiResponse = require('./apiResponse');
-const dateUtils = require('./dateUtils');
-const errorHandler = require('./errorHandler');
-const exportUtils = require('./exportUtils');
+const AnalyticsUtils = require('./analyticsUtils');
+const ApiResponse = require('./apiResponse');
+const DateUtils = require('./dateUtils');
+const ErrorHandler = require('./errorHandler');
+const ExportUtils = require('./exportUtils');
 const logger = require('./logger');
-const notificationUtils = require('./notificationUtils');
-const stringUtils = require('./stringUtils');
-const validationUtils = require('./validationUtils');
+const NotificationUtils = require('./notificationUtils');
+const StringUtils = require('./stringUtils');
+const ValidationUtils = require('./validationUtils');
 
-module.exports = {
-  analyticsUtils,
-  apiResponse,
-  dateUtils,
-  errorHandler,
-  exportUtils,
+const utils = {
+  AnalyticsUtils,
+  ApiResponse,
+  DateUtils,
+  ErrorHandler,
+  ExportUtils,
   logger,
-  notificationUtils,
-  stringUtils,
-  validationUtils
+  NotificationUtils,
+  StringUtils,
+  ValidationUtils,
+
+  initialize() {
+    ErrorHandler.setupErrorHandlers();
+    ErrorHandler.validateEnv();
+    
+    logger.info('Utils initialized');
+    return this;
+  },
+
+  getUtils() {
+    return {
+      analytics: AnalyticsUtils,
+      response: ApiResponse,
+      date: DateUtils,
+      error: ErrorHandler,
+      export: ExportUtils,
+      logger,
+      notification: NotificationUtils,
+      string: StringUtils,
+      validation: ValidationUtils
+    };
+  }
 };
+
+module.exports = utils;

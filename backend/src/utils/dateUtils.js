@@ -1,347 +1,269 @@
-const moment = require('moment-timezone');
-const config = require('../config/environment');
-const constants = require('../config/constants');
-
 class DateUtils {
-  constructor() {
-    this.defaultTimezone = 'UTC';
-    this.dateFormats = {
-      iso: 'YYYY-MM-DDTHH:mm:ss.SSSZ',
-      date: 'YYYY-MM-DD',
-      time: 'HH:mm:ss',
-      datetime: 'YYYY-MM-DD HH:mm:ss',
-      human: 'MMMM Do YYYY, h:mm:ss a',
-      short: 'MMM D, YYYY'
-    };
+  static getCurrentDate() {
+    return new Date();
   }
 
-  now(timezone = null) {
-    return moment().tz(timezone || this.defaultTimezone);
-  }
-
-  format(date, format = 'iso', timezone = null) {
+  static formatDate(date, format = 'iso') {
     if (!date) return null;
     
-    const m = moment(date);
-    if (timezone) {
-      m.tz(timezone);
-    }
+    const d = new Date(date);
     
-    return m.format(this.dateFormats[format] || format);
-  }
-
-  parse(dateString, format = 'iso', timezone = null) {
-    if (!dateString) return null;
-    
-    const m = moment(dateString, this.dateFormats[format] || format);
-    if (timezone) {
-      m.tz(timezone);
+    switch (format) {
+      case 'iso':
+        return d.toISOString();
+      case 'date':
+        return d.toISOString().split('T')[0];
+      case 'time':
+        return d.toISOString().split('T')[1].split('.')[0];
+      case 'datetime':
+        return d.toLocaleString();
+      case 'timestamp':
+        return d.getTime();
+      default:
+        return d.toISOString();
     }
-    
-    return m.isValid() ? m.toDate() : null;
   }
 
-  startOf(date, unit = 'day', timezone = null) {
-    const m = moment(date).tz(timezone || this.defaultTimezone);
-    return m.startOf(unit).toDate();
+  static addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
   }
 
-  endOf(date, unit = 'day', timezone = null) {
-    const m = moment(date).tz(timezone || this.defaultTimezone);
-    return m.endOf(unit).toDate();
+  static addHours(date, hours) {
+    const result = new Date(date);
+    result.setHours(result.getHours() + hours);
+    return result;
   }
 
-  add(date, amount, unit = 'days', timezone = null) {
-    const m = moment(date).tz(timezone || this.defaultTimezone);
-    return m.add(amount, unit).toDate();
+  static addMinutes(date, minutes) {
+    const result = new Date(date);
+    result.setMinutes(result.getMinutes() + minutes);
+    return result;
   }
 
-  subtract(date, amount, unit = 'days', timezone = null) {
-    const m = moment(date).tz(timezone || this.defaultTimezone);
-    return m.subtract(amount, unit).toDate();
+  static differenceInDays(date1, date2) {
+    const diffTime = Math.abs(date2 - date1);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
 
-  difference(date1, date2, unit = 'days') {
-    const m1 = moment(date1);
-    const m2 = moment(date2);
-    return m2.diff(m1, unit);
+  static differenceInHours(date1, date2) {
+    const diffTime = Math.abs(date2 - date1);
+    return Math.ceil(diffTime / (1000 * 60 * 60));
   }
 
-  isSame(date1, date2, unit = 'day') {
-    return moment(date1).isSame(date2, unit);
+  static differenceInMinutes(date1, date2) {
+    const diffTime = Math.abs(date2 - date1);
+    return Math.ceil(diffTime / (1000 * 60));
   }
 
-  isBefore(date1, date2, unit = null) {
-    if (unit) {
-      return moment(date1).isBefore(date2, unit);
+  static isSameDay(date1, date2) {
+    return date1.toDateString() === date2.toDateString();
+  }
+
+  static isToday(date) {
+    return this.isSameDay(date, new Date());
+  }
+
+  static isYesterday(date) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return this.isSameDay(date, yesterday);
+  }
+
+  static isThisWeek(date) {
+    const now = new Date();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    const endOfWeek = new Date(now.setDate(now.getDate() + 6));
+    return date >= startOfWeek && date <= endOfWeek;
+  }
+
+  static isThisMonth(date) {
+    const now = new Date();
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  }
+
+  static startOfDay(date) {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  static endOfDay(date) {
+    const result = new Date(date);
+    result.setHours(23, 59, 59, 999);
+    return result;
+  }
+
+  static startOfWeek(date) {
+    const result = new Date(date);
+    const day = result.getDay();
+    const diff = result.getDate() - day + (day === 0 ? -6 : 1);
+    result.setDate(diff);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  static endOfWeek(date) {
+    const result = this.startOfWeek(date);
+    result.setDate(result.getDate() + 6);
+    result.setHours(23, 59, 59, 999);
+    return result;
+  }
+
+  static startOfMonth(date) {
+    const result = new Date(date.getFullYear(), date.getMonth(), 1);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  static endOfMonth(date) {
+    const result = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    result.setHours(23, 59, 59, 999);
+    return result;
+  }
+
+  static getWeekNumber(date) {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  }
+
+  static formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}d ${hours % 24}h`;
     }
-    return moment(date1).isBefore(date2);
-  }
-
-  isAfter(date1, date2, unit = null) {
-    if (unit) {
-      return moment(date1).isAfter(date2, unit);
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
     }
-    return moment(date1).isAfter(date2);
+    if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    }
+    return `${seconds}s`;
   }
 
-  isBetween(date, start, end, unit = null, inclusivity = '()') {
-    return moment(date).isBetween(start, end, unit, inclusivity);
-  }
+  static parseDuration(durationString) {
+    const regex = /(\d+)\s*(d|h|m|s)/g;
+    let totalMs = 0;
+    let match;
 
-  getWeekNumber(date) {
-    return moment(date).isoWeek();
-  }
+    while ((match = regex.exec(durationString)) !== null) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
 
-  getMonthNumber(date) {
-    return moment(date).month() + 1;
-  }
-
-  getYear(date) {
-    return moment(date).year();
-  }
-
-  getDayOfWeek(date) {
-    return moment(date).isoWeekday();
-  }
-
-  getDayOfYear(date) {
-    return moment(date).dayOfYear();
-  }
-
-  getBusinessDays(start, end) {
-    let count = 0;
-    const current = moment(start);
-    const endMoment = moment(end);
-    
-    while (current.isSameOrBefore(endMoment, 'day')) {
-      const dayOfWeek = current.isoWeekday();
-      if (dayOfWeek !== 6 && dayOfWeek !== 7) {
-        count++;
+      switch (unit) {
+        case 'd':
+          totalMs += value * 24 * 60 * 60 * 1000;
+          break;
+        case 'h':
+          totalMs += value * 60 * 60 * 1000;
+          break;
+        case 'm':
+          totalMs += value * 60 * 1000;
+          break;
+        case 's':
+          totalMs += value * 1000;
+          break;
       }
-      current.add(1, 'day');
     }
-    
-    return count;
+
+    return totalMs;
   }
 
-  formatDuration(milliseconds, format = 'human') {
-    const duration = moment.duration(milliseconds);
-    
-    if (format === 'human') {
-      const parts = [];
-      
-      const days = Math.floor(duration.asDays());
-      if (days > 0) parts.push(`${days}d`);
-      
-      const hours = duration.hours();
-      if (hours > 0) parts.push(`${hours}h`);
-      
-      const minutes = duration.minutes();
-      if (minutes > 0) parts.push(`${minutes}m`);
-      
-      const seconds = duration.seconds();
-      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-      
-      return parts.join(' ');
+  static isValidDate(date) {
+    return date instanceof Date && !isNaN(date.getTime());
+  }
+
+  static toTimezone(date, timezone) {
+    try {
+      return new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+    } catch (error) {
+      return date;
     }
+  }
+
+  static getDayName(date, locale = 'en-US') {
+    return date.toLocaleDateString(locale, { weekday: 'long' });
+  }
+
+  static getMonthName(date, locale = 'en-US') {
+    return date.toLocaleDateString(locale, { month: 'long' });
+  }
+
+  static getRelativeTime(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSeconds < 60) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
     
-    if (format === 'seconds') {
-      return Math.floor(duration.asSeconds());
-    }
+    const weeks = Math.floor(diffDays / 7);
+    if (weeks < 4) return `${weeks}w ago`;
     
-    if (format === 'minutes') {
-      return Math.floor(duration.asMinutes());
-    }
+    const months = Math.floor(diffDays / 30);
+    if (months < 12) return `${months}mo ago`;
     
-    if (format === 'hours') {
-      return Math.floor(duration.asHours());
-    }
-    
-    return duration.asMilliseconds();
+    const years = Math.floor(diffDays / 365);
+    return `${years}y ago`;
   }
 
-  parseDuration(durationString) {
-    return moment.duration(durationString).asMilliseconds();
-  }
-
-  getTimeSlots(start, end, interval, timezone = null) {
-    const slots = [];
-    let current = moment(start).tz(timezone || this.defaultTimezone);
-    const endMoment = moment(end).tz(timezone || this.defaultTimezone);
-    
-    while (current.isBefore(endMoment)) {
-      slots.push({
-        start: current.toDate(),
-        end: current.clone().add(interval, 'minutes').toDate()
-      });
-      current.add(interval, 'minutes');
-    }
-    
-    return slots;
-  }
-
-  isDST(date, timezone = 'UTC') {
-    return moment.tz(date, timezone).isDST();
-  }
-
-  convertTimezone(date, fromTimezone, toTimezone) {
-    return moment.tz(date, fromTimezone).tz(toTimezone).toDate();
-  }
-
-  getAge(birthDate, asOfDate = new Date()) {
-    return moment(asOfDate).diff(moment(birthDate), 'years');
-  }
-
-  getLastDayOfMonth(date) {
-    return moment(date).endOf('month').toDate();
-  }
-
-  getFirstDayOfMonth(date) {
-    return moment(date).startOf('month').toDate();
-  }
-
-  getDateRange(startDate, endDate, interval = 'day') {
+  static generateDateRange(startDate, endDate, interval = 'day') {
     const dates = [];
-    let current = moment(startDate);
-    const end = moment(endDate);
-    
-    while (current.isSameOrBefore(end, interval)) {
-      dates.push(current.toDate());
-      current.add(1, interval);
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+
+    while (current <= end) {
+      dates.push(new Date(current));
+      
+      switch (interval) {
+        case 'day':
+          current.setDate(current.getDate() + 1);
+          break;
+        case 'week':
+          current.setDate(current.getDate() + 7);
+          break;
+        case 'month':
+          current.setMonth(current.getMonth() + 1);
+          break;
+        default:
+          current.setDate(current.getDate() + 1);
+      }
     }
-    
+
     return dates;
   }
 
-  isValidTimezone(timezone) {
-    return moment.tz.zone(timezone) !== null;
-  }
-
-  getUserTimezone(user) {
-    return user && user.timezone && this.isValidTimezone(user.timezone) 
-      ? user.timezone 
-      : this.defaultTimezone;
-  }
-
-  scheduleTime(timeString, timezone = null) {
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const now = this.now(timezone);
-    const scheduled = now.clone().set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+  static getAge(date) {
+    const today = new Date();
+    const birthDate = new Date(date);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
     
-    if (scheduled.isBefore(now)) {
-      scheduled.add(1, 'day');
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
     }
     
-    return scheduled.toDate();
+    return age;
   }
 
-  getUpcomingDates(startDate, count, interval = 'days', timezone = null) {
-    const dates = [];
-    let current = moment(startDate).tz(timezone || this.defaultTimezone);
-    
-    for (let i = 0; i < count; i++) {
-      dates.push(current.toDate());
-      current.add(1, interval);
-    }
-    
-    return dates;
+  static isLeapYear(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
   }
 
-  calculateWorkingHours(start, end, breakStart = null, breakEnd = null) {
-    const startMoment = moment(start);
-    const endMoment = moment(end);
-    
-    let totalMinutes = endMoment.diff(startMoment, 'minutes');
-    
-    if (breakStart && breakEnd) {
-      const breakStartMoment = moment(breakStart);
-      const breakEndMoment = moment(breakEnd);
-      
-      if (breakStartMoment.isBetween(startMoment, endMoment) && 
-          breakEndMoment.isBetween(startMoment, endMoment)) {
-        totalMinutes -= breakEndMoment.diff(breakStartMoment, 'minutes');
-      }
-    }
-    
-    return {
-      minutes: totalMinutes,
-      hours: totalMinutes / 60,
-      formatted: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
-    };
-  }
-
-  isWeekend(date) {
-    const dayOfWeek = moment(date).isoWeekday();
-    return dayOfWeek === 6 || dayOfWeek === 7;
-  }
-
-  isWeekday(date) {
-    return !this.isWeekend(date);
-  }
-
-  getNextWeekday(date) {
-    let next = moment(date).add(1, 'day');
-    while (this.isWeekend(next.toDate())) {
-      next.add(1, 'day');
-    }
-    return next.toDate();
-  }
-
-  getPreviousWeekday(date) {
-    let prev = moment(date).subtract(1, 'day');
-    while (this.isWeekend(prev.toDate())) {
-      prev.subtract(1, 'day');
-    }
-    return prev.toDate();
-  }
-
-  getTimezoneOffset(timezone = 'UTC', date = new Date()) {
-    return moment.tz(date, timezone).utcOffset();
-  }
-
-  roundToNearest(date, minutes = 15, direction = 'nearest') {
-    const m = moment(date);
-    const remainder = m.minute() % minutes;
-    
-    if (remainder === 0) return m.toDate();
-    
-    if (direction === 'up') {
-      m.add(minutes - remainder, 'minutes');
-    } else if (direction === 'down') {
-      m.subtract(remainder, 'minutes');
-    } else {
-      if (remainder < minutes / 2) {
-        m.subtract(remainder, 'minutes');
-      } else {
-        m.add(minutes - remainder, 'minutes');
-      }
-    }
-    
-    m.second(0).millisecond(0);
-    return m.toDate();
-  }
-
-  getCurrentQuarter(date = new Date()) {
-    const m = moment(date);
-    const quarter = Math.floor((m.month() + 3) / 3);
-    return {
-      quarter,
-      start: m.clone().month((quarter - 1) * 3).startOf('month').toDate(),
-      end: m.clone().month((quarter - 1) * 3 + 2).endOf('month').toDate()
-    };
-  }
-
-  getFiscalYear(date = new Date(), startMonth = 4) {
-    const m = moment(date);
-    const year = m.month() >= startMonth - 1 ? m.year() + 1 : m.year();
-    return {
-      year,
-      start: moment([year - 1, startMonth - 1, 1]).toDate(),
-      end: moment([year, startMonth - 1, 0]).toDate()
-    };
+  static getDaysInMonth(year, month) {
+    return new Date(year, month + 1, 0).getDate();
   }
 }
 
-const dateUtils = new DateUtils();
-module.exports = dateUtils;
+module.exports = DateUtils;

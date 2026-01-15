@@ -1,320 +1,223 @@
-const xss = require('xss-clean');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const hpp = require('hpp');
 const validator = require('validator');
 const config = require('../config/environment');
 const constants = require('../config/constants');
-const logger = require('../utils/logger');
 
 class SanitizeMiddleware {
   constructor() {
-    this.helmetConfig = this.getHelmetConfig();
-    this.xssOptions = this.getXssOptions();
-    this.hppOptions = this.getHppOptions();
+    this.sanitizeInput = this.sanitizeInput.bind(this);
+    this.sanitizeOutput = this.sanitizeOutput.bind(this);
+    this.validateInput = this.validateInput.bind(this);
+    this.escapeHtml = this.escapeHtml.bind(this);
   }
 
-  getHelmetConfig() {
-    return {
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
-          imgSrc: ["'self'", "data:", "https:"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-          connectSrc: ["'self'"],
-          frameSrc: ["'none'"],
-          objectSrc: ["'none'"]
-        }
-      },
-      hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-      },
-      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-      frameguard: { action: 'deny' },
-      noSniff: true,
-      ieNoOpen: true,
-      xssFilter: true,
-      hidePoweredBy: true
-    };
-  }
-
-  getXssOptions() {
-    return {
-      whiteList: {},
-      stripIgnoreTag: true,
-      stripIgnoreTagBody: ['script']
-    };
-  }
-
-  getHppOptions() {
-    return {
-      whitelist: ['page', 'limit', 'sort', 'fields', 'search']
-    };
-  }
-
-  helmetMiddleware() {
-    return helmet(this.helmetConfig);
-  }
-
-  xssCleanMiddleware() {
-    return xss(this.xssOptions);
-  }
-
-  mongoSanitizeMiddleware() {
-    return mongoSanitize({
-      replaceWith: '_',
-      onSanitize: ({ req, key }) => {
-        logger.warn('MongoDB sanitization applied', {
-          path: req.path,
-          method: req.method,
-          key: key,
-          ip: req.ip,
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
-  }
-
-  hppMiddleware() {
-    return hpp(this.hppOptions);
-  }
-
-  inputSanitizer() {
-    return (req, res, next) => {
-      this.sanitizeObject(req.query);
-      this.sanitizeObject(req.body);
-      this.sanitizeObject(req.params);
-      
-      next();
-    };
-  }
-
-  sanitizeObject(obj) {
-    if (!obj || typeof obj !== 'object') return;
-    
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const value = obj[key];
-        
-        if (typeof value === 'string') {
-          obj[key] = this.sanitizeString(value);
-        } else if (typeof value === 'object' && value !== null) {
-          this.sanitizeObject(value);
-        }
-      }
-    }
-  }
-
-  sanitizeString(str) {
-    if (!str || typeof str !== 'string') return str;
-    
-    let sanitized = str;
-    
-    sanitized = validator.trim(sanitized);
-    sanitized = validator.escape(sanitized);
-    sanitized = validator.stripLow(sanitized);
-    sanitized = validator.blacklist(sanitized, '\'"<>{}[]`');
-    
-    if (validator.isURL(sanitized, { require_protocol: false })) {
-      sanitized = validator.normalizeEmail(sanitized, { all_lowercase: true });
-    }
-    
-    if (validator.isEmail(sanitized)) {
-      sanitized = validator.normalizeEmail(sanitized, { all_lowercase: true });
-    }
-    
-    const maxLength = 10000;
-    if (sanitized.length > maxLength) {
-      sanitized = sanitized.substring(0, maxLength);
-      logger.warn('String truncated due to length', {
-        originalLength: str.length,
-        truncatedLength: maxLength
-      });
-    }
-    
-    return sanitized;
-  }
-
-  validateContentType() {
-    return (req, res, next) => {
-      const contentType = req.get('Content-Type');
-      
-      if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
-        if (!contentType || !contentType.includes('application/json')) {
-          return res.status(415).json({
-            success: false,
-            error: {
-              code: constants.ERROR_CODES.VALIDATION_ERROR,
-              message: 'Content-Type must be application/json',
-              statusCode: 415
-            }
-          });
-        }
-      }
-      
-      next();
-    };
-  }
-
-  validateFileUpload() {
-    return (req, res, next) => {
-      if (!req.file && !req.files) {
-        return next();
-      }
-      
-      const files = req.file ? [req.file] : req.files;
-      const errors = [];
-      
-      for (const file of files) {
-        if (file.size > constants.FILE.MAX_SIZE) {
-          errors.push(`File ${file.originalname} exceeds maximum size of ${constants.FILE.MAX_SIZE / 1024 / 1024}MB`);
-        }
-        
-        const ext = '.' + file.originalname.split('.').pop().toLowerCase();
-        if (!constants.FILE.ALLOWED_EXTENSIONS.includes(ext)) {
-          errors.push(`File ${file.originalname} has invalid extension. Allowed: ${constants.FILE.ALLOWED_EXTENSIONS.join(', ')}`);
-        }
-        
-        if (!constants.FILE.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-          errors.push(`File ${file.originalname} has invalid MIME type. Allowed: ${constants.FILE.ALLOWED_MIME_TYPES.join(', ')}`);
-        }
-        
-        if (file.mimetype.startsWith('image/')) {
-          const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
-          if (!imageExtensions.includes(ext)) {
-            errors.push(`Image file ${file.originalname} has invalid extension for its MIME type`);
-          }
-        }
-      }
-      
-      if (errors.length > 0) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: constants.ERROR_CODES.VALIDATION_ERROR,
-            message: 'File validation failed',
-            statusCode: 400,
-            details: errors
-          }
-        });
-      }
-      
-      next();
-    };
-  }
-
-  preventNoSQLInjection() {
-    return (req, res, next) => {
-      const checkObject = (obj) => {
-        if (!obj || typeof obj !== 'object') return;
-        
-        for (const key in obj) {
-          if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            const value = obj[key];
-            
-            if (typeof value === 'string') {
-              if (value.includes('$') || value.includes('{') || value.includes('}')) {
-                logger.warn('Potential NoSQL injection attempt', {
-                  path: req.path,
-                  method: req.method,
-                  key: key,
-                  value: value.substring(0, 100),
-                  ip: req.ip,
-                  timestamp: new Date().toISOString()
-                });
-                
-                delete obj[key];
-              }
-            } else if (typeof value === 'object' && value !== null) {
-              checkObject(value);
-            }
-          }
-        }
-      };
-      
-      checkObject(req.query);
-      checkObject(req.body);
-      checkObject(req.params);
-      
-      next();
-    };
-  }
-
-  validateOrigin() {
-    return (req, res, next) => {
-      const origin = req.get('Origin');
-      const allowedOrigins = config.security.corsOrigin.split(',');
-      
-      if (origin && !allowedOrigins.includes(origin) && !origin.includes('localhost')) {
-        logger.warn('Invalid origin', {
-          origin: origin,
-          path: req.path,
-          method: req.method,
-          ip: req.ip,
-          allowedOrigins: allowedOrigins,
-          timestamp: new Date().toISOString()
-        });
-        
-        return res.status(403).json({
-          success: false,
-          error: {
-            code: constants.ERROR_CODES.AUTHORIZATION_ERROR,
-            message: 'Origin not allowed',
-            statusCode: 403
-          }
-        });
-      }
-      
-      next();
-    };
-  }
-
-  getMiddleware() {
-    return [
-      this.helmetMiddleware(),
-      this.xssCleanMiddleware(),
-      this.mongoSanitizeMiddleware(),
-      this.hppMiddleware(),
-      this.validateContentType(),
-      this.inputSanitizer(),
-      this.preventNoSQLInjection(),
-      this.validateOrigin()
-    ];
-  }
-
-  sanitizeForLogging(data) {
-    const sensitiveFields = ['password', 'token', 'secret', 'key', 'authorization', 'cookie'];
-    
-    const sanitize = (obj) => {
+  sanitizeInput(req, res, next) {
+    const sanitizeObject = (obj) => {
       if (!obj || typeof obj !== 'object') return obj;
       
       const sanitized = Array.isArray(obj) ? [] : {};
       
       for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          const value = obj[key];
-          const lowerKey = key.toLowerCase();
+          let value = obj[key];
           
-          if (sensitiveFields.some(field => lowerKey.includes(field))) {
-            sanitized[key] = '***REDACTED***';
-          } else if (typeof value === 'object' && value !== null) {
-            sanitized[key] = sanitize(value);
-          } else {
-            sanitized[key] = value;
+          if (typeof value === 'string') {
+            value = validator.trim(value);
+            value = validator.escape(value);
+            
+            if (validator.isEmail(value)) {
+              value = validator.normalizeEmail(value, { gmail_remove_dots: false });
+            }
+            
+            if (validator.isURL(value, { require_protocol: true })) {
+              value = validator.escape(value);
+            }
+            
+            if (validator.isJSON(value)) {
+              try {
+                const parsed = JSON.parse(value);
+                value = JSON.stringify(sanitizeObject(parsed));
+              } catch (error) {
+                value = validator.escape(value);
+              }
+            }
+          } else if (typeof value === 'object') {
+            value = sanitizeObject(value);
           }
+          
+          sanitized[key] = value;
         }
       }
       
       return sanitized;
     };
     
-    return sanitize(data);
+    if (req.body) {
+      req.body = sanitizeObject(req.body);
+    }
+    
+    if (req.query) {
+      req.query = sanitizeObject(req.query);
+    }
+    
+    if (req.params) {
+      req.params = sanitizeObject(req.params);
+    }
+    
+    next();
+  }
+
+  sanitizeOutput(data) {
+    if (!data || typeof data !== 'object') return data;
+    
+    const sanitized = Array.isArray(data) ? [] : {};
+    
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        let value = data[key];
+        
+        if (typeof value === 'string') {
+          value = validator.escape(value);
+        } else if (typeof value === 'object') {
+          value = this.sanitizeOutput(value);
+        }
+        
+        sanitized[key] = value;
+      }
+    }
+    
+    return sanitized;
+  }
+
+  validateInput(rules) {
+    return (req, res, next) => {
+      const errors = {};
+      
+      for (const field in rules) {
+        const rule = rules[field];
+        const value = req.body[field] || req.query[field] || req.params[field];
+        
+        if (rule.required && (value === undefined || value === null || value === '')) {
+          errors[field] = `${field} is required`;
+          continue;
+        }
+        
+        if (value === undefined || value === null || value === '') {
+          continue;
+        }
+        
+        if (rule.type === 'string') {
+          if (typeof value !== 'string') {
+            errors[field] = `${field} must be a string`;
+          }
+          
+          if (rule.minLength && value.length < rule.minLength) {
+            errors[field] = `${field} must be at least ${rule.minLength} characters`;
+          }
+          
+          if (rule.maxLength && value.length > rule.maxLength) {
+            errors[field] = `${field} must be at most ${rule.maxLength} characters`;
+          }
+          
+          if (rule.pattern && !rule.pattern.test(value)) {
+            errors[field] = `${field} format is invalid`;
+          }
+          
+          if (rule.enum && !rule.enum.includes(value)) {
+            errors[field] = `${field} must be one of: ${rule.enum.join(', ')}`;
+          }
+        }
+        
+        if (rule.type === 'number') {
+          const num = Number(value);
+          if (isNaN(num)) {
+            errors[field] = `${field} must be a number`;
+          } else {
+            if (rule.min !== undefined && num < rule.min) {
+              errors[field] = `${field} must be at least ${rule.min}`;
+            }
+            
+            if (rule.max !== undefined && num > rule.max) {
+              errors[field] = `${field} must be at most ${rule.max}`;
+            }
+            
+            if (rule.integer && !Number.isInteger(num)) {
+              errors[field] = `${field} must be an integer`;
+            }
+          }
+        }
+        
+        if (rule.type === 'boolean') {
+          if (typeof value !== 'boolean' && value !== 'true' && value !== 'false' && value !== 0 && value !== 1) {
+            errors[field] = `${field} must be a boolean`;
+          }
+        }
+        
+        if (rule.type === 'email') {
+          if (!validator.isEmail(value)) {
+            errors[field] = `${field} must be a valid email`;
+          }
+        }
+        
+        if (rule.type === 'url') {
+          if (!validator.isURL(value, { require_protocol: true })) {
+            errors[field] = `${field} must be a valid URL with protocol`;
+          }
+        }
+        
+        if (rule.type === 'date') {
+          if (!validator.isISO8601(value)) {
+            errors[field] = `${field} must be a valid ISO 8601 date`;
+          }
+        }
+        
+        if (rule.type === 'objectId') {
+          if (!constants.PATTERNS.OBJECT_ID.test(value)) {
+            errors[field] = `${field} must be a valid ObjectId`;
+          }
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            code: constants.ERROR_CODES.VALIDATION_ERROR,
+            errors: errors
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      next();
+    };
+  }
+
+  escapeHtml(str) {
+    if (typeof str !== 'string') return str;
+    
+    const htmlEntities = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+      '/': '&#x2F;',
+      '`': '&#x60;',
+      '=': '&#x3D;'
+    };
+    
+    return str.replace(/[&<>"'`=/]/g, (char) => htmlEntities[char]);
+  }
+
+  middleware() {
+    return {
+      sanitizeInput: this.sanitizeInput,
+      sanitizeOutput: this.sanitizeOutput,
+      validateInput: this.validateInput,
+      escapeHtml: this.escapeHtml
+    };
   }
 }
 
-const sanitizeMiddleware = new SanitizeMiddleware();
-module.exports = sanitizeMiddleware;
+module.exports = new SanitizeMiddleware();

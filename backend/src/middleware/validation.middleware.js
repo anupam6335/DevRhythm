@@ -1,9 +1,5 @@
 const Joi = require('joi');
-const mongoose = require('mongoose');
-const config = require('../config/environment');
 const constants = require('../config/constants');
-const logger = require('../utils/logger');
-const apiResponse = require('../utils/apiResponse');
 
 class ValidationMiddleware {
   constructor() {
@@ -12,74 +8,74 @@ class ValidationMiddleware {
 
   initializeSchemas() {
     return {
-      objectId: Joi.string().custom((value, helpers) => {
-        if (!mongoose.Types.ObjectId.isValid(value)) {
-          return helpers.error('any.invalid');
-        }
-        return value;
-      }, 'ObjectId validation').message('Invalid ObjectId'),
-
       pagination: Joi.object({
-        page: Joi.number().integer().min(1).default(constants.PAGINATION.DEFAULT_PAGE),
-        limit: Joi.number().integer().min(1).max(constants.PAGINATION.MAX_LIMIT).default(constants.PAGINATION.DEFAULT_LIMIT),
-        sort: Joi.string(),
-        order: Joi.string().valid('asc', 'desc').default('desc'),
-        search: Joi.string().max(100)
+        page: Joi.number().integer().min(constants.VALIDATION.PAGINATION.MIN_PAGE).default(1),
+        limit: Joi.number()
+          .integer()
+          .min(constants.VALIDATION.PAGINATION.MIN_LIMIT)
+          .max(constants.VALIDATION.PAGINATION.MAX_LIMIT)
+          .default(constants.VALIDATION.PAGINATION.DEFAULT_LIMIT),
+        sort: Joi.string().pattern(/^[a-zA-Z_]+:(asc|desc)$/),
+        search: Joi.string().min(1).max(100)
       }),
+
+      objectId: Joi.string().pattern(constants.PATTERNS.OBJECT_ID).required(),
+
+      email: Joi.string().email().required(),
+
+      password: Joi.string()
+        .min(8)
+        .max(100)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .required(),
 
       dateRange: Joi.object({
-        startDate: Joi.date().iso(),
-        endDate: Joi.date().iso().min(Joi.ref('startDate')),
-        period: Joi.string().valid('today', 'week', 'month', 'year', 'custom')
+        startDate: Joi.date().iso().required(),
+        endDate: Joi.date().iso().min(Joi.ref('startDate')).required()
       }),
 
-      email: Joi.string().email().max(255).trim().lowercase(),
-      
-      url: Joi.string().uri().max(2000),
-      
-      timezone: Joi.string().pattern(constants.VALIDATION.TIMEZONE),
-      
-      date: Joi.string().pattern(constants.VALIDATION.DATE_FORMAT),
-      
-      datetime: Joi.string().pattern(constants.VALIDATION.DATETIME_FORMAT)
+      fileUpload: Joi.object({
+        fieldname: Joi.string().required(),
+        originalname: Joi.string().required(),
+        encoding: Joi.string().required(),
+        mimetype: Joi.string().required(),
+        size: Joi.number().integer().positive().required(),
+        destination: Joi.string(),
+        filename: Joi.string(),
+        path: Joi.string()
+      })
     };
   }
 
-  validate(schema, source = 'body') {
+  validate(schema, property = 'body') {
     return (req, res, next) => {
-      const data = req[source];
+      const data = req[property];
       
       const { error, value } = schema.validate(data, {
         abortEarly: false,
         stripUnknown: true,
-        allowUnknown: false
+        convert: true
       });
 
       if (error) {
-        const details = error.details.map(detail => ({
-          field: detail.path.join('.'),
-          message: detail.message.replace(/['"]/g, ''),
-          type: detail.type
-        }));
+        const errors = error.details.reduce((acc, detail) => {
+          const key = detail.path.join('.');
+          acc[key] = detail.message;
+          return acc;
+        }, {});
 
-        logger.warn('Validation failed', {
-          path: req.path,
-          method: req.method,
-          source: source,
-          errors: details,
-          ip: req.ip,
+        return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            code: constants.ERROR_CODES.VALIDATION_ERROR,
+            errors: errors
+          },
           timestamp: new Date().toISOString()
-        });
-
-        return apiResponse.unprocessableEntity(res, 'Validation failed', {
-          errors: details
         });
       }
 
-      req[source] = value;
-      req.validated = req.validated || {};
-      req.validated[source] = value;
-      
+      req[property] = value;
       next();
     };
   }
@@ -97,37 +93,38 @@ class ValidationMiddleware {
   }
 
   validateHeaders(schema) {
-    return (req, res, next) => {
-      const { error, value } = schema.validate(req.headers, {
-        abortEarly: false,
-        stripUnknown: true,
-        allowUnknown: true
-      });
-
-      if (error) {
-        const details = error.details.map(detail => ({
-          field: detail.path.join('.'),
-          message: detail.message.replace(/['"]/g, ''),
-          type: detail.type
-        }));
-
-        return apiResponse.unprocessableEntity(res, 'Header validation failed', {
-          errors: details
-        });
-      }
-
-      req.headers = { ...req.headers, ...value };
-      req.validated = req.validated || {};
-      req.validated.headers = value;
-      
-      next();
-    };
+    return this.validate(schema, 'headers');
   }
 
   validateFile() {
     return (req, res, next) => {
       if (!req.file && !req.files) {
-        return apiResponse.badRequest(res, 'No file uploaded');
+        return next();
+      }
+
+      const files = req.file ? [req.file] : req.files;
+      const errors = [];
+
+      files.forEach((file, index) => {
+        const { error } = this.schemas.fileUpload.validate(file);
+        if (error) {
+          errors.push({
+            file: file.originalname,
+            errors: error.details.map(detail => detail.message)
+          });
+        }
+      });
+
+      if (errors.length > 0) {
+        return res.status(constants.HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          error: {
+            message: 'File validation failed',
+            code: constants.ERROR_CODES.VALIDATION_ERROR,
+            errors: errors
+          },
+          timestamp: new Date().toISOString()
+        });
       }
 
       next();
@@ -138,246 +135,51 @@ class ValidationMiddleware {
     return this.validateQuery(this.schemas.pagination);
   }
 
+  validateObjectId(paramName = 'id') {
+    return this.validateParams(
+      Joi.object({
+        [paramName]: this.schemas.objectId
+      })
+    );
+  }
+
+  validateEmail() {
+    return this.validateBody(
+      Joi.object({
+        email: this.schemas.email
+      })
+    );
+  }
+
   validateDateRange() {
     return this.validateQuery(this.schemas.dateRange);
   }
 
-  validateObjectId(paramName = 'id') {
-    return (req, res, next) => {
-      const id = req.params[paramName];
-      
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return apiResponse.badRequest(res, `Invalid ${paramName} format`);
-      }
+  createSchema(baseSchema) {
+    return Joi.object(baseSchema);
+  }
 
-      next();
+  extendSchema(baseSchema, extensions) {
+    return baseSchema.append(extensions);
+  }
+
+  middleware() {
+    return {
+      validate: this.validate.bind(this),
+      validateParams: this.validateParams.bind(this),
+      validateQuery: this.validateQuery.bind(this),
+      validateBody: this.validateBody.bind(this),
+      validateHeaders: this.validateHeaders.bind(this),
+      validateFile: this.validateFile.bind(this),
+      validatePagination: this.validatePagination.bind(this),
+      validateObjectId: this.validateObjectId.bind(this),
+      validateEmail: this.validateEmail.bind(this),
+      validateDateRange: this.validateDateRange.bind(this),
+      createSchema: this.createSchema.bind(this),
+      extendSchema: this.extendSchema.bind(this),
+      schemas: this.schemas
     };
-  }
-
-  validateArrayOfObjectIds(fieldName) {
-    return (req, res, next) => {
-      const ids = req.body[fieldName];
-      
-      if (!Array.isArray(ids)) {
-        return apiResponse.badRequest(res, `${fieldName} must be an array`);
-      }
-
-      for (const id of ids) {
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-          return apiResponse.badRequest(res, `Invalid ObjectId in ${fieldName}`);
-        }
-      }
-
-      next();
-    };
-  }
-
-  validateEnum(fieldName, enumValues, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value && !enumValues.includes(value)) {
-        return apiResponse.badRequest(res, `Invalid ${fieldName}. Must be one of: ${enumValues.join(', ')}`);
-      }
-
-      next();
-    };
-  }
-
-  validateRequiredFields(fields, source = 'body') {
-    return (req, res, next) => {
-      const missingFields = [];
-      
-      for (const field of fields) {
-        if (req[source][field] === undefined || req[source][field] === null || req[source][field] === '') {
-          missingFields.push(field);
-        }
-      }
-
-      if (missingFields.length > 0) {
-        return apiResponse.badRequest(res, `Missing required fields: ${missingFields.join(', ')}`);
-      }
-
-      next();
-    };
-  }
-
-  validateAtLeastOne(fields, source = 'body') {
-    return (req, res, next) => {
-      const hasAtLeastOne = fields.some(field => 
-        req[source][field] !== undefined && 
-        req[source][field] !== null && 
-        req[source][field] !== ''
-      );
-
-      if (!hasAtLeastOne) {
-        return apiResponse.badRequest(res, `At least one of these fields is required: ${fields.join(', ')}`);
-      }
-
-      next();
-    };
-  }
-
-  validateLength(fieldName, min, max, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      if (typeof value !== 'string') {
-        return apiResponse.badRequest(res, `${fieldName} must be a string`);
-      }
-
-      if (value.length < min) {
-        return apiResponse.badRequest(res, `${fieldName} must be at least ${min} characters`);
-      }
-
-      if (value.length > max) {
-        return apiResponse.badRequest(res, `${fieldName} must be at most ${max} characters`);
-      }
-
-      next();
-    };
-  }
-
-  validateNumberRange(fieldName, min, max, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      const num = Number(value);
-      
-      if (isNaN(num)) {
-        return apiResponse.badRequest(res, `${fieldName} must be a number`);
-      }
-
-      if (num < min) {
-        return apiResponse.badRequest(res, `${fieldName} must be at least ${min}`);
-      }
-
-      if (num > max) {
-        return apiResponse.badRequest(res, `${fieldName} must be at most ${max}`);
-      }
-
-      next();
-    };
-  }
-
-  validateDate(fieldName, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      const date = new Date(value);
-      
-      if (isNaN(date.getTime())) {
-        return apiResponse.badRequest(res, `${fieldName} must be a valid date`);
-      }
-
-      next();
-    };
-  }
-
-  validateFutureDate(fieldName, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      const date = new Date(value);
-      const now = new Date();
-      
-      if (isNaN(date.getTime())) {
-        return apiResponse.badRequest(res, `${fieldName} must be a valid date`);
-      }
-
-      if (date <= now) {
-        return apiResponse.badRequest(res, `${fieldName} must be a future date`);
-      }
-
-      next();
-    };
-  }
-
-  validatePastDate(fieldName, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      const date = new Date(value);
-      const now = new Date();
-      
-      if (isNaN(date.getTime())) {
-        return apiResponse.badRequest(res, `${fieldName} must be a valid date`);
-      }
-
-      if (date >= now) {
-        return apiResponse.badRequest(res, `${fieldName} must be a past date`);
-      }
-
-      next();
-    };
-  }
-
-  validateRegex(fieldName, pattern, source = 'body') {
-    return (req, res, next) => {
-      const value = req[source][fieldName];
-      
-      if (value === undefined || value === null) {
-        return next();
-      }
-
-      const regex = new RegExp(pattern);
-      
-      if (!regex.test(value)) {
-        return apiResponse.badRequest(res, `${fieldName} has invalid format`);
-      }
-
-      next();
-    };
-  }
-
-  validateEmail(fieldName, source = 'body') {
-    return this.validateRegex(fieldName, constants.VALIDATION.EMAIL, source);
-  }
-
-  validateURL(fieldName, source = 'body') {
-    return this.validateRegex(fieldName, constants.VALIDATION.URL, source);
-  }
-
-  getSchema(name) {
-    return this.schemas[name];
-  }
-
-  createSchema(baseSchema, customizations = {}) {
-    return baseSchema.append(customizations);
-  }
-
-  logValidationError(req, errors) {
-    logger.warn('Request validation failed', {
-      path: req.path,
-      method: req.method,
-      ip: req.ip,
-      userId: req.user ? req.user._id : 'anonymous',
-      errors: errors,
-      timestamp: new Date().toISOString(),
-      body: config.env === 'development' ? req.body : undefined
-    });
   }
 }
 
-const validationMiddleware = new ValidationMiddleware();
-module.exports = validationMiddleware;
+module.exports = new ValidationMiddleware();

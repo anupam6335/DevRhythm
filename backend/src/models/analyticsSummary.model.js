@@ -55,7 +55,7 @@ const AnalyticsSummarySchema = new mongoose.Schema({
     topic: { type: String, required: true },
     attempted: { type: Number, default: 0 },
     solved: { type: Number, default: 0 },
-    timeSpent: { type: Number, default: 0 },
+    timeSpent: { type: Number, default: 0 }, // minutes
     accuracy: { type: Number, default: 0 },
     confidence: { type: Number, default: 0 },
     weaknessScore: { type: Number, default: 0 } // 0-100, higher = weaker
@@ -142,7 +142,7 @@ const AnalyticsSummarySchema = new mongoose.Schema({
   }],
   
   // Export & Sharing
-  exportData: {
+  exportMetadata: { // Renamed from exportData to avoid conflict
     lastExported: { type: Date },
     exportFormat: { type: String },
     shareToken: { type: String }
@@ -720,8 +720,8 @@ AnalyticsSummarySchema.methods.getDisplaySummary = function() {
   };
 };
 
-// Method to export analytics data
-AnalyticsSummarySchema.methods.exportData = function(format = 'json') {
+// Method to export analytics data - Renamed from exportData to exportAnalytics
+AnalyticsSummarySchema.methods.exportAnalytics = function(format = 'json') {
   const summary = this.getDisplaySummary();
   
   if (format === 'json') {

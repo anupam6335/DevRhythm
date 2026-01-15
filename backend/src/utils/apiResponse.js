@@ -1,212 +1,133 @@
-const config = require('../config/environment');
 const constants = require('../config/constants');
-const logger = require('./logger');
 
 class ApiResponse {
-  constructor() {
-    this.defaultHeaders = {
-      'Content-Type': 'application/json',
-      'X-API-Version': config.api.version,
-      'X-Powered-By': 'DevRhythm'
-    };
-  }
-
-  success(res, data = null, message = 'Success', statusCode = constants.HTTP_STATUS.OK) {
-    const response = {
+  static success(res, data = {}, message = 'Success', statusCode = constants.HTTP_STATUS.OK) {
+    return res.status(statusCode).json({
       success: true,
       message,
       data,
       timestamp: new Date().toISOString()
-    };
-
-    if (config.env === 'development' && data && data.pagination) {
-      response.pagination = data.pagination;
-    }
-
-    res.set(this.defaultHeaders);
-    return res.status(statusCode).json(response);
+    });
   }
 
-  created(res, data = null, message = 'Resource created successfully') {
+  static created(res, data = {}, message = 'Resource created successfully') {
     return this.success(res, data, message, constants.HTTP_STATUS.CREATED);
   }
 
-  accepted(res, data = null, message = 'Request accepted') {
+  static accepted(res, data = {}, message = 'Request accepted') {
     return this.success(res, data, message, constants.HTTP_STATUS.ACCEPTED);
   }
 
-  noContent(res, message = 'No content') {
-    return this.success(res, null, message, constants.HTTP_STATUS.NO_CONTENT);
+  static noContent(res) {
+    return res.status(constants.HTTP_STATUS.NO_CONTENT).end();
   }
 
-  error(res, errorCode, message, statusCode = constants.HTTP_STATUS.BAD_REQUEST, details = null) {
+  static error(res, { message = 'An error occurred', code = constants.ERROR_CODES.SERVER_ERROR, statusCode = constants.HTTP_STATUS.INTERNAL_SERVER_ERROR, errors = null, error = null }) {
     const response = {
       success: false,
       error: {
-        code: errorCode,
         message,
-        statusCode,
-        details,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    if (config.env === 'development') {
-      response.error.stack = new Error().stack;
-    }
-
-    res.set(this.defaultHeaders);
-    return res.status(statusCode).json(response);
-  }
-
-  badRequest(res, message = 'Bad Request', details = null) {
-    return this.error(res, constants.ERROR_CODES.VALIDATION_ERROR, message, constants.HTTP_STATUS.BAD_REQUEST, details);
-  }
-
-  unauthorized(res, message = 'Unauthorized', details = null) {
-    return this.error(res, constants.ERROR_CODES.AUTHENTICATION_ERROR, message, constants.HTTP_STATUS.UNAUTHORIZED, details);
-  }
-
-  forbidden(res, message = 'Forbidden', details = null) {
-    return this.error(res, constants.ERROR_CODES.AUTHORIZATION_ERROR, message, constants.HTTP_STATUS.FORBIDDEN, details);
-  }
-
-  notFound(res, message = 'Resource not found', details = null) {
-    return this.error(res, constants.ERROR_CODES.NOT_FOUND_ERROR, message, constants.HTTP_STATUS.NOT_FOUND, details);
-  }
-
-  methodNotAllowed(res, message = 'Method not allowed', details = null) {
-    return this.error(res, constants.ERROR_CODES.VALIDATION_ERROR, message, constants.HTTP_STATUS.METHOD_NOT_ALLOWED, details);
-  }
-
-  conflict(res, message = 'Resource conflict', details = null) {
-    return this.error(res, constants.ERROR_CODES.CONFLICT_ERROR, message, constants.HTTP_STATUS.CONFLICT, details);
-  }
-
-  unprocessableEntity(res, message = 'Unprocessable entity', details = null) {
-    return this.error(res, constants.ERROR_CODES.VALIDATION_ERROR, message, constants.HTTP_STATUS.UNPROCESSABLE_ENTITY, details);
-  }
-
-  tooManyRequests(res, message = 'Too many requests', details = null) {
-    return this.error(res, constants.ERROR_CODES.RATE_LIMIT_ERROR, message, constants.HTTP_STATUS.TOO_MANY_REQUESTS, details);
-  }
-
-  serverError(res, message = 'Internal server error', details = null) {
-    return this.error(res, constants.ERROR_CODES.INTERNAL_SERVER_ERROR, message, constants.HTTP_STATUS.INTERNAL_SERVER_ERROR, details);
-  }
-
-  serviceUnavailable(res, message = 'Service unavailable', details = null) {
-    return this.error(res, constants.ERROR_CODES.EXTERNAL_SERVICE_ERROR, message, constants.HTTP_STATUS.SERVICE_UNAVAILABLE, details);
-  }
-
-  paginated(res, data, pagination, message = 'Success') {
-    const response = {
-      success: true,
-      message,
-      data,
-      pagination: {
-        page: pagination.page || constants.PAGINATION.DEFAULT_PAGE,
-        limit: pagination.limit || constants.PAGINATION.DEFAULT_LIMIT,
-        total: pagination.total || 0,
-        pages: pagination.pages || 0,
-        hasNext: pagination.hasNext || false,
-        hasPrev: pagination.hasPrev || false
+        code
       },
       timestamp: new Date().toISOString()
     };
 
-    res.set(this.defaultHeaders);
-    return res.status(constants.HTTP_STATUS.OK).json(response);
+    if (errors) {
+      response.error.errors = errors;
+    }
+
+    if (error && process.env.NODE_ENV === 'development') {
+      response.error.stack = error.stack;
+      response.error.details = error.message;
+    }
+
+    return res.status(statusCode).json(response);
   }
 
-  download(res, content, filename, contentType = 'application/octet-stream') {
-    res.set({
-      'Content-Type': contentType,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': content.length,
-      'X-API-Version': config.api.version
-    });
-
-    return res.send(content);
-  }
-
-  redirect(res, url, permanent = false) {
-    return res.redirect(permanent ? 301 : 302, url);
-  }
-
-  setHeaders(res, headers) {
-    Object.entries(headers).forEach(([key, value]) => {
-      res.set(key, value);
+  static badRequest(res, message = 'Bad request', errors = null) {
+    return this.error(res, {
+      message,
+      code: constants.ERROR_CODES.VALIDATION_ERROR,
+      statusCode: constants.HTTP_STATUS.BAD_REQUEST,
+      errors
     });
   }
 
-  addPaginationHeaders(res, pagination) {
-    const links = [];
-    
-    if (pagination.hasPrev) {
-      links.push(`</api/v1/resource?page=${pagination.page - 1}&limit=${pagination.limit}>; rel="prev"`);
-    }
-    
-    if (pagination.hasNext) {
-      links.push(`</api/v1/resource?page=${pagination.page + 1}&limit=${pagination.limit}>; rel="next"`);
-    }
-    
-    links.push(`</api/v1/resource?page=${pagination.pages}&limit=${pagination.limit}>; rel="last"`);
-    links.push(`</api/v1/resource?page=1&limit=${pagination.limit}>; rel="first"`);
-    
-    res.set('Link', links.join(', '));
-    res.set('X-Total-Count', pagination.total.toString());
-    res.set('X-Total-Pages', pagination.pages.toString());
-    res.set('X-Current-Page', pagination.page.toString());
-    res.set('X-Per-Page', pagination.limit.toString());
+  static unauthorized(res, message = 'Unauthorized') {
+    return this.error(res, {
+      message,
+      code: constants.ERROR_CODES.AUTH_ERROR,
+      statusCode: constants.HTTP_STATUS.UNAUTHORIZED
+    });
   }
 
-  validateAndRespond(validationResult, res, successCallback) {
-    if (!validationResult.isValid) {
-      return this.unprocessableEntity(res, 'Validation failed', validationResult.errors);
-    }
-    
-    return successCallback();
+  static forbidden(res, message = 'Forbidden') {
+    return this.error(res, {
+      message,
+      code: constants.ERROR_CODES.AUTH_ERROR,
+      statusCode: constants.HTTP_STATUS.FORBIDDEN
+    });
   }
 
-  logRequest(req, res, responseData) {
-    const logData = {
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      userId: req.user ? req.user._id : 'anonymous',
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-      responseTime: Date.now() - req._startTime,
+  static notFound(res, message = 'Resource not found') {
+    return this.error(res, {
+      message,
+      code: constants.ERROR_CODES.NOT_FOUND_ERROR,
+      statusCode: constants.HTTP_STATUS.NOT_FOUND
+    });
+  }
+
+  static conflict(res, message = 'Resource already exists') {
+    return this.error(res, {
+      message,
+      code: constants.ERROR_CODES.DUPLICATE_ERROR,
+      statusCode: constants.HTTP_STATUS.CONFLICT
+    });
+  }
+
+  static tooManyRequests(res, message = 'Too many requests', retryAfter = null) {
+    const response = this.error(res, {
+      message,
+      code: constants.ERROR_CODES.RATE_LIMIT_ERROR,
+      statusCode: constants.HTTP_STATUS.TOO_MANY_REQUESTS
+    });
+
+    if (retryAfter) {
+      res.set('Retry-After', retryAfter);
+    }
+
+    return response;
+  }
+
+  static paginated(res, data, pagination, message = 'Success') {
+    return res.status(constants.HTTP_STATUS.OK).json({
+      success: true,
+      message,
+      data,
+      pagination,
       timestamp: new Date().toISOString()
-    };
-
-    if (res.statusCode >= 400) {
-      logger.warn('API Request Error', logData);
-    } else {
-      logger.info('API Request Success', logData);
-    }
+    });
   }
 
-  handleAsyncResponse(promise, res, successMessage = 'Success') {
-    return promise
-      .then(data => {
-        if (data && data.pagination) {
-          return this.paginated(res, data.data || data, data.pagination, successMessage);
-        }
-        return this.success(res, data, successMessage);
-      })
-      .catch(error => {
-        logger.error('Async response error:', error);
-        
-        if (error.statusCode) {
-          return this.error(res, error.code || 'UNKNOWN_ERROR', error.message, error.statusCode, error.details);
-        }
-        
-        return this.serverError(res, 'Internal server error');
-      });
+  static download(res, fileData, fileName, contentType = 'application/octet-stream') {
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.send(fileData);
+  }
+
+  static redirect(res, url, statusCode = constants.HTTP_STATUS.FOUND) {
+    return res.redirect(statusCode, url);
+  }
+
+  static withMeta(res, data, meta = {}, message = 'Success') {
+    return res.status(constants.HTTP_STATUS.OK).json({
+      success: true,
+      message,
+      data,
+      meta,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 
-const apiResponse = new ApiResponse();
-module.exports = apiResponse;
+module.exports = ApiResponse;

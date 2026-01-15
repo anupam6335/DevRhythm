@@ -1,284 +1,145 @@
-const redisClient = require('../config/redis');
 const config = require('../config/environment');
 const constants = require('../config/constants');
+const redis = require('../config/redis');
 const logger = require('../utils/logger');
-const crypto = require('crypto');
 
 class CacheMiddleware {
   constructor() {
-    this.cache = new Map();
-    this.enabled = config.redis.enabled || false;
-    this.memoryCache = new Map();
+    this.cache = this.cache.bind(this);
+    this.invalidateCache = this.invalidateCache.bind(this);
+    this.invalidatePattern = this.invalidatePattern.bind(this);
+    this.getCacheKey = this.getCacheKey.bind(this);
   }
 
-  generateCacheKey(req, prefix = '') {
-    const { originalUrl, method, query, body, user } = req;
-    const keyData = {
-      url: originalUrl,
-      method: method,
-      query: query,
-      body: method === 'GET' ? {} : body,
-      userId: user ? user._id : 'anonymous'
-    };
-
-    const hash = crypto
-      .createHash('md5')
-      .update(JSON.stringify(keyData))
-      .digest('hex');
-
-    return `${prefix}:${hash}`;
-  }
-
-  cacheResponse(ttl = constants.CACHE.TTL.MEDIUM, prefix = 'api') {
+  cache(ttl = constants.CACHE.TTL.MEDIUM, prefix = 'cache') {
     return async (req, res, next) => {
-      if (req.method !== 'GET') {
+      if (!config.QUERY_CACHE_ENABLED || req.method !== 'GET') {
         return next();
       }
 
-      if (req.headers['cache-control'] === 'no-cache') {
-        return next();
-      }
-
-      const cacheKey = this.generateCacheKey(req, prefix);
+      const cacheKey = this.getCacheKey(req, prefix);
       
       try {
-        let cachedData = null;
-        
-        if (this.enabled) {
-          cachedData = await redisClient.get(cacheKey);
-        } else {
-          const cachedItem = this.memoryCache.get(cacheKey);
-          if (cachedItem && cachedItem.expiry > Date.now()) {
-            cachedData = cachedItem.data;
-          } else {
-            this.memoryCache.delete(cacheKey);
-          }
-        }
-
+        const cachedData = await redis.get(cacheKey);
         if (cachedData) {
-          res.set('X-Cache', 'HIT');
+          logger.debug(`Cache hit: ${cacheKey}`);
           return res.json(cachedData);
         }
-
-        const originalSend = res.json;
-        res.json = function(data) {
-          res.locals.cacheData = data;
-          return originalSend.call(this, data);
+        
+        logger.debug(`Cache miss: ${cacheKey}`);
+        
+        const originalSend = res.send;
+        const originalJson = res.json;
+        
+        res.json = (body) => {
+          res.locals.cacheBody = body;
+          return originalJson.call(res, body);
         };
-
+        
+        res.send = (body) => {
+          if (typeof body === 'object') {
+            res.locals.cacheBody = body;
+          }
+          return originalSend.call(res, body);
+        };
+        
         res.on('finish', async () => {
-          if (res.statusCode === 200 && res.locals.cacheData) {
+          if (res.statusCode === constants.HTTP_STATUS.OK && res.locals.cacheBody) {
             try {
-              if (this.enabled) {
-                await redisClient.set(cacheKey, res.locals.cacheData, ttl);
-              } else {
-                this.memoryCache.set(cacheKey, {
-                  data: res.locals.cacheData,
-                  expiry: Date.now() + (ttl * 1000)
-                });
-                
-                this.cleanupMemoryCache();
-              }
+              await redis.set(cacheKey, res.locals.cacheBody, ttl);
+              logger.debug(`Cache set: ${cacheKey} for ${ttl}s`);
             } catch (error) {
-              logger.error(`Cache set error: ${error.message}`);
+              logger.error('Error setting cache:', error);
             }
           }
         });
-
+        
         next();
       } catch (error) {
-        logger.error(`Cache middleware error: ${error.message}`);
+        logger.error('Cache middleware error:', error);
         next();
       }
     };
   }
 
-  cleanupMemoryCache() {
-    const now = Date.now();
-    for (const [key, value] of this.memoryCache.entries()) {
-      if (value.expiry <= now) {
-        this.memoryCache.delete(key);
-      }
-    }
-  }
-
-  invalidateCache(patterns = []) {
-    return async (req, res, next) => {
-      const originalEnd = res.end;
-      
-      res.end = async function(...args) {
-        try {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            const cacheMiddleware = require('./cache.middleware');
-            await cacheMiddleware.invalidatePatterns(patterns, req.user);
-          }
-        } catch (error) {
-          logger.error(`Cache invalidation error: ${error.message}`);
-        }
-        
-        return originalEnd.apply(this, args);
-      };
-
-      next();
-    };
-  }
-
-  async invalidatePatterns(patterns, user = null) {
-    if (!this.enabled) {
-      this.invalidateMemoryCache(patterns, user);
-      return;
-    }
-
+  async invalidateCache(key) {
+    if (!config.QUERY_CACHE_ENABLED) return;
+    
     try {
-      for (const pattern of patterns) {
-        let finalPattern = pattern;
-        
-        if (user && pattern.includes(':userId')) {
-          finalPattern = pattern.replace(':userId', user._id);
-        }
-        
-        const keys = await redisClient.keys(finalPattern);
-        
-        if (keys.length > 0) {
-          await redisClient.del(...keys);
-          logger.debug(`Invalidated cache keys for pattern: ${finalPattern}`);
-        }
+      await redis.del(key);
+      logger.debug(`Cache invalidated: ${key}`);
+    } catch (error) {
+      logger.error('Error invalidating cache:', error);
+    }
+  }
+
+  async invalidatePattern(pattern) {
+    if (!config.QUERY_CACHE_ENABLED) return;
+    
+    try {
+      const keys = await redis.keys(pattern);
+      if (keys.length > 0) {
+        const pipeline = redis.client.pipeline();
+        keys.forEach(key => pipeline.del(key));
+        await pipeline.exec();
+        logger.debug(`Pattern cache invalidated: ${pattern}, keys: ${keys.length}`);
       }
     } catch (error) {
-      logger.error(`Cache pattern invalidation error: ${error.message}`);
+      logger.error('Error invalidating pattern cache:', error);
     }
   }
 
-  invalidateMemoryCache(patterns, user = null) {
-    for (const pattern of patterns) {
-      let finalPattern = pattern;
-      
-      if (user && pattern.includes(':userId')) {
-        finalPattern = pattern.replace(':userId', user._id);
-      }
-      
-      const regex = new RegExp(finalPattern.replace('*', '.*'));
-      
-      for (const key of this.memoryCache.keys()) {
-        if (regex.test(key)) {
-          this.memoryCache.delete(key);
-        }
-      }
-    }
+  getCacheKey(req, prefix = 'cache') {
+    const { originalUrl, method, query, body, user } = req;
+    const userId = user?.id || 'anonymous';
+    
+    const keyParts = [
+      prefix,
+      method,
+      originalUrl,
+      userId,
+      JSON.stringify(query),
+      JSON.stringify(body)
+    ];
+    
+    return keyParts.join('|').replace(/[^a-zA-Z0-9|:.-]/g, '_');
   }
 
-  cacheUserData(ttl = constants.CACHE.TTL.LONG) {
-    return async (req, res, next) => {
-      if (!req.user) {
-        return next();
-      }
-
-      const cacheKey = `user:${req.user._id}:data`;
+  cacheResponse(ttl = constants.CACHE.TTL.MEDIUM) {
+    return async (key, data) => {
+      if (!config.QUERY_CACHE_ENABLED) return data;
       
       try {
-        let userData = null;
-        
-        if (this.enabled) {
-          userData = await redisClient.get(cacheKey);
-        } else {
-          const cachedItem = this.memoryCache.get(cacheKey);
-          if (cachedItem && cachedItem.expiry > Date.now()) {
-            userData = cachedItem.data;
-          }
-        }
-
-        if (userData) {
-          req.user.cachedData = userData;
-        }
-
-        const originalEnd = res.end;
-        
-        res.end = async function(...args) {
-          if (res.statusCode === 200 && req.user.cachedData) {
-            try {
-              if (cacheMiddleware.enabled) {
-                await redisClient.set(cacheKey, req.user.cachedData, ttl);
-              } else {
-                cacheMiddleware.memoryCache.set(cacheKey, {
-                  data: req.user.cachedData,
-                  expiry: Date.now() + (ttl * 1000)
-                });
-              }
-            } catch (error) {
-              logger.error(`User cache set error: ${error.message}`);
-            }
-          }
-          
-          return originalEnd.apply(this, args);
-        };
-
-        next();
+        await redis.set(key, data, ttl);
+        return data;
       } catch (error) {
-        logger.error(`User cache middleware error: ${error.message}`);
-        next();
+        logger.error('Error caching response:', error);
+        return data;
       }
     };
   }
 
-  async clearUserCache(userId) {
+  async getCachedResponse(key) {
+    if (!config.QUERY_CACHE_ENABLED) return null;
+    
     try {
-      if (this.enabled) {
-        const pattern = `user:${userId}:*`;
-        const keys = await redisClient.keys(pattern);
-        
-        if (keys.length > 0) {
-          await redisClient.del(...keys);
-        }
-      } else {
-        const pattern = new RegExp(`^user:${userId}:`);
-        
-        for (const key of this.memoryCache.keys()) {
-          if (pattern.test(key)) {
-            this.memoryCache.delete(key);
-          }
-        }
-      }
+      return await redis.get(key);
     } catch (error) {
-      logger.error(`Clear user cache error: ${error.message}`);
+      logger.error('Error getting cached response:', error);
+      return null;
     }
   }
 
-  healthCheck() {
+  middleware() {
     return {
-      enabled: this.enabled,
-      memoryCacheSize: this.memoryCache.size,
-      redisConnected: this.enabled ? redisClient.isConnected : false
-    };
-  }
-
-  async flushAll() {
-    try {
-      if (this.enabled) {
-        await redisClient.flush('*');
-      }
-      
-      this.memoryCache.clear();
-      logger.info('Cache flushed successfully');
-      return true;
-    } catch (error) {
-      logger.error(`Cache flush error: ${error.message}`);
-      return false;
-    }
-  }
-
-  getStats() {
-    return {
-      enabled: this.enabled,
-      memoryCache: {
-        size: this.memoryCache.size,
-        keys: Array.from(this.memoryCache.keys())
-      },
-      redis: this.enabled ? {
-        connected: redisClient.isConnected
-      } : null
+      cache: this.cache,
+      invalidateCache: this.invalidateCache,
+      invalidatePattern: this.invalidatePattern,
+      getCacheKey: this.getCacheKey,
+      cacheResponse: this.cacheResponse,
+      getCachedResponse: this.getCachedResponse
     };
   }
 }
 
-const cacheMiddleware = new CacheMiddleware();
-module.exports = cacheMiddleware;
+module.exports = new CacheMiddleware();
