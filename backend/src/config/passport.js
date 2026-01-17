@@ -35,6 +35,11 @@ class PassportConfig {
   }
 
   setupGoogleStrategy() {
+    if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
+      console.warn('Google OAuth credentials not configured');
+      return;
+    }
+
     const googleOptions = {
       clientID: config.GOOGLE_CLIENT_ID,
       clientSecret: config.GOOGLE_CLIENT_SECRET,
@@ -86,6 +91,11 @@ class PassportConfig {
   }
 
   setupGitHubStrategy() {
+    if (!config.GITHUB_CLIENT_ID || !config.GITHUB_CLIENT_SECRET) {
+      console.warn('GitHub OAuth credentials not configured');
+      return;
+    }
+
     const githubOptions = {
       clientID: config.GITHUB_CLIENT_ID,
       clientSecret: config.GITHUB_CLIENT_SECRET,

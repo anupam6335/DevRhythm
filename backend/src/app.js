@@ -1,4 +1,3 @@
-// Load environment variables FIRST
 require('dotenv').config();
 
 const express = require('express');
@@ -21,12 +20,9 @@ class App {
 
   initializeMiddlewares() {
     // CORS
-    this.app.use(cors({
-      origin: config.environment.CORS_ORIGIN,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-    }));
+    const corsMiddleware = require('./middleware/cors.middleware');
+    this.app.use(corsMiddleware.middleware());
+    this.app.use(corsMiddleware.preflight());
 
     // Compression
     if (config.environment.COMPRESSION_ENABLED) {
@@ -83,6 +79,11 @@ class App {
   }
 
   initializeRoutes() {
+    // Favicon route to prevent 404 errors
+    this.app.get('/favicon.ico', (req, res) => {
+      res.status(204).end();
+    });
+
     // Health check
     this.app.get('/health', (req, res) => {
       const health = {
