@@ -11,6 +11,11 @@ class SanitizeMiddleware {
   }
 
   sanitizeInput(req, res, next) {
+    // Skip sanitization for OAuth callback URLs to prevent encoding issues
+    if (req.originalUrl.includes('/auth/google/callback') || req.originalUrl.includes('/auth/github/callback')) {
+      return next();
+    }
+
     const sanitizeObject = (obj) => {
       if (!obj || typeof obj !== 'object') return obj;
       
@@ -22,7 +27,11 @@ class SanitizeMiddleware {
           
           if (typeof value === 'string') {
             value = validator.trim(value);
-            value = validator.escape(value);
+            
+            // Don't escape URLs or codes for OAuth
+            if (!key.includes('code') && !key.includes('url') && !key.includes('redirect')) {
+              value = validator.escape(value);
+            }
             
             if (validator.isEmail(value)) {
               value = validator.normalizeEmail(value, { gmail_remove_dots: false });

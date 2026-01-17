@@ -22,7 +22,22 @@ const middleware = {
   initialize(app) {
     // Security middleware
     if (config.HELMET_ENABLED) {
-      app.use(helmet());
+      app.use(helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "http://localhost:5000", "http://127.0.0.1:5000", "https://accounts.google.com", "https://github.com"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'self'", "https://accounts.google.com"]
+          }
+        },
+        hsts: false
+      }));
     }
     
     if (config.HIDE_POWERED_BY) {
@@ -35,30 +50,6 @@ const middleware = {
     
     if (config.XSS_PROTECTION_ENABLED) {
       app.use(helmet.xssFilter());
-    }
-    
-    if (config.HSTS_ENABLED && config.isProduction) {
-      app.use(helmet.hsts({
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-      }));
-    }
-    
-    if (config.CONTENT_SECURITY_POLICY_ENABLED) {
-      app.use(helmet.contentSecurityPolicy({
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
-          imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'", config.FRONTEND_URL, config.BACKEND_URL],
-          fontSrc: ["'self'", "https:", "data:"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"]
-        }
-      }));
     }
 
     app.use(mongoSanitize());

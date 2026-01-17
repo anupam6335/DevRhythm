@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 // Import route modules (these will be implemented later)
-// const authRoutes = require('./auth.routes');
-// const userRoutes = require('./user.routes');
+const authRoutes = require('./auth.routes');
+const userRoutes = require('./user.routes');
 // const questionRoutes = require('./question.routes');
 // const dayRoutes = require('./day.routes');
 // const analyticsRoutes = require('./analytics.routes');
@@ -33,8 +33,8 @@ router.get('/status', (req, res) => {
 });
 
 // Mount route modules (uncomment when implemented)
-// router.use('/auth', authRoutes);
-// router.use('/users', userRoutes);
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
 // router.use('/questions', questionRoutes);
 // router.use('/days', dayRoutes);
 // router.use('/analytics', analyticsRoutes);
