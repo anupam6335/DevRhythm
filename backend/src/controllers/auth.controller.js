@@ -10,6 +10,7 @@ const initiateOAuth = (provider) => (req, res, next) => {
   const state = crypto.randomBytes(32).toString('hex');
   const redirectUri = req.query.redirect_uri || config.frontendUrl;
   
+  // Store the frontend redirect URI with state
   redisClient.setEx(`devrhythm:auth:${provider}:state:${state}`, 300, redirectUri);
   
   const authParams = {
@@ -18,28 +19,46 @@ const initiateOAuth = (provider) => (req, res, next) => {
     scope: provider === 'google' ? ['profile', 'email'] : ['user:email', 'read:user']
   };
   
-  if (req.query.redirect_uri) {
-    authParams.callbackURL += `?redirect_uri=${encodeURIComponent(req.query.redirect_uri)}`;
-  }
-  
+  // Use passport authenticate
   passport.authenticate(provider, authParams)(req, res, next);
 };
 
 const handleOAuthCallback = (provider) => (req, res, next) => {
   passport.authenticate(provider, { session: false }, async (err, user, info) => {
     try {
-      if (err || !user) throw new Error(info?.message || 'Authentication failed');
+      if (err || !user) {
+        console.error('OAuth error:', err || info);
+        // Redirect to frontend with error
+        const redirectUri = await redisClient.get(`devrhythm:auth:${provider}:state:${req.query.state}`);
+        const frontendUrl = redirectUri || config.frontendUrl;
+        return res.redirect(`${frontendUrl}?error=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+      }
       
       const token = generateToken(user._id);
       const refreshToken = generateRefreshToken(user._id);
       
+      // Get the stored frontend redirect URI
       const redirectUri = await redisClient.get(`devrhythm:auth:${provider}:state:${req.query.state}`);
       await redisClient.del(`devrhythm:auth:${provider}:state:${req.query.state}`);
       
-      const frontendUrl = redirectUri || config.frontendUrl;
-      res.redirect(`${frontendUrl}/auth/callback?token=${token}&refreshToken=${refreshToken}&userId=${user._id}`);
+      // Ensure we have a valid redirect URI
+      let frontendUrl;
+      if (redirectUri && (redirectUri.startsWith('http://') || redirectUri.startsWith('https://'))) {
+        frontendUrl = redirectUri;
+      } else {
+        frontendUrl = config.frontendUrl;
+      }
+      
+      // IMPORTANT: Redirect to frontend with tokens in URL
+      const redirectUrl = new URL(frontendUrl);
+      redirectUrl.searchParams.set('token', token);
+      redirectUrl.searchParams.set('refreshToken', refreshToken);
+      redirectUrl.searchParams.set('userId', user._id.toString());
+      
+      res.redirect(redirectUrl.toString());
     } catch (error) {
-      res.redirect(`${config.frontendUrl}/auth/error?message=${encodeURIComponent(error.message)}`);
+      console.error('OAuth callback error:', error);
+      res.redirect(`${config.frontendUrl}?error=${encodeURIComponent('Internal server error')}`);
     }
   })(req, res, next);
 };
