@@ -35,4 +35,13 @@ const invalidateUserCache = async (userId) => {
   await invalidateCache(`leaderboards:user:${userId}:`);
 };
 
-module.exports = { cache, invalidateCache, invalidateUserCache };
+const invalidateQuestionCache = async (questionId, platform, platformQuestionId) => {
+  await invalidateCache('questions:*');
+  await invalidateCache(`question:${questionId}`);
+  await invalidateCache(`question:platform:${platform}:${platformQuestionId}`);
+  await invalidateCache('questions:patterns');
+  await invalidateCache('questions:tags');
+  await invalidateCache('questions:statistics');
+};
+
+module.exports = { cache, invalidateCache, invalidateUserCache, invalidateQuestionCache };
