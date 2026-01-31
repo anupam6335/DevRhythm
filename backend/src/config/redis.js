@@ -25,7 +25,15 @@ const createRedisClient = () => {
     client.on('end', () => console.log('Redis client disconnected'));
 
     client.connect()
-      .then(() => console.log('Redis connected successfully'))
+      .then(() => {
+        console.log('Redis connected successfully');
+        
+        if (process.env.NODE_ENV === 'development') {
+          client.flushAll()
+            .then(() => console.log('Redis cache cleared for development'))
+            .catch(err => console.error('Error clearing Redis cache:', err));
+        }
+      })
       .catch(err => console.error('Redis connection error:', err));
 
     process.on('SIGINT', async () => {

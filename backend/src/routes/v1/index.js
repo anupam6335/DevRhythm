@@ -3,6 +3,7 @@ const router = express.Router();
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const questionRoutes = require('./question.routes');
+const progressRoutes = require('./progress.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -28,5 +29,6 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/questions', questionRoutes);
+router.use('/progress', progressRoutes);
 
 module.exports = router;
