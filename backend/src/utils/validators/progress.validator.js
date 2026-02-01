@@ -63,6 +63,53 @@ const getRecentProgress = Joi.object({
   limit: Joi.number().integer().min(1).max(50).default(10)
 });
 
+const getRevisions = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  status: Joi.string().valid('active', 'completed', 'overdue'),
+  questionId: Joi.string().hex().length(24),
+  sortBy: Joi.string().valid('schedule', 'baseDate', 'currentRevisionIndex', 'updatedAt').default('schedule'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('asc')
+});
+
+const getToday = Joi.object({
+  date: Joi.date().default(() => new Date().toISOString().split('T')[0])
+});
+
+const getUpcoming = Joi.object({
+  startDate: Joi.date().default(() => new Date().toISOString().split('T')[0]),
+  endDate: Joi.date().default(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split('T')[0];
+  })
+});
+
+const getQuestionRevision = Joi.object({
+  questionId: Joi.string().hex().length(24).required()
+});
+
+const createRevision = Joi.object({
+  baseDate: Joi.date().default(() => new Date()),
+  schedule: Joi.array().items(Joi.date()).length(5).optional()
+});
+
+const completeRevision = Joi.object({
+  completedAt: Joi.date().default(() => new Date()),
+  status: Joi.string().valid('completed', 'skipped').default('completed'),
+  confidenceLevel: Joi.number().integer().min(1).max(5)
+});
+
+const rescheduleRevision = Joi.object({
+  newDate: Joi.date().required(),
+  revisionIndex: Joi.number().integer().min(0).max(4).required()
+});
+
+const getOverdue = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(50).default(20)
+});
+
 module.exports = {
   getProgress,
   getQuestionProgress,
@@ -74,5 +121,13 @@ module.exports = {
   recordAttempt,
   recordRevision,
   deleteProgress,
-  getRecentProgress
+  getRecentProgress,
+  getRevisions,
+  getToday,
+  getUpcoming,
+  getQuestionRevision,
+  createRevision,
+  completeRevision,
+  rescheduleRevision,
+  getOverdue
 };

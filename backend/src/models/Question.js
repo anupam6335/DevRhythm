@@ -14,7 +14,7 @@ const QuestionSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ["LeetCode", "Codeforces", "HackerRank", "AtCoder", "CodeChef", "Other"],
+    enum: ["LeetCode", "Codeforces", "HackerRank", "AtCoder", "CodeChef", "GeeksForGeeks", "Other"],
     required: true,
   },
   platformQuestionId: {
