@@ -179,15 +179,8 @@ const getQuestionRevision = async (req, res, next) => {
 
 const createRevision = async (req, res, next) => {
   try {
-    console.log('DEBUG: createRevision called with:', {
-      userId: req.user._id,
-      questionId: req.params.questionId,
-      body: req.body
-    });
 
     let { baseDate = new Date(), schedule } = req.body;
-    
-    console.log('DEBUG: Parsed baseDate:', baseDate, 'Type:', typeof baseDate);
     
     let baseDateObj;
     if (baseDate instanceof Date) {
@@ -201,27 +194,22 @@ const createRevision = async (req, res, next) => {
       throw new AppError('Invalid baseDate format. Use ISO string like: 2026-02-01T08:00:00.000Z', 400);
     }
     
-    console.log('DEBUG: Checking for existing revision...');
     const existing = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
     });
     
     if (existing) {
-      console.log('DEBUG: Revision already exists');
       throw new AppError('Revision schedule already exists for this question', 409);
     }
     
-    console.log('DEBUG: Checking question exists...');
     const question = await Question.findById(req.params.questionId);
     if (!question) {
-      console.log('DEBUG: Question not found:', req.params.questionId);
       throw new AppError('Question not found', 404);
     }
     
     let revisionSchedule;
     if (schedule && Array.isArray(schedule) && schedule.length > 0) {
-      console.log('DEBUG: Using provided schedule');
       revisionSchedule = schedule.map(dateStr => {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) {
@@ -234,11 +222,9 @@ const createRevision = async (req, res, next) => {
         throw new AppError('Schedule must contain exactly 5 dates', 400);
       }
     } else {
-      console.log('DEBUG: Calculating spaced repetition schedule');
       revisionSchedule = calculateSpacedRepetitionSchedule(baseDateObj);
     }
     
-    console.log('DEBUG: Creating revision schedule...');
     const revision = await RevisionSchedule.create({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -247,10 +233,8 @@ const createRevision = async (req, res, next) => {
       status: 'active',
     });
     
-    console.log('DEBUG: Invalidating cache...');
     await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     
-    console.log('DEBUG: Sending response...');
     res.status(201).json(formatResponse('Revision schedule created successfully', {
       revision,
     }));
