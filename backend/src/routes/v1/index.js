@@ -5,6 +5,7 @@ const userRoutes = require('./user.routes');
 const questionRoutes = require('./question.routes');
 const progressRoutes = require('./progress.routes');
 const revisionRoutes = require('./revision.routes');
+const goalRoutes = require('./goal.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -32,5 +33,6 @@ router.use('/users', userRoutes);
 router.use('/questions', questionRoutes);
 router.use('/progress', progressRoutes);
 router.use('/revisions', revisionRoutes);
+router.use('/goals', goalRoutes);
 
 module.exports = router;

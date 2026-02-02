@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "bf48533e-78a5-4e9f-b85f-3d81b715b371",
+    "_postman_id": "0855c2b5-3370-4d44-8179-7cbc406ac0d6",
     "name": "DevRhythm API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "51940446",
-    "_collection_link": "https://go.postman.co/collection/51940446-bf48533e-78a5-4e9f-b85f-3d81b715b371?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/51940446-0855c2b5-3370-4d44-8179-7cbc406ac0d6?source=collection_link"
   },
   "item": [
     {
@@ -525,7 +525,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Best Time to Buy and Sell Stock\",\n  \"problemLink\": \"https://leetcode.com/problems/best-time-to-buy-and-sell-stock/\",\n  \"platform\": \"LeetCode\",\n  \"platformQuestionId\": \"best-time-to-buy-and-sell-stock\",\n  \"difficulty\": \"Easy\",\n  \"tags\": [\"Array\", \"Dynamic Programming\"],\n  \"pattern\": \"Kadane Variant\",\n  \"solutionLinks\": [\"https://example.com/best-time-to-buy-and-sell-stock-solution\"],\n  \"similarQuestions\": [],\n  \"contentRef\": \"\"\n}"
+              "raw": "{\n  \"title\": \"Revision Question II\",\n  \"problemLink\": \"https://leetcode.com/problems/rev-question-II/\",\n  \"platform\": \"LeetCode\",\n  \"platformQuestionId\": \"rev-question-II\",\n  \"difficulty\": \"Easy\",\n  \"tags\": [\"Array\", \"Dynamic Programming\"],\n  \"pattern\": \"Kadane Variant\",\n  \"solutionLinks\": [\"https://example.com/rev-question-solution-II\"],\n  \"similarQuestions\": [],\n  \"contentRef\": \"\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/{{api_version}}/questions",
@@ -1447,7 +1447,7 @@
         }
       ]
     },
-     {
+    {
       "name": "Revision Management",
       "item": [
         {
@@ -1566,6 +1566,40 @@
         },
         {
           "name": "Create New Revision Schedule (When Question Solved/Mastered)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate dates for revision schedule\r",
+                  "const now = new Date();\r",
+                  "\r",
+                  "// Base date is current time\r",
+                  "const baseDate = now.toISOString();\r",
+                  "\r",
+                  "// Generate schedule dates (Day 0, 3, 7, 14, 30)\r",
+                  "const schedule = [];\r",
+                  "[0, 3, 7, 14, 30].forEach(days => {\r",
+                  "    const date = new Date(now);\r",
+                  "    date.setDate(date.getDate() + days);\r",
+                  "    date.setUTCHours(0, 0, 0, 0); // Set to start of day\r",
+                  "    schedule.push(date.toISOString());\r",
+                  "});\r",
+                  "\r",
+                  "// Set the request body\r",
+                  "pm.request.body.raw = JSON.stringify({\r",
+                  "    baseDate: baseDate,\r",
+                  "    schedule: schedule\r",
+                  "}, null, 2);\r",
+                  "\r",
+                  "console.log('Generated request body:', pm.request.body.raw);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -1654,7 +1688,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"completedAt\": \"{{$timestamp}}\",\n  \"status\": \"completed\",\n  \"confidenceLevel\": 4\n}"
+              "raw": "{\n  \"completedAt\": \"2026-02-01T00:00:00.000Z\",\n  \"status\": \"completed\",\n  \"confidenceLevel\": 4\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/{{api_version}}/revisions/question/{{question_id}}/complete",
@@ -1691,7 +1725,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"newDate\": \"{{$timestamp day=+2}}T00:00:00.000Z\",\n  \"revisionIndex\": 1\n}"
+              "raw": "{\n  \"newDate\": \"2026-02-10T00:00:00.000Z\",\n  \"revisionIndex\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/{{api_version}}/revisions/{{revision_id}}/reschedule",
@@ -1881,6 +1915,461 @@
               "        pm.environment.set('revision_id', jsonData.data.revision._id);",
               "        console.log(`Stored revision_id: ${jsonData.data.revision._id}`);",
               "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Goal Management",
+      "item": [
+        {
+          "name": "Get All Goals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current Goals (Today's Daily & Weekly)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/current",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "current"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Goal by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "{{goal_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create New Goal",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate dates for a daily goal (today)\r",
+                  "const today = new Date();\r",
+                  "const startDate = new Date(today);\r",
+                  "startDate.setHours(0, 0, 0, 0);\r",
+                  "const endDate = new Date(today);\r",
+                  "endDate.setHours(23, 59, 59, 999);\r",
+                  "\r",
+                  "pm.environment.set('daily_start_date', startDate.toISOString());\r",
+                  "pm.environment.set('daily_end_date', endDate.toISOString());\r",
+                  "\r",
+                  "// Generate dates for a weekly goal (this week)\r",
+                  "const weekStart = new Date(today);\r",
+                  "const dayOfWeek = weekStart.getDay();\r",
+                  "const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;\r",
+                  "weekStart.setDate(weekStart.getDate() + diffToMonday);\r",
+                  "weekStart.setHours(0, 0, 0, 0);\r",
+                  "\r",
+                  "const weekEnd = new Date(weekStart);\r",
+                  "weekEnd.setDate(weekEnd.getDate() + 6);\r",
+                  "weekEnd.setHours(23, 59, 59, 999);\r",
+                  "\r",
+                  "pm.environment.set('weekly_start_date', weekStart.toISOString());\r",
+                  "pm.environment.set('weekly_end_date', weekEnd.toISOString());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goalType\": \"daily\",\n  \"targetCount\": 3,\n  \"startDate\": \"{{daily_start_date}}\",\n  \"endDate\": \"{{daily_end_date}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Goal",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetCount\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "{{goal_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Increment Goal Progress",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}/increment",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "goals",
+                "{{goal_id}}",
+                "increment"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Decrement Goal Progress",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}/decrement",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "goals",
+                "{{goal_id}}",
+                "decrement"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Goal Progress to Specific Value",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedCount\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}/progress",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "{{goal_id}}", "progress"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auto-create Daily/Weekly Goals",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Set today's date for auto-create\r",
+                  "const today = new Date();\r",
+                  "const dateStr = today.toISOString().split('T')[0];\r",
+                  "pm.environment.set('today_date', dateStr);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/auto-create?date={{today_date}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "auto-create"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{today_date}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Goal",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "{{goal_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Goal Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Goal History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/goals/history?period=month",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "goals", "history"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "month"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "console.log(`[Goal] ${pm.request.method} ${pm.request.url}`);",
+              "",
+              "// Set default headers",
+              "if (pm.request.method === 'POST' || pm.request.method === 'PUT') {",
+              "    pm.request.headers.upsert({",
+              "        key: 'Content-Type',",
+              "        value: 'application/json'",
+              "    });",
+              "}",
+              "",
+              "// Add Authorization header if token exists",
+              "const token = pm.environment.get('token');",
+              "if (token && token !== '') {",
+              "    pm.request.headers.upsert({",
+              "        key: 'Authorization',",
+              "        value: `Bearer ${token}`",
+              "    });",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Common tests for all goal endpoints",
+              "pm.test(\"Response time is less than 1000ms\", function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+              "});",
+              "",
+              "pm.test(\"Status code is success\", function () {",
+              "    const successCodes = [200, 201, 204];",
+              "    pm.expect(pm.response.code).to.be.oneOf(successCodes);",
+              "});",
+              "",
+              "// Store goal_id from creation response for chaining",
+              "if (pm.response.code === 201 && pm.request.url.toString().includes('/goals') && pm.request.method === 'POST') {",
+              "    const jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.goal && jsonData.data.goal._id) {",
+              "        pm.environment.set('goal_id', jsonData.data.goal._id);",
+              "        console.log(`Stored goal_id: ${jsonData.data.goal._id}`);",
+              "    }",
+              "}",
+              "",
+              "// For GET requests with data",
+              "if (pm.response.code === 200 && pm.request.method === 'GET') {",
+              "    const jsonData = pm.response.json();",
+              "    pm.test(\"Response has success structure\", function () {",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.statusCode).to.equal(200);",
+              "        pm.expect(jsonData).to.have.property('message');",
+              "        pm.expect(jsonData).to.have.property('data');",
+              "    });",
+              "    ",
+              "    // If getting current goals, check the structure",
+              "    if (pm.request.url.toString().includes('/goals/current')) {",
+              "        pm.test(\"Current goals response has correct structure\", function () {",
+              "            pm.expect(jsonData.data).to.have.property('currentGoals');",
+              "            pm.expect(jsonData.data).to.have.property('stats');",
+              "        });",
+              "    }",
+              "    ",
+              "    // If getting goal by ID, store the goal ID",
+              "    if (pm.request.url.toString().match(/\\/goals\\/[a-f0-9]{24}$/)) {",
+              "        if (jsonData.data && jsonData.data.goal) {",
+              "            pm.environment.set('goal_id', jsonData.data.goal._id);",
+              "        }",
+              "    }",
+              "}",
+              "",
+              "// For POST/PUT requests",
+              "if (pm.response.code === 200 || pm.response.code === 201) {",
+              "    pm.test(\"Response has success structure\", function () {",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.be.true;",
+              "        pm.expect(jsonData.statusCode).to.equal(pm.response.code);",
+              "        pm.expect(jsonData).to.have.property('message');",
+              "        pm.expect(jsonData).to.have.property('data');",
+              "    });",
               "}"
             ]
           }
