@@ -10,7 +10,7 @@ module.exports = {
   backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
   
   database: {
-    uri: process.env.MONGODB_URI,
+    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/devrhythm',
     maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE) || 500,
     minPoolSize: parseInt(process.env.MONGODB_MIN_POOL_SIZE) || 2,
     connectionTimeoutMs: parseInt(process.env.MONGODB_CONNECTION_TIMEOUT_MS) || 50000
