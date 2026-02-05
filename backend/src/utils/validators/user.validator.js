@@ -35,10 +35,22 @@ const checkUsername = Joi.object({
   username: Joi.string().alphanum().min(3).max(30).required()
 });
 
+const followUser = Joi.object({
+  userId: Joi.string().hex().length(24).required()
+});
+
+const getPublicFollowing = Joi.object({
+  userId: Joi.string().hex().length(24).required(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(50).default(20)
+});
+
 module.exports = {
   updateUser,
   getUserByUsername,
   searchUsers,
   topUsers,
-  checkUsername
+  checkUsername,
+  followUser,
+  getPublicFollowing
 };
