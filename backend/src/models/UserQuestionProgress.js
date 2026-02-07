@@ -61,4 +61,41 @@ UserQuestionProgressSchema.index({ questionId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, confidenceLevel: -1 });
 UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
 
+UserQuestionProgressSchema.post('save', async function(doc) {
+  try {
+    const patternMasteryService = require('../services/patternMastery.service');
+    setTimeout(async () => {
+      await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
+    }, 100);
+  } catch (error) {
+    console.error('Pattern mastery post-save sync error:', error);
+  }
+});
+
+UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
+  try {
+    if (doc) {
+      const patternMasteryService = require('../services/patternMastery.service');
+      setTimeout(async () => {
+        await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
+      }, 100);
+    }
+  } catch (error) {
+    console.error('Pattern mastery post-update sync error:', error);
+  }
+});
+
+UserQuestionProgressSchema.post('findOneAndDelete', async function(doc) {
+  try {
+    if (doc) {
+      const patternMasteryService = require('../services/patternMastery.service');
+      setTimeout(async () => {
+        await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
+      }, 100);
+    }
+  } catch (error) {
+    console.error('Pattern mastery post-delete sync error:', error);
+  }
+});
+
 module.exports = mongoose.model("UserQuestionProgress", UserQuestionProgressSchema);
