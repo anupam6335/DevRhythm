@@ -1,10 +1,22 @@
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
 const progressService = require('../services/progress.service');
+const patternMasteryService = require('../services/patternMastery.service');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
 const { invalidateProgressCache } = require('../middleware/cache');
+
+const updateProgressPatternMastery = async (userId, questionId) => {
+  try {
+    const progress = await UserQuestionProgress.findOne({ userId, questionId });
+    if (progress) {
+      await patternMasteryService.updatePatternMasteryFromProgress(userId, progress._id);
+    }
+  } catch (error) {
+    console.error('Pattern mastery sync failed:', error);
+  }
+};
 
 const getProgress = async (req, res, next) => {
   try {
@@ -109,6 +121,7 @@ const createOrUpdateProgress = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     const statusCode = progress.createdAt === progress.updatedAt ? 201 : 200;
     res.status(statusCode).json(formatResponse(
@@ -135,6 +148,7 @@ const updateStatus = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Status updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -158,6 +172,7 @@ const updateCode = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Code updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -180,6 +195,7 @@ const updateNotes = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Notes updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -202,6 +218,7 @@ const updateConfidence = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Confidence level updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -237,6 +254,7 @@ const recordAttempt = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
   } catch (error) { next(error); }
@@ -267,6 +285,7 @@ const recordRevision = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Revision recorded successfully', { progress }));
   } catch (error) { next(error); }
@@ -282,6 +301,7 @@ const deleteProgress = async (req, res, next) => {
     if (!progress) throw new AppError('Progress record not found', 404);
 
     await invalidateProgressCache(req.user._id);
+    await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id);
 
     res.json(formatResponse('Progress deleted successfully'));
   } catch (error) { next(error); }

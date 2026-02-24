@@ -10,6 +10,7 @@ const shareRoutes = require('./share.routes');
 const studyGroupRoutes = require('./studyGroup.routes');
 const followRoutes = require('./follow.routes');
 const heatmapRoutes = require('./heatmap.routes');
+const patternMasteryRoutes = require('./patternMastery.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -42,5 +43,6 @@ router.use('/shares', shareRoutes);
 router.use('/study-groups', studyGroupRoutes);
 router.use('/follow', followRoutes);
 router.use('/heatmap', heatmapRoutes);
+router.use('/pattern-mastery', patternMasteryRoutes);
 
 module.exports = router;
