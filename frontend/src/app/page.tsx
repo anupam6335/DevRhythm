@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FaCrown } from "react-icons/fa";
-import { Avatar, AvatarGroup } from "@/shared/components/Avatar";
+import CodeBlock from "@/shared/components/CodeBlock";
+import Button from "@/shared/components/Button";
+import { FaAirbnb, FaLightbulb } from "react-icons/fa";
 
 export default function HomePage() {
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -23,208 +24,221 @@ export default function HomePage() {
     localStorage.setItem("theme", newTheme);
   };
 
+  // Admin mode toggle for testing
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // State for editable code blocks
+  const [pythonCode, setPythonCode] = useState(`def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+# Generate first 10 Fibonacci numbers
+for i in range(10):
+    print(f"F({i}) = {fibonacci(i)}")`);
+
+  const [jsCode, setJsCode] = useState(`function quickSort(arr) {
+  if (arr.length <= 1) return arr;
+  const pivot = arr[0];
+  const left = arr.slice(1).filter(x => x < pivot);
+  const right = arr.slice(1).filter(x => x >= pivot);
+  return [...quickSort(left), pivot, ...quickSort(right)];
+}
+
+const unsorted = [3, 6, 8, 10, 1, 2, 1];
+console.log(quickSort(unsorted));`);
+
+  const [htmlCode, setHtmlCode] = useState(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Sample</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+    <p>This is a test.</p>
+</body>
+</html>`);
+
+  // Status message for user feedback
+  const [lastAction, setLastAction] = useState<string>("");
+
+  // Handlers for admin actions
+  const handleSavePython = (newCode: string) => {
+    setPythonCode(newCode);
+    setLastAction(`✅ Python code saved at ${new Date().toLocaleTimeString()}`);
+    console.log("Python code saved:", newCode);
+  };
+
+  const handleSaveJs = (newCode: string) => {
+    setJsCode(newCode);
+    setLastAction(`✅ JavaScript code saved at ${new Date().toLocaleTimeString()}`);
+    console.log("JavaScript code saved:", newCode);
+  };
+
+  const handleDeletePython = () => {
+    if (confirm("Are you sure you want to delete the Python code?")) {
+      setPythonCode("# Code deleted");
+      setLastAction(`🗑️ Python code deleted at ${new Date().toLocaleTimeString()}`);
+    }
+  };
+
+  const handleDeleteJs = () => {
+    if (confirm("Are you sure you want to delete the JavaScript code?")) {
+      setJsCode("// Code deleted");
+      setLastAction(`🗑️ JavaScript code deleted at ${new Date().toLocaleTimeString()}`);
+    }
+  };
+
+  const handleDeleteHtml = () => {
+    if (confirm("Are you sure you want to delete the HTML code?")) {
+      setHtmlCode("<!-- Code deleted -->");
+      setLastAction(`🗑️ HTML code deleted at ${new Date().toLocaleTimeString()}`);
+    }
+  };
+
   return (
     <main style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-      {/* Theme toggle */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "2rem" }}>
-        <button
-          onClick={toggleTheme}
-          style={{
-            padding: "0.5rem 1rem",
-            borderRadius: "2rem",
-            border: "1px solid var(--border-input)",
-            background: "var(--bg-surface)",
-            color: "var(--text-primary)",
-            cursor: "pointer",
-          }}
-        >
-          {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
-        </button>
+      {/* Custom styles for demonstrating className prop */}
+      <style>{`
+        .custom-code-block {
+          border: 2px solid red;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+        }
+        .custom-code-block .header {
+          background-color: rgba(255, 0, 0, 0.1);
+        }
+      `}</style>
+
+      <div style={{ marginBottom: "2rem", display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+        <h1>CodeBlock Demo</h1>
+        <Button variant="outline" size="sm" onClick={toggleTheme}>
+           <FaLightbulb/> {theme === "light" ? "Dark" : "Light"} Mode
+        </Button>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={isAdmin}
+            onChange={(e) => setIsAdmin(e.target.checked)}
+          />
+          <span>Admin Mode (show edit/delete)</span>
+        </label>
       </div>
 
-      <h1>Avatar Component Test Page</h1>
-      <p style={{ color: "var(--text-secondary)", marginBottom: "2rem" }}>
-        Demonstrating all variants, sizes, statuses, badges, and groups.
-      </p>
-
-      {/* Basic Avatars */}
-      <section style={{ marginBottom: "3rem" }}>
-        <h2>1. Basic Avatar</h2>
-        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="https://images.unsplash.com/photo-1619024387526-4eab9b3bb305" alt="User with image" />
-            <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>With image</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="John Doe" />
-            <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Initials (JD)</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar />
-            <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Default icon</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="A" />
-            <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Single initial</div>
-          </div>
+      {/* Status bar */}
+      {lastAction && (
+        <div
+          style={{
+            marginBottom: "1.5rem",
+            padding: "0.75rem 1rem",
+            backgroundColor: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            color: "var(--text-secondary)",
+            fontFamily: "var(--font-body)",
+          }}
+        >
+          <strong>Last action:</strong> {lastAction}
         </div>
+      )}
+
+      <section style={{ marginBottom: "3rem" }}>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Read‑only with custom className</h2>
+        <CodeBlock
+          code={`console.log("This block has a custom red border!");`}
+          language="javascript"
+          className="custom-code-block"
+        />
+        <p style={{ marginTop: "0.5rem", color: "var(--text-secondary)" }}>
+          The <code>className</code> prop adds a red border and rounded corners.
+        </p>
       </section>
 
-      {/* Sizes */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>2. Sizes</h2>
-        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-          {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
-            <div key={size} style={{ textAlign: "center" }}>
-              <Avatar name="Avatar" size={size}  src="https://images.unsplash.com/photo-1602077422495-c8733eb58c34" />
-              <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{size}</div>
-            </div>
-          ))}
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Read‑only (non‑admin)</h2>
+        <CodeBlock
+          code={`console.log("Hello, world!");`}
+          language="javascript"
+          showLineNumbers={false}
+        />
       </section>
 
-      {/* Status */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>3. Status Indicator</h2>
-        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="https://images.unsplash.com/photo-1602077422495-c8733eb58c34" status="online" />
-            <div style={{ color: "var(--text-muted)" }}>Online</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="MK" status="offline" />
-            <div style={{ color: "var(--text-muted)" }}>Offline</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Busy User" status="busy" size="lg" />
-            <div style={{ color: "var(--text-muted)" }}>Busy (large)</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Small Online" size="xs" status="online" />
-            <div style={{ color: "var(--text-muted)" }}>XS + online</div>
-          </div>
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Read‑only with line numbers</h2>
+        <CodeBlock
+          code={`# Python with line numbers
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("DevRhythm"))`}
+          language="python"
+          showLineNumbers={true}
+        />
       </section>
 
-      {/* Badge */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>4. Badge</h2>
-        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="https://images.unsplash.com/photo-1602077422495-c8733eb58c34" badge={3} />
-            <div style={{ color: "var(--text-muted)" }}>Count badge</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="JD" badge={<FaCrown />} />
-            <div style={{ color: "var(--text-muted)" }}>Icon badge (crown)</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Large Count" size="lg" badge={42} />
-            <div style={{ color: "var(--text-muted)" }}>Large + count</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="With Status" status="online" badge={5} />
-            <div style={{ color: "var(--text-muted)" }}>Status + badge</div>
-          </div>
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Editable Python (admin only)</h2>
+        <CodeBlock
+          code={pythonCode}
+          language="python"
+          isAdmin={isAdmin}
+          onSave={handleSavePython}
+          onDelete={handleDeletePython}
+        />
       </section>
 
-      {/* Ring */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>5. Ring (Selected / Focus)</h2>
-        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="https://i.pravatar.cc/96?img=9" ring />
-            <div style={{ color: "var(--text-muted)" }}>With ring</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Selected" ring size="lg" />
-            <div style={{ color: "var(--text-muted)" }}>Large + ring</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Ring+Status" status="busy" ring />
-            <div style={{ color: "var(--text-muted)" }}>Ring + busy</div>
-          </div>
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Editable JavaScript (admin only)</h2>
+        <CodeBlock
+          code={jsCode}
+          language="javascript"
+          isAdmin={isAdmin}
+          onSave={handleSaveJs}
+          onDelete={handleDeleteJs}
+        />
       </section>
 
-      {/* Avatar Group */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>6. Avatar Group (Stacked)</h2>
-        <div style={{ display: "flex", gap: "3rem", flexWrap: "wrap", alignItems: "center" }}>
-          <div>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Default stacking</h3>
-            <AvatarGroup>
-              <Avatar src="https://images.unsplash.com/photo-1602077422495-c8733eb58c34" size="sm" />
-              <Avatar src="https://plus.unsplash.com/premium_photo-1668443422726-a833ad5c0b77" size="sm" />
-              <Avatar name="JD" size="sm" />
-              <Avatar name="+3" size="sm" />
-            </AvatarGroup>
-          </div>
-          <div>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>With max=3</h3>
-            <AvatarGroup max={3}>
-              <Avatar src="https://images.unsplash.com/photo-1602077422495-c8733eb58c34" size="sm" />
-              <Avatar src="https://plus.unsplash.com/premium_photo-1668443422726-a833ad5c0b77" size="sm" />
-              <Avatar src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04" name="JD" size="sm" />
-              <Avatar name="AL" size="sm" />
-              <Avatar name="MK" size="sm" />
-            </AvatarGroup>
-          </div>
-          <div>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Mixed sizes (use same size)</h3>
-            <AvatarGroup>
-              <Avatar src="https://i.pravatar.cc/96?img=4" size="md" />
-              <Avatar src="https://i.pravatar.cc/96?img=5" size="md" />
-              <Avatar name="MD" size="md" />
-            </AvatarGroup>
-          </div>
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Editable HTML (admin only, with line numbers)</h2>
+        <CodeBlock
+          code={htmlCode}
+          language="html"
+          showLineNumbers={true}
+          isAdmin={isAdmin}
+          onSave={(newCode) => {
+            setHtmlCode(newCode);
+            setLastAction(`✅ HTML code saved at ${new Date().toLocaleTimeString()}`);
+          }}
+          onDelete={handleDeleteHtml}
+        />
       </section>
 
-      {/* Edge Cases */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>7. Edge Cases</h2>
-        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="broken-image.jpg" name="Fallback Name" />
-            <div style={{ color: "var(--text-muted)" }}>Broken image → initials</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar src="broken-image.jpg" />
-            <div style={{ color: "var(--text-muted)" }}>Broken image → default icon</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="Very Long Name That Should Be Truncated to Initials" />
-            <div style={{ color: "var(--text-muted)" }}>Long name → VL</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Avatar name="" /> {/* empty name */}
-            <div style={{ color: "var(--text-muted)" }}>Empty name → default icon</div>
-          </div>
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>CSS example (read‑only)</h2>
+        <CodeBlock
+          code={`.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--bg-app);
+}`}
+          language="css"
+        />
       </section>
 
-      {/* Combined Example */}
       <section style={{ marginBottom: "3rem" }}>
-        <h2>8. All Features Combined</h2>
-        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
-          <Avatar
-            src="https://images.unsplash.com/photo-1611983512040-b8e48141cf4a"
-            name="Jane Doe"
-            size="xl"
-            status="online"
-            badge={99}
-            ring
-          />
-          <Avatar
-            name="Admin"
-            size="lg"
-            status="busy"
-            badge={<FaCrown />}
-            ring
-          />
-        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>JSON example (read‑only, line numbers)</h2>
+        <CodeBlock
+          code={`{
+  "name": "DevRhythm",
+  "version": "1.0.0",
+  "features": ["progress", "revisions", "goals"],
+  "users": 1234
+}`}
+          language="json"
+          showLineNumbers={true}
+        />
       </section>
     </main>
   );
