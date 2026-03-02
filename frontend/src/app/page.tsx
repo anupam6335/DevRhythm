@@ -3,37 +3,17 @@
 import { useState } from "react";
 import CodeBlock from "@/shared/components/CodeBlock";
 import Button from "@/shared/components/Button";
+import ThemeToggle from "@/shared/components/ThemeToggle";
 import {
-  FaLightbulb,
   FaInfo,
   FaCheck,
   FaExclamationCircle,
   FaExclamationTriangle,
 } from "react-icons/fa";
-import { toast } from "@/shared/components/Toast"; // ✅ import toast
+import { toast } from "@/shared/components/Toast";
 
 export default function HomePage() {
-  const [theme, setTheme] = useState<"light" | "dark">(
-    typeof window !== "undefined" &&
-      document.documentElement.classList.contains("dark")
-      ? "dark"
-      : "light"
-  );
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    localStorage.setItem("theme", newTheme);
-    toast.info(`Switched to ${newTheme} mode`); // ✅ toast on theme switch
-  };
-
   const [isAdmin, setIsAdmin] = useState(false);
-
   const [pythonCode, setPythonCode] = useState(`def fibonacci(n):
     if n <= 1:
         return n
@@ -70,22 +50,20 @@ console.log(quickSort(unsorted));`);
   const handleSavePython = (newCode: string) => {
     setPythonCode(newCode);
     setLastAction(`✅ Python code saved at ${new Date().toLocaleTimeString()}`);
-    toast.success("Python code saved successfully!"); // ✅ toast
-    console.log("Python code saved:", newCode);
+    toast.success("Python code saved successfully!");
   };
 
   const handleSaveJs = (newCode: string) => {
     setJsCode(newCode);
     setLastAction(`✅ JavaScript code saved at ${new Date().toLocaleTimeString()}`);
-    toast.success("JavaScript code saved successfully!"); // ✅ toast
-    console.log("JavaScript code saved:", newCode);
+    toast.success("JavaScript code saved successfully!");
   };
 
   const handleDeletePython = () => {
     if (confirm("Are you sure you want to delete the Python code?")) {
       setPythonCode("# Code deleted");
       setLastAction(`🗑️ Python code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("Python code deleted"); // ✅ toast
+      toast.warning("Python code deleted");
     }
   };
 
@@ -93,7 +71,7 @@ console.log(quickSort(unsorted));`);
     if (confirm("Are you sure you want to delete the JavaScript code?")) {
       setJsCode("// Code deleted");
       setLastAction(`🗑️ JavaScript code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("JavaScript code deleted"); // ✅ toast
+      toast.warning("JavaScript code deleted");
     }
   };
 
@@ -101,7 +79,7 @@ console.log(quickSort(unsorted));`);
     if (confirm("Are you sure you want to delete the HTML code?")) {
       setHtmlCode("<!-- Code deleted -->");
       setLastAction(`🗑️ HTML code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("HTML code deleted"); // ✅ toast
+      toast.warning("HTML code deleted");
     }
   };
 
@@ -116,13 +94,106 @@ console.log(quickSort(unsorted));`);
         .custom-code-block .header {
           background-color: rgba(255, 0, 0, 0.1);
         }
+        .theme-demo-card {
+          background-color: var(--bg-surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 1.5rem;
+          margin-bottom: 1.5rem;
+        }
+        .theme-demo-row {
+          display: flex;
+          gap: 2rem;
+          flex-wrap: wrap;
+          align-items: center;
+          margin-top: 1rem;
+        }
       `}</style>
 
-      <div style={{ marginBottom: "2rem", display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
-        <h1>CodeBlock Demo</h1>
-        <Button variant="outline" size="sm" onClick={toggleTheme}>
-           <FaLightbulb/> {theme === "light" ? "Dark" : "Light"} Mode
-        </Button>
+      <header className="theme-demo-card">
+        <h1 style={{ margin: 0, fontFamily: "var(--font-heading)" }}>
+          ThemeToggle – Multiple Test Cases
+        </h1>
+        <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
+          Each toggle below tests different combinations of <code>variant</code> and <code>className</code>.
+        </p>
+      </header>
+
+
+      
+
+      {/* ===== Demo 1: Default (icon only) ===== */}
+      <div className="theme-demo-card">
+        <h3>1. Default (variant="icon")</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle />
+          <span style={{ color: "var(--text-secondary)" }}>– Standard icon‑only toggle</span>
+        </div>
+      </div>
+
+      {/* ===== Demo 2: Text only ===== */}
+      <div className="theme-demo-card">
+        <h3>2. Text only (variant="text")</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle variant="text" />
+          <span style={{ color: "var(--text-secondary)" }}>– Displays "Light mode" / "Dark mode" text</span>
+        </div>
+      </div>
+
+      {/* ===== Demo 3: Both icon and text ===== */}
+      <div className="theme-demo-card">
+        <h3>3. Both (variant="both")</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle variant="both" />
+          <span style={{ color: "var(--text-secondary)" }}>– Icon + text together</span>
+        </div>
+      </div>
+
+      {/* ===== Demo 4: Custom label (overrides auto text) ===== */}
+      <div className="theme-demo-card">
+        <h3>4. Custom label (variant="both" with label prop)</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle variant="both" label="Toggle theme" />
+          <span style={{ color: "var(--text-secondary)" }}>– Uses "Toggle theme" as aria-label and title</span>
+        </div>
+      </div>
+
+      {/* ===== Demo 5: Custom className (enlarged) ===== */}
+      <div className="theme-demo-card">
+        <h3>5. Custom className (enlarged, variant="icon")</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle className="large-toggle" />
+          <style>{`
+            .large-toggle {
+              transform: scale(2);
+              margin: 0.5rem;
+            }
+          `}</style>
+          <span style={{ color: "var(--text-secondary)" }}>– 1.5x scale via className</span>
+        </div>
+      </div>
+
+      {/* ===== Demo 6: Different background color ===== */}
+      <div className="theme-demo-card">
+        <h3>6. Custom styling (variant="both")</h3>
+        <div className="theme-demo-row">
+          <ThemeToggle variant="both" className="custom-toggle" />
+          <style>{`
+            .custom-toggle {
+              background-color: var(--accent-moss);
+              border-color: var(--primary-action);
+              color: var(--primary-text-on-action);
+            }
+            .custom-toggle:hover {
+              background-color: var(--accent-sand);
+            }
+          `}</style>
+          <span style={{ color: "var(--text-secondary)" }}>– Uses accent moss background</span>
+        </div>
+      </div>
+
+      {/* ===== Admin mode toggle ===== */}
+      <div style={{ marginBottom: "2rem", display: "flex", gap: "1rem", alignItems: "center" }}>
         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
           <input
             type="checkbox"
@@ -133,7 +204,7 @@ console.log(quickSort(unsorted));`);
         </label>
       </div>
 
-      {/* Toast Demo Section */}
+      {/* ===== Toast Demo ===== */}
       <section style={{ marginBottom: "3rem", padding: "1.5rem", backgroundColor: "var(--bg-surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
         <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Toast Notifications</h2>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
@@ -171,6 +242,7 @@ console.log(quickSort(unsorted));`);
         </div>
       )}
 
+      {/* ===== CodeBlock examples (unchanged) ===== */}
       <section style={{ marginBottom: "3rem" }}>
         <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Read‑only with custom className</h2>
         <CodeBlock
@@ -270,6 +342,16 @@ print(greet("DevRhythm"))`}
           showLineNumbers={true}
         />
       </section>
+
+      <footer style={{
+        marginTop: "3rem",
+        padding: "1rem",
+        textAlign: "center",
+        borderTop: "1px solid var(--divider)",
+        color: "var(--text-muted)",
+      }}>
+        <p>DevRhythm – Theme toggle demo with multiple test cases</p>
+      </footer>
     </main>
   );
 }

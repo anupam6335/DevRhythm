@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
+import { ThemeProvider } from 'next-themes';
 import { ToastProvider } from '@/shared/components/Toast';
 import './globals.css';
 
@@ -33,15 +34,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${commissioner.variable} ${outfit.variable} ${patrickHand.variable}`}>
+    <html
+      lang="en"
+      className={`${commissioner.variable} ${outfit.variable} ${patrickHand.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <link rel="icon" href="/images/devrhythm-logo.png" type="image/png" />
-        {/* Cascadia Mono is a system font, fallback to monospace */}
       </head>
       <body>
-        <ToastProvider position="top-center"> 
-          {children}
-        </ToastProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ToastProvider position="top-center">
+            {children}
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
