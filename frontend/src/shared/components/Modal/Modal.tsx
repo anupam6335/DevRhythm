@@ -45,18 +45,17 @@ export interface ModalProps {
   preventScroll?: boolean;
 }
 
-// Map to track open modals and manage scroll lock reliably
-const openModals = new Set<symbol>();
+// Global modal stack counter
+let modalStack = 0;
 
 /**
  * Modal component – accessible, animated, and fully customizable dialog.
  *
  * Features:
  * - Full accessibility (ARIA, focus trap, keyboard navigation)
- * - Smooth enter/exit animations with prefers-reduced-motion support
+ * - Smooth enter/exit animations (CSS transitions, respects prefers-reduced-motion)
  * - Body scroll lock with width compensation to prevent layout shift
- * - Proper focus trap that cycles focus within the modal
- * - Reliable stacked modal handling using a Set
+ * - Stacked modal support (multiple modals open at once)
  * - Customizable close icon, size variants, and close prevention
  * - Focus management with initial/return focus
  */
@@ -88,76 +87,40 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     const previouslyFocusedElement = useRef<HTMLElement | null>(null);
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
     const titleId = useId();
-    const modalId = useRef(Symbol('modal')).current; // Unique identifier for this modal instance
 
-    // Scroll lock with width compensation – uses a Set to handle multiple modals reliably
+    // Scroll lock with width compensation
     useEffect(() => {
       if (!preventScroll) return;
 
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
       if (isOpen) {
-        // If this is the first modal opening, lock scroll and store padding
-        if (openModals.size === 0) {
+        modalStack++;
+        if (modalStack === 1) {
           previouslyFocusedElement.current = document.activeElement as HTMLElement;
           document.body.style.overflow = 'hidden';
           document.body.style.paddingRight = `${scrollbarWidth}px`;
         }
-        openModals.add(modalId);
       } else {
-        openModals.delete(modalId);
-        if (openModals.size === 0) {
+        modalStack = Math.max(0, modalStack - 1);
+        if (modalStack === 0) {
           document.body.style.overflow = '';
           document.body.style.paddingRight = '';
         }
       }
 
       return () => {
-        // Cleanup if component unmounts while open
-        if (openModals.has(modalId)) {
-          openModals.delete(modalId);
-          if (openModals.size === 0) {
+        if (preventScroll && modalStack > 0) {
+          modalStack--;
+          if (modalStack === 0) {
             document.body.style.overflow = '';
             document.body.style.paddingRight = '';
           }
         }
       };
-    }, [isOpen, preventScroll, modalId]);
+    }, [isOpen, preventScroll]);
 
-    // Focus trap – intercept Tab key and cycle focus within modal
-    useEffect(() => {
-      if (!isOpen || !modalRef.current) return;
-
-      const handleTabKey = (e: KeyboardEvent) => {
-        if (e.key !== 'Tab') return;
-
-        const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-
-        if (!focusableElements || focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === firstElement) {
-            e.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement.focus();
-          }
-        }
-      };
-
-      document.addEventListener('keydown', handleTabKey);
-      return () => document.removeEventListener('keydown', handleTabKey);
-    }, [isOpen]);
-
-    // Set initial focus when modal opens
+    // Focus trap and initial focus
     useEffect(() => {
       if (!isOpen || !modalRef.current) return;
 
@@ -175,9 +138,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         }
       };
 
-      // Slight delay to ensure DOM is ready (especially with animations)
-      const timeoutId = setTimeout(setFocus, 50);
-      return () => clearTimeout(timeoutId);
+      setFocus();
     }, [isOpen, initialFocusRef]);
 
     // Handle Escape key with potential prevention
@@ -186,11 +147,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         if (closeOnEsc && event.key === 'Escape' && isOpen) {
           const shouldClose = onCloseAttempt?.({ source: 'escape' }) !== false;
           if (shouldClose) {
-            triggerClose();
+            onClose();
           }
         }
       },
-      [closeOnEsc, isOpen, onCloseAttempt]
+      [closeOnEsc, isOpen, onClose, onCloseAttempt]
     );
 
     useEffect(() => {
@@ -199,7 +160,10 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       } else {
         document.removeEventListener('keydown', handleKeyDown);
       }
-      return () => document.removeEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
     }, [isOpen, handleKeyDown]);
 
     // Handle backdrop click
@@ -208,45 +172,31 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
         if (closeOnBackdropClick && event.target === overlayRef.current) {
           const shouldClose = onCloseAttempt?.({ source: 'backdrop' }) !== false;
           if (shouldClose) {
-            triggerClose();
+            onClose();
           }
         }
       },
-      [closeOnBackdropClick, onCloseAttempt]
+      [closeOnBackdropClick, onClose, onCloseAttempt]
     );
 
     // Handle close button click
     const handleCloseButtonClick = useCallback(() => {
       const shouldClose = onCloseAttempt?.({ source: 'closeButton' }) !== false;
       if (shouldClose) {
-        triggerClose();
-      }
-    }, [onCloseAttempt]);
-
-    // Unified close trigger that starts exit animation
-    const triggerClose = useCallback(() => {
-      setIsAnimatingOut(true);
-    }, []);
-
-    // Handle animation end: when exit animation finishes, actually call onClose
-    const handleAnimationEnd = useCallback(() => {
-      if (isAnimatingOut) {
-        setIsAnimatingOut(false);
         onClose();
       }
-    }, [isAnimatingOut, onClose]);
+    }, [onClose, onCloseAttempt]);
 
-    // Return focus when closed (after animation)
+    // Return focus when closed
     useEffect(() => {
-      if (!isOpen && !isAnimatingOut) {
+      if (!isOpen) {
         const target = returnFocusRef?.current || previouslyFocusedElement.current;
         if (target && document.contains(target) && typeof target.focus === 'function') {
           target.focus();
         }
       }
-    }, [isOpen, isAnimatingOut, returnFocusRef]);
+    }, [isOpen, returnFocusRef]);
 
-    // If modal is closed and not animating out, render nothing
     if (!isOpen && !isAnimatingOut) return null;
 
     return createPortal(
@@ -256,6 +206,11 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           [styles.overlayClosing]: isAnimatingOut,
         })}
         onClick={handleOverlayClick}
+        onAnimationEnd={() => {
+          if (isAnimatingOut) {
+            setIsAnimatingOut(false);
+          }
+        }}
         role="presentation"
       >
         <div
@@ -267,7 +222,6 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           className={clsx(styles.modal, styles[size], className, {
             [styles.modalClosing]: isAnimatingOut,
           })}
-          onAnimationEnd={handleAnimationEnd}
           role="dialog"
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
@@ -294,7 +248,9 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           </div>
 
           {/* Body */}
-          <div className={styles.body}>{children}</div>
+          <div className={styles.body}>
+            {children}
+          </div>
 
           {/* Footer (optional) */}
           {footer && <div className={styles.footer}>{footer}</div>}
