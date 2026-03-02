@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
+import { ToastProvider } from '@/shared/components/Toast'; // ✅ added
 import './globals.css';
 
 const commissioner = Commissioner({
@@ -37,7 +38,11 @@ export default function RootLayout({
         <link rel="icon" href="/images/devrhythm-logo.png" type="image/png" />
         {/* Cascadia Mono is a system font, fallback to monospace */}
       </head>
-      <body>{children}</body>
+      <body>
+        <ToastProvider position="top-center"> 
+          {children}
+        </ToastProvider>
+      </body>
     </html>
   );
 }

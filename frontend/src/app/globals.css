@@ -42,6 +42,12 @@
   --heat-3: #30a14e;
   --heat-4: #216e39;
 
+  /* Toast */
+  --toast-success: #40c463;
+  --toast-error: #c44c4c;
+  --toast-warning: #d68b5c;
+  --toast-info: #6c7a6e;
+
   /* Transitions */
   --transition: all 0.2s ease;
   --radius: 6px;
@@ -102,6 +108,10 @@
   --focus-ring: 0 0 0 3px rgba(124, 139, 122, 0.5);
   --accent-moss-rgb: 124, 139, 122;
   --primary-action-rgb: 216, 215, 207;
+  --toast-success: #2e7d32;
+  --toast-error: #a33d3d;
+  --toast-warning: #b86b3f;
+  --toast-info: #7c8b7a;  
 }
 
 /* ===== Selection Styling ===== */
