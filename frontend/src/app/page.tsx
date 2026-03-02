@@ -3,7 +3,14 @@
 import { useState } from "react";
 import CodeBlock from "@/shared/components/CodeBlock";
 import Button from "@/shared/components/Button";
-import { FaAirbnb, FaLightbulb } from "react-icons/fa";
+import {
+  FaLightbulb,
+  FaInfo,
+  FaCheck,
+  FaExclamationCircle,
+  FaExclamationTriangle,
+} from "react-icons/fa";
+import { toast } from "@/shared/components/Toast"; // ✅ import toast
 
 export default function HomePage() {
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -22,12 +29,11 @@ export default function HomePage() {
       document.documentElement.classList.remove("dark");
     }
     localStorage.setItem("theme", newTheme);
+    toast.info(`Switched to ${newTheme} mode`); // ✅ toast on theme switch
   };
 
-  // Admin mode toggle for testing
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // State for editable code blocks
   const [pythonCode, setPythonCode] = useState(`def fibonacci(n):
     if n <= 1:
         return n
@@ -59,19 +65,19 @@ console.log(quickSort(unsorted));`);
 </body>
 </html>`);
 
-  // Status message for user feedback
   const [lastAction, setLastAction] = useState<string>("");
 
-  // Handlers for admin actions
   const handleSavePython = (newCode: string) => {
     setPythonCode(newCode);
     setLastAction(`✅ Python code saved at ${new Date().toLocaleTimeString()}`);
+    toast.success("Python code saved successfully!"); // ✅ toast
     console.log("Python code saved:", newCode);
   };
 
   const handleSaveJs = (newCode: string) => {
     setJsCode(newCode);
     setLastAction(`✅ JavaScript code saved at ${new Date().toLocaleTimeString()}`);
+    toast.success("JavaScript code saved successfully!"); // ✅ toast
     console.log("JavaScript code saved:", newCode);
   };
 
@@ -79,6 +85,7 @@ console.log(quickSort(unsorted));`);
     if (confirm("Are you sure you want to delete the Python code?")) {
       setPythonCode("# Code deleted");
       setLastAction(`🗑️ Python code deleted at ${new Date().toLocaleTimeString()}`);
+      toast.warning("Python code deleted"); // ✅ toast
     }
   };
 
@@ -86,6 +93,7 @@ console.log(quickSort(unsorted));`);
     if (confirm("Are you sure you want to delete the JavaScript code?")) {
       setJsCode("// Code deleted");
       setLastAction(`🗑️ JavaScript code deleted at ${new Date().toLocaleTimeString()}`);
+      toast.warning("JavaScript code deleted"); // ✅ toast
     }
   };
 
@@ -93,12 +101,12 @@ console.log(quickSort(unsorted));`);
     if (confirm("Are you sure you want to delete the HTML code?")) {
       setHtmlCode("<!-- Code deleted -->");
       setLastAction(`🗑️ HTML code deleted at ${new Date().toLocaleTimeString()}`);
+      toast.warning("HTML code deleted"); // ✅ toast
     }
   };
 
   return (
     <main style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-      {/* Custom styles for demonstrating className prop */}
       <style>{`
         .custom-code-block {
           border: 2px solid red;
@@ -125,7 +133,28 @@ console.log(quickSort(unsorted));`);
         </label>
       </div>
 
-      {/* Status bar */}
+      {/* Toast Demo Section */}
+      <section style={{ marginBottom: "3rem", padding: "1.5rem", backgroundColor: "var(--bg-surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+        <h2 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>Toast Notifications</h2>
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+          <Button variant="primary" onClick={() => toast.success("Operation completed successfully!")}>
+            <FaCheck /> Success
+          </Button>
+          <Button variant="secondary" onClick={() => toast.error("Something went wrong!")}>
+            <FaExclamationCircle /> Error
+          </Button>
+          <Button variant="outline" onClick={() => toast.info("Here's some information for you.")}>
+            <FaInfo /> Info
+          </Button>
+          <Button variant="outline" onClick={() => toast.warning("This action cannot be undone.")}>
+            <FaExclamationTriangle /> Warning
+          </Button>
+        </div>
+        <p style={{ marginTop: "1rem", color: "var(--text-secondary)" }}>
+          Click any button to see a themed toast notification at the top‑center of the screen.
+        </p>
+      </section>
+
       {lastAction && (
         <div
           style={{
@@ -208,6 +237,7 @@ print(greet("DevRhythm"))`}
           onSave={(newCode) => {
             setHtmlCode(newCode);
             setLastAction(`✅ HTML code saved at ${new Date().toLocaleTimeString()}`);
+            toast.success("HTML code saved successfully!");
           }}
           onDelete={handleDeleteHtml}
         />

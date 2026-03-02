@@ -1,0 +1,98 @@
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1rem 1rem 1.25rem; /* extra left padding for border */
+  border-radius: var(--radius, 6px);
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px var(--shadow);
+  max-width: 380px;
+  width: 100%;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Variant border colours */
+.success {
+  border-left-color: var(--toast-success);
+}
+.error {
+  border-left-color: var(--toast-error);
+}
+.info {
+  border-left-color: var(--toast-info);
+}
+.warning {
+  border-left-color: var(--toast-warning);
+}
+
+/* Icon styling – coloured by variant */
+.icon {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary); /* default, but we override per variant */
+}
+
+.success .icon {
+  color: var(--toast-success);
+}
+.error .icon {
+  color: var(--toast-error);
+}
+.info .icon {
+  color: var(--toast-info);
+}
+.warning .icon {
+  color: var(--toast-warning);
+}
+
+.message {
+  flex: 1;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+.closeButton {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  color: var(--text-primary);
+  background-color: var(--hover-surface);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--accent-moss);
+  outline-offset: 2px;
+}
+
+.closeButton svg {
+  width: 1rem;
+  height: 1rem;
+}
