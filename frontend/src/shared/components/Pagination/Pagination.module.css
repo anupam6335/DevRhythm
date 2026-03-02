@@ -1,0 +1,113 @@
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: var(--font-body);
+}
+
+.list {
+  display: flex;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.5rem;
+  line-height: 1;
+}
+
+.button:hover:not(:disabled):not(.active) {
+  background-color: var(--hover-surface);
+  border-color: var(--border-input);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.active {
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+  border-color: var(--primary-action);
+}
+
+.active:hover {
+  background-color: var(--primary-action-hover);
+  border-color: var(--primary-action-hover);
+}
+
+/* Sizes */
+.sm {
+  min-width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  padding: 0 0.25rem;
+}
+
+.md {
+  min-width: 36px;
+  height: 36px;
+  font-size: 0.95rem;
+  padding: 0 0.5rem;
+}
+
+.lg {
+  min-width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  padding: 0 0.75rem;
+}
+
+/* Ellipsis (non‑interactive) */
+.ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.ellipsis.sm {
+  min-width: 28px;
+  height: 28px;
+  font-size: 1rem;
+}
+
+.ellipsis.md {
+  min-width: 36px;
+  height: 36px;
+  font-size: 1.2rem;
+}
+
+.ellipsis.lg {
+  min-width: 44px;
+  height: 44px;
+  font-size: 1.4rem;
+}
