@@ -1,37 +1,56 @@
 'use client';
 
 import React from 'react';
-import { Toaster, toast as hotToast } from 'react-hot-toast';
-import Toast, { ToastType, ToastProps } from './Toast';
+import { Toaster, toast as hotToast, ToastOptions } from 'react-hot-toast';
+import Toast, { ToastProps } from './Toast';
 
-// Re-export hotToast for advanced usage (optional)
+// Re-export hotToast for advanced usage
 export { hotToast };
 
-// Custom toast functions that use our themed Toast component
+// Custom toast functions using our themed Toast component
 export const toast = {
-  success: (message: string, options?: Partial<Omit<ToastProps, 't' | 'message' | 'type'>>) =>
-    hotToast.custom(
-      (t) => <Toast t={t} message={message} type="success" {...options} />,
-      { duration: 4000, ...options }
-    ),
-  error: (message: string, options?: Partial<Omit<ToastProps, 't' | 'message' | 'type'>>) =>
-    hotToast.custom(
-      (t) => <Toast t={t} message={message} type="error" {...options} />,
-      { duration: 5000, ...options }
-    ),
-  info: (message: string, options?: Partial<Omit<ToastProps, 't' | 'message' | 'type'>>) =>
-    hotToast.custom(
-      (t) => <Toast t={t} message={message} type="info" {...options} />,
-      { duration: 4000, ...options }
-    ),
-  warning: (message: string, options?: Partial<Omit<ToastProps, 't' | 'message' | 'type'>>) =>
-    hotToast.custom(
-      (t) => <Toast t={t} message={message} type="warning" {...options} />,
-      { duration: 4000, ...options }
-    ),
-  // Generic method to show any toast (you can pass a custom type or component)
-  custom: (render: (t: any) => React.ReactNode, options?: any) =>
-    hotToast.custom(render, options),
+  success: (
+    message: string,
+    options?: Omit<Partial<ToastProps>, 't' | 'message' | 'type'> & ToastOptions
+  ) => {
+    const { icon, className, ...toastOptions } = options || {};
+    return hotToast.custom(
+      (t) => <Toast t={t} message={message} type="success" icon={icon} className={className} />,
+      { duration: 4000, ...toastOptions }
+    );
+  },
+  error: (
+    message: string,
+    options?: Omit<Partial<ToastProps>, 't' | 'message' | 'type'> & ToastOptions
+  ) => {
+    const { icon, className, ...toastOptions } = options || {};
+    return hotToast.custom(
+      (t) => <Toast t={t} message={message} type="error" icon={icon} className={className} />,
+      { duration: 5000, ...toastOptions }
+    );
+  },
+  info: (
+    message: string,
+    options?: Omit<Partial<ToastProps>, 't' | 'message' | 'type'> & ToastOptions
+  ) => {
+    const { icon, className, ...toastOptions } = options || {};
+    return hotToast.custom(
+      (t) => <Toast t={t} message={message} type="info" icon={icon} className={className} />,
+      { duration: 4000, ...toastOptions }
+    );
+  },
+  warning: (
+    message: string,
+    options?: Omit<Partial<ToastProps>, 't' | 'message' | 'type'> & ToastOptions
+  ) => {
+    const { icon, className, ...toastOptions } = options || {};
+    return hotToast.custom(
+      (t) => <Toast t={t} message={message} type="warning" icon={icon} className={className} />,
+      { duration: 4000, ...toastOptions }
+    );
+  },
+  // Generic method to show any toast (pass a custom render function)
+  custom: hotToast.custom,
   dismiss: hotToast.dismiss,
   remove: hotToast.remove,
 };

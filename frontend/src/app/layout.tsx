@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
-import { ToastProvider } from '@/shared/components/Toast'; // ✅ added
+import { ToastProvider } from '@/shared/components/Toast';
 import './globals.css';
 
 const commissioner = Commissioner({
