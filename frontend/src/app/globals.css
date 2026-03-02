@@ -17,7 +17,11 @@
   --accent-moss: #6C7A6E;
   --accent-sand: #D6CFC4;
   --shadow: rgba(0, 0, 0, 0.06);
-  --focus-ring: 0 0 0 3px rgba(108, 122, 110, 0.4); 
+  --focus-ring: 0 0 0 3px rgba(108, 122, 110, 0.4);
+
+  /* RGB versions for rgba() usage */
+  --accent-moss-rgb: 108, 122, 110;
+  --primary-action-rgb: 58, 58, 58;
 
   /* Code block & notes (light) */
   --code-bg: #E8E6E0;
@@ -66,6 +70,10 @@
     --notes-bg: #2C2D28;
     --notes-text: #E6E5DF;
     --focus-ring: 0 0 0 3px rgba(124, 139, 122, 0.5);
+
+    /* RGB versions for dark mode */
+    --accent-moss-rgb: 124, 139, 122;
+    --primary-action-rgb: 216, 215, 207;
   }
 }
 
@@ -92,6 +100,19 @@
   --notes-bg: #2C2D28;
   --notes-text: #E6E5DF;
   --focus-ring: 0 0 0 3px rgba(124, 139, 122, 0.5);
+  --accent-moss-rgb: 124, 139, 122;
+  --primary-action-rgb: 216, 215, 207;
+}
+
+/* ===== Selection Styling ===== */
+::selection {
+  background-color: rgba(var(--accent-moss-rgb), 0.3);
+  color: inherit; /* Keeps original text color for readability */
+}
+
+::-moz-selection {
+  background-color: rgba(var(--accent-moss-rgb), 0.3);
+  color: inherit;
 }
 
 /* ===== Base Styles ===== */
