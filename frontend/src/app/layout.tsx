@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { ToastProvider } from '@/shared/components/Toast';
-import './globals.css';
+import '@/shared/styles/globals.css'; 
 
 const commissioner = Commissioner({
   subsets: ['latin'],

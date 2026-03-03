@@ -1,0 +1,23 @@
+/* frontend/src/shared/styles/variables.css */
+
+@import './themes/light.css';
+@import './themes/dark.css';
+
+:root {
+  /* Font families (same for both themes) */
+  --font-body: var(--font-commissioner), system-ui, sans-serif;
+  --font-heading: var(--font-outfit), system-ui, sans-serif;
+  --font-code: 'Cascadia Mono', 'Consolas', monospace;
+  --font-notes: var(--font-patrick-hand), cursive;
+
+  /* Heatmap colors (same for both themes) */
+  --heat-0: #ebedf0;
+  --heat-1: #9be9a8;
+  --heat-2: #40c463;
+  --heat-3: #30a14e;
+  --heat-4: #216e39;
+
+  /* Transitions & spacing */
+  --transition: all 0.2s ease;
+  --radius: 6px;
+}

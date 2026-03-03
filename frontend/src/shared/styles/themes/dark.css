@@ -1,0 +1,36 @@
+.dark {
+  /* Dark mode (Zen Charcoal) */
+  --bg-app: #1E1F1C;
+  --bg-surface: #262723;
+  --bg-elevated: #2C2D28;
+  --text-primary: #E6E5DF;
+  --text-secondary: #B7B6AF;
+  --text-muted: #8C8B85;
+  --border: #3A3B36;
+  --border-input: #3A3B36;
+  --divider: #32332E;
+  --hover-surface: #2F302B;
+  --primary-action: #D8D7CF;
+  --primary-action-hover: #E6E5DF;
+  --primary-text-on-action: #1E1F1C;
+  --accent-moss: #7C8B7A;
+  --accent-sand: #5C5B55;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --focus-ring: 0 0 0 3px rgba(124, 139, 122, 0.5);
+
+  /* RGB versions for rgba() usage */
+  --accent-moss-rgb: 124, 139, 122;
+  --primary-action-rgb: 216, 215, 207;
+
+  /* Code block & notes */
+  --code-bg: #2A2B26;
+  --code-text: #E6E5DF;
+  --notes-bg: #2C2D28;
+  --notes-text: #E6E5DF;
+
+  /* Toast colors */
+  --toast-success: #2e7d32;
+  --toast-error: #a33d3d;
+  --toast-warning: #b86b3f;
+  --toast-info: #7c8b7a;
+}
