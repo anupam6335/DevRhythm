@@ -1,0 +1,36 @@
+:root {
+  /* Light mode (Zen Paper) */
+  --bg-app: #ECEBE6;
+  --bg-surface: #F6F5F1;
+  --bg-elevated: #FBFAF6;
+  --text-primary: #242424;
+  --text-secondary: #575757;
+  --text-muted: #6C6C6C;
+  --border: #DAD8D2;
+  --border-input: #C9C6C0;
+  --divider: #E6E4DE;
+  --hover-surface: #E8E6E0;
+  --primary-action: #3A3A3A;
+  --primary-action-hover: #2A2A2A;
+  --primary-text-on-action: #F6F5F1;
+  --accent-moss: #6C7A6E;
+  --accent-sand: #D6CFC4;
+  --shadow: rgba(0, 0, 0, 0.06);
+  --focus-ring: 0 0 0 3px rgba(108, 122, 110, 0.4);
+
+  /* RGB versions for rgba() usage */
+  --accent-moss-rgb: 108, 122, 110;
+  --primary-action-rgb: 58, 58, 58;
+
+  /* Code block & notes */
+  --code-bg: #E8E6E0;
+  --code-text: #242424;
+  --notes-bg: #F7F6F0;
+  --notes-text: #242424;
+
+  /* Toast colors */
+  --toast-success: #40c463;
+  --toast-error: #c44c4c;
+  --toast-warning: #d68b5c;
+  --toast-info: #6c7a6e;
+}

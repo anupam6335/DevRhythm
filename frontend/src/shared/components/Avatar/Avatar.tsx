@@ -3,6 +3,7 @@
 import React, { useState, forwardRef } from "react";
 import { FaUser } from "react-icons/fa";
 import clsx from "clsx";
+import { extractInitials } from "@/shared/lib";
 import styles from "./Avatar.module.css";
 
 export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
@@ -27,17 +28,6 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
 }
 
-/**
- * Generates initials from a full name.
- * Example: "John Doe" -> "JD", "Alice" -> "A"
- */
-const getInitials = (name: string): string => {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-};
-
 const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
   (
     {
@@ -61,7 +51,7 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
     // Fallback content: initials or default icon
     let fallbackContent: React.ReactNode;
     if (name) {
-      fallbackContent = <span className={styles.initials}>{getInitials(name)}</span>;
+      fallbackContent = <span className={styles.initials}>{extractInitials(name)}</span>;
     } else {
       fallbackContent = <FaUser className={styles.defaultIcon} />;
     }
