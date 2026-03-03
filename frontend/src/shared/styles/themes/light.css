@@ -33,4 +33,9 @@
   --toast-error: #c44c4c;
   --toast-warning: #d68b5c;
   --toast-info: #6c7a6e;
+
+  /* Error states */
+  --error: #c44c4c;
+  --error-soft: rgba(196, 76, 76, 0.1);
+  --error-focus-ring: 0 0 0 3px rgba(196, 76, 76, 0.3);
 }

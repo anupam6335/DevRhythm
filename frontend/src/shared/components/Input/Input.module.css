@@ -1,0 +1,163 @@
+/* ===== Wrapper for icon positioning ===== */
+.wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+}
+
+.wrapper.fullWidth {
+  width: 100%;
+}
+
+.wrapper.fullWidth .input {
+  width: 100%;
+}
+
+/* ===== Base Input ===== */
+.input {
+  width: 100%;
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius, 6px);
+  transition: var(--transition, all 0.2s ease);
+  outline: none;
+}
+
+/* Remove default browser outline, we provide custom focus */
+.input:focus {
+  outline: none;
+  border-color: var(--primary-action);
+  box-shadow: var(--focus-ring);
+}
+
+/* ===== Variants ===== */
+.outline {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+}
+
+.filled {
+  background-color: var(--bg-surface);
+  border: 1px solid transparent;
+}
+
+.filled:hover:not(:disabled):not(.readOnly) {
+  background-color: var(--hover-surface);
+}
+
+/* ===== Sizes ===== */
+.sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  height: 2rem;
+}
+
+.md {
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  height: 2.5rem;
+}
+
+.lg {
+  padding: 0.8rem 1.25rem;
+  font-size: 1.1rem;
+  height: 3rem;
+}
+
+/* Adjust padding when icons are present */
+.hasLeftIcon .input.sm {
+  padding-left: 2rem;
+}
+.hasLeftIcon .input.md {
+  padding-left: 2.5rem;
+}
+.hasLeftIcon .input.lg {
+  padding-left: 3rem;
+}
+
+.hasRightIcon .input.sm {
+  padding-right: 2rem;
+}
+.hasRightIcon .input.md {
+  padding-right: 2.5rem;
+}
+.hasRightIcon .input.lg {
+  padding-right: 3rem;
+}
+
+/* ===== Icons ===== */
+.leftIcon,
+.rightIcon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  pointer-events: none; /* prevents interfering with input clicks */
+  font-size: 1.1em;
+}
+
+.leftIcon {
+  left: 0.75rem;
+}
+
+.rightIcon {
+  right: 0.75rem;
+}
+
+/* Adjust icon positions for different sizes (optional, but consistent) */
+.sm + .leftIcon,
+.sm ~ .leftIcon {
+  left: 0.5rem;
+}
+.sm + .rightIcon,
+.sm ~ .rightIcon {
+  right: 0.5rem;
+}
+
+.lg + .leftIcon,
+.lg ~ .leftIcon {
+  left: 1rem;
+}
+.lg + .rightIcon,
+.lg ~ .rightIcon {
+  right: 1rem;
+}
+
+/* ===== Error State ===== */
+.input.error {
+  border-color: var(--error) !important;
+  background-color: var(--error-soft);
+}
+
+.input.error:focus {
+  box-shadow: var(--error-focus-ring);
+}
+
+/* ===== Disabled & ReadOnly ===== */
+.input.disabled,
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--bg-surface);
+  border-color: var(--border);
+}
+
+.input.readOnly,
+.input[readonly] {
+  background-color: var(--bg-surface);
+  cursor: default;
+}
+
+.input.readOnly:focus,
+.input[readonly]:focus {
+  border-color: var(--border-input);
+  box-shadow: none;
+}
