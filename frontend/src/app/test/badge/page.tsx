@@ -1,5 +1,3 @@
-// src/app/test/badge/page.tsx
-
 import React from 'react';
 import Badge from '@/shared/components/Badge';
 import {
