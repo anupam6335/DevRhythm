@@ -1,0 +1,113 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+/* Sizes */
+.badge--sm {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+}
+
+.badge--md {
+  font-size: 0.875rem;
+  padding: 4px 12px;
+}
+
+.badge--lg {
+  font-size: 1rem;
+  padding: 6px 16px;
+}
+
+/* Pill shape */
+.badge--pill {
+  border-radius: 9999px;
+}
+
+/* Variants – maps to theme variables */
+
+/* Default: neutral surface */
+.badge--default {
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+/* Primary action */
+.badge--primary {
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+}
+
+/* Success */
+.badge--success {
+  background-color: var(--toast-success);
+  color: var(--primary-text-on-action);
+}
+
+/* Warning */
+.badge--warning {
+  background-color: var(--toast-warning);
+  color: var(--primary-text-on-action);
+}
+
+/* Error */
+.badge--error {
+  background-color: var(--toast-error);
+  color: var(--primary-text-on-action);
+}
+
+/* Info */
+.badge--info {
+  background-color: var(--toast-info);
+  color: var(--primary-text-on-action);
+}
+
+/* Moss accent */
+.badge--moss {
+  background-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+}
+
+/* Sand accent */
+.badge--sand {
+  background-color: var(--accent-sand);
+  color: var(--text-primary);
+}
+
+/* Difficulty – Easy (success green) */
+.badge--easy {
+  background-color: var(--toast-success);
+  color: var(--primary-text-on-action);
+}
+
+/* Difficulty – Medium (warning orange) */
+.badge--medium {
+  background-color: var(--toast-warning);
+  color: var(--primary-text-on-action);
+}
+
+/* Difficulty – Hard (error red) */
+.badge--hard {
+  background-color: var(--toast-error);
+  color: var(--primary-text-on-action);
+}
+
+/* Icon spacing */
+.badge__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.badge__text {
+  display: inline-block;
+}
