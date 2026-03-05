@@ -1,0 +1,14 @@
+.container {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.starFilled {
+  color: var(--accent-moss);
+}
+
+.starEmpty {
+  color: var(--border);
+}
