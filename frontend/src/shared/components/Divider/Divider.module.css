@@ -1,0 +1,72 @@
+/* Base styles for both orientations */
+.horizontal,
+.vertical,
+.withText {
+  --divider-color: var(--divider);
+  --divider-thickness: 1px;
+}
+
+/* Horizontal line (no text) */
+.horizontal {
+  width: 100%;
+  height: 0;
+  border: none;
+  border-top: var(--divider-thickness) solid var(--divider-color);
+  margin: 1rem 0;
+}
+
+/* Vertical line */
+.vertical {
+  display: inline-block;
+  width: 0;
+  height: 100%;
+  border: none;
+  border-left: var(--divider-thickness) solid var(--divider-color);
+  margin: 0 1rem;
+  vertical-align: middle;
+}
+
+/* Horizontal divider with text */
+.withText {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.withText::before,
+.withText::after {
+  content: '';
+  flex: 1;
+  height: 0;
+  border-top: var(--divider-thickness) solid var(--divider-color);
+}
+
+/* Text positioning */
+.text-left::before {
+  flex: 0 0 1rem;
+}
+.text-left::after {
+  flex: 1;
+}
+
+.text-center::before,
+.text-center::after {
+  flex: 1;
+}
+
+.text-right::before {
+  flex: 1;
+}
+.text-right::after {
+  flex: 0 0 1rem;
+}
+
+.text {
+  padding: 0 0.75rem;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+}

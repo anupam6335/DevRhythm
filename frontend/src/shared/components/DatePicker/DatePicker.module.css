@@ -1,0 +1,135 @@
+/* Container – can be used for spacing if needed */
+.container {
+  display: inline-block;
+  width: 100%;
+}
+
+/* Make the icon span clickable */
+.iconClickable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.iconClickable:hover {
+  color: var(--accent-moss);
+}
+
+/* Popper (dropdown) – ensure it appears above other content */
+.popper {
+  z-index: 1000;
+}
+
+/* Calendar container */
+.calendar {
+  background-color: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--font-body) !important;
+  box-shadow: 0 4px 12px var(--shadow) !important;
+}
+
+/* Header */
+.calendar :global(.react-datepicker__header) {
+  background-color: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--divider) !important;
+  border-top-left-radius: var(--radius) !important;
+  border-top-right-radius: var(--radius) !important;
+}
+
+.calendar :global(.react-datepicker__current-month) {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+.calendar :global(.react-datepicker__navigation-icon::before) {
+  border-color: var(--text-secondary) !important;
+}
+
+.calendar :global(.react-datepicker__navigation:hover .react-datepicker__navigation-icon::before) {
+  border-color: var(--accent-moss) !important;
+}
+
+/* Day names */
+.weekDay {
+  color: var(--text-muted) !important;
+  font-weight: 500 !important;
+}
+
+/* Day cells */
+.day {
+  color: var(--text-primary) !important;
+  border-radius: var(--radius) !important;
+  transition: var(--transition) !important;
+}
+
+.day:hover {
+  background-color: var(--hover-surface) !important;
+}
+
+/* Selected day */
+.calendar :global(.react-datepicker__day--selected) {
+  background-color: var(--accent-moss) !important;
+  color: var(--primary-text-on-action) !important;
+}
+
+.calendar :global(.react-datepicker__day--keyboard-selected) {
+  background-color: var(--accent-sand) !important;
+  color: var(--text-primary) !important;
+}
+
+.calendar :global(.react-datepicker__day--today) {
+  font-weight: bold !important;
+  border: 1px solid var(--accent-moss) !important;
+}
+
+/* Disabled days */
+.calendar :global(.react-datepicker__day--disabled) {
+  color: var(--text-muted) !important;
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+}
+
+/* Time picker */
+.time {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-elevated) !important;
+}
+
+.calendar :global(.react-datepicker__time-container) {
+  border-left: 1px solid var(--divider) !important;
+}
+
+.calendar :global(.react-datepicker__time-list-item) {
+  color: var(--text-primary) !important;
+}
+
+.calendar :global(.react-datepicker__time-list-item:hover) {
+  background-color: var(--hover-surface) !important;
+}
+
+.calendar :global(.react-datepicker__time-list-item--selected) {
+  background-color: var(--accent-moss) !important;
+  color: var(--primary-text-on-action) !important;
+}
+
+/* Month/year dropdowns */
+.calendar :global(.react-datepicker__month-dropdown),
+.calendar :global(.react-datepicker__year-dropdown) {
+  background-color: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+
+.calendar :global(.react-datepicker__month-option),
+.calendar :global(.react-datepicker__year-option) {
+  color: var(--text-primary) !important;
+}
+
+.calendar :global(.react-datepicker__month-option:hover),
+.calendar :global(.react-datepicker__year-option:hover) {
+  background-color: var(--hover-surface) !important;
+}
