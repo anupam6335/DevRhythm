@@ -1,0 +1,97 @@
+/* Container label */
+.checkboxContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  user-select: none;
+  transition: var(--transition);
+}
+
+/* Hide the native input visually but keep it accessible */
+.checkboxInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Custom checkbox visual */
+.checkboxControl {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  background-color: var(--bg-elevated);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+/* Focus state */
+.checkboxInput:focus-visible + .checkboxControl {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Hover state */
+.checkboxContainer:hover .checkboxControl {
+  border-color: var(--primary-action);
+}
+
+/* Checked state */
+.checkboxControl.checked {
+  background-color: var(--primary-action);
+  border-color: var(--primary-action);
+}
+
+.checkboxControl.checked svg {
+  fill: var(--primary-text-on-action);
+  width: 0.8em;
+  height: 0.8em;
+}
+
+/* Indeterminate state – show a dash instead of a check */
+.checkboxControl.indeterminate {
+  background-color: var(--primary-action);
+  border-color: var(--primary-action);
+}
+
+.indeterminateDash {
+  width: 0.6em;
+  height: 2px;
+  background-color: var(--primary-text-on-action);
+  border-radius: 1px;
+}
+
+/* Disabled state */
+.checkboxContainer.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.checkboxContainer.disabled .checkboxControl {
+  background-color: var(--bg-surface);
+  border-color: var(--border);
+}
+
+/* Error state */
+.checkboxContainer.error .checkboxControl {
+  border-color: var(--error);
+}
+
+.checkboxContainer.error .checkboxInput:focus-visible + .checkboxControl {
+  box-shadow: var(--error-focus-ring);
+}
+
+/* Label text */
+.checkboxLabel {
+  line-height: 1.4;
+}
