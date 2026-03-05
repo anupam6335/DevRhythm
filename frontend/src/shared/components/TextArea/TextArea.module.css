@@ -1,0 +1,106 @@
+/* ===== Container ===== */
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: var(--font-body);
+}
+
+.container.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== Label ===== */
+.label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.required {
+  color: var(--error);
+  margin-left: 0.125rem;
+}
+
+/* ===== Textarea ===== */
+.textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: 0.5rem;
+  resize: vertical;
+  transition: var(--transition);
+  box-shadow: inset 0 1px 2px var(--shadow);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent-moss);
+  box-shadow: var(--focus-ring), inset 0 1px 2px var(--shadow);
+}
+
+.textarea:disabled {
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.textarea.error {
+  border-color: var(--error);
+}
+
+.textarea.error:focus {
+  box-shadow: var(--error-focus-ring), inset 0 1px 2px var(--shadow);
+}
+
+/* ===== Footer (helper/error + char count) ===== */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  min-height: 1.5rem;
+}
+
+.messageContainer {
+  flex: 1;
+}
+
+.helperText {
+  color: var(--text-muted);
+}
+
+.errorMessage {
+  color: var(--error);
+  font-weight: 500;
+}
+
+.charCount {
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+
+.charCountNearLimit {
+  color: var(--accent-sand);
+  font-weight: 500;
+}
+
+.charCountExceeded {
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* When autoResize is used, ensure the textarea can grow */
+.textarea[style*="height: auto"] {
+  overflow-y: hidden;
+}

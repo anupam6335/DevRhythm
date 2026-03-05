@@ -52,6 +52,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
       onClick={handleToggle}
       className={`${styles.toggleButton} ${styles[variant]} ${className}`}
       aria-label={buttonLabel}
+      aria-pressed={isDark}
       title={buttonLabel}
     >
       {(variant === 'icon' || variant === 'both') && icon}

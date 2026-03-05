@@ -1,0 +1,144 @@
+/* ===== Base Loader ===== */
+.loader {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--primary-action);
+  font-family: var(--font-body);
+}
+
+/* ===== Ring Container ===== */
+.ringContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Core (center dot) ===== */
+.core {
+  position: absolute;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== Expanding Ring ===== */
+.ring {
+  position: absolute;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  animation: expand 1.5s ease-out infinite;
+}
+
+/* ===== Sizes ===== */
+.size-sm .ringContainer {
+  width: 32px;
+  height: 32px;
+}
+.size-sm .core {
+  width: 6px;
+  height: 6px;
+}
+.size-sm .ring {
+  width: 24px;
+  height: 24px;
+  border-width: 1.5px;
+}
+
+.size-md .ringContainer {
+  width: 48px;
+  height: 48px;
+}
+.size-md .core {
+  width: 8px;
+  height: 8px;
+}
+.size-md .ring {
+  width: 36px;
+  height: 36px;
+  border-width: 2px;
+}
+
+.size-lg .ringContainer {
+  width: 64px;
+  height: 64px;
+}
+.size-lg .core {
+  width: 10px;
+  height: 10px;
+}
+.size-lg .ring {
+  width: 48px;
+  height: 48px;
+  border-width: 2.5px;
+}
+
+/* ===== Animations ===== */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+@keyframes expand {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* ===== Loading Text ===== */
+.text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+}
+
+/* ===== Backdrop (for overlay/full-screen) ===== */
+.backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 50;
+}
+
+.fullScreenBackdrop {
+  position: fixed;
+  z-index: 9999;
+  background-color: var(--bg-surface);
+}
+
+/* When full-screen, loader color adapts for contrast */
+.fullScreenBackdrop .loader {
+  color: var(--text-primary);
+}
+
+.fullScreenBackdrop .text {
+  color: var(--text-secondary);
+}
+
+/* ===== Overlay mode (transparent backdrop) ===== */
+.overlay .loader {
+  position: relative;
+  z-index: 10;
+}

@@ -1,323 +1,248 @@
 "use client";
 
-import { useState } from 'react';
-import Pagination from '@/shared/components/Pagination';
-import Button from '@/shared/components/Button';
-import ThemeToggle from '@/shared/components/ThemeToggle';
-import CodeBlock from '@/shared/components/CodeBlock';
-import {
-  FaCog,
-  FaChevronLeft,
-  FaChevronRight,
-  FaAngleDoubleLeft,
-  FaAngleDoubleRight,
-} from 'react-icons/fa';
+import { useState } from "react";
+import Pagination from "@/shared/components/Pagination";
+import Button from "@/shared/components/Button";
+import ThemeToggle from "@/shared/components/ThemeToggle";
+import CodeBlock from "@/shared/components/CodeBlock";
+import Input from "@/shared/components/Input";
 
 export default function PaginationTestPage() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(20);
-  const [siblingCount, setSiblingCount] = useState(1);
+  const [totalPages, setTotalPages] = useState(1000);
+  const [siblingCount, setSiblingCount] = useState(2);
   const [showFirstLast, setShowFirstLast] = useState(true);
   const [showPrevNext, setShowPrevNext] = useState(true);
-  const [size, setSize] = useState<'sm' | 'md' | 'lg'>('md');
-  const [lastAction, setLastAction] = useState('');
+  const [size, setSize] = useState<"sm" | "md" | "lg">("md");
+  const [lastAction, setLastAction] = useState("");
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     setLastAction(`Page changed to ${page}`);
   };
 
+  const sectionStyle: React.CSSProperties = {
+    backgroundColor: "var(--bg-surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius)",
+    padding: "1.5rem",
+    marginBottom: "2rem",
+  };
+
+  const previewStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100px",
+    marginTop: "1rem",
+  };
+
   return (
-    <main style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
+    <main style={{ padding: "2rem", maxWidth: "1100px", margin: "0 auto" }}>
+      {/* Header */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '2rem',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "2rem",
         }}
       >
-        <h1 style={{ fontFamily: 'var(--font-heading)', margin: 0 }}>
-          Pagination – Interactive Test Page
-        </h1>
+        <h1 style={{ margin: 0 }}>Pagination – Full Edge Case Test</h1>
         <ThemeToggle variant="both" label="Toggle theme" />
       </div>
 
-      {/* Controls */}
-      <section
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <h2 style={{ marginBottom: '1rem' }}>Controls</h2>
+      {/* Interactive Controls */}
+      <section style={sectionStyle}>
+        <h2>Interactive Controls</h2>
 
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '1.5rem',
-            marginBottom: '1.5rem',
+            display: "grid",
+            gap: "1rem",
+            gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
           }}
         >
-          {/* Current page */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: 500,
-              }}
-            >
-              Current Page
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              value={currentPage}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                  setCurrentPage(val);
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                backgroundColor: 'var(--bg-elevated)',
-                border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--text-primary)',
-              }}
-            />
-          </div>
+          <Input
+            type="number"
+            label="Current Page"
+            value={currentPage}
+            min={-10}
+            onChange={(e) => setCurrentPage(Number(e.target.value))}
+            fullWidth
+          />
 
-          {/* Total pages */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: 500,
-              }}
-            >
-              Total Pages
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={totalPages}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (!isNaN(val) && val >= 1) {
-                  setTotalPages(val);
-                  if (currentPage > val) setCurrentPage(val);
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                backgroundColor: 'var(--bg-elevated)',
-                border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--text-primary)',
-              }}
-            />
-          </div>
+          <Input
+            type="number"
+            label="Total Pages"
+            value={totalPages}
+            min={-10}
+            onChange={(e) => setTotalPages(Number(e.target.value))}
+            fullWidth
+          />
 
-          {/* Sibling count */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: 500,
-              }}
-            >
-              Sibling Count
-            </label>
-            <select
-              value={siblingCount}
-              onChange={(e) => setSiblingCount(parseInt(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                backgroundColor: 'var(--bg-elevated)',
-                border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value={0}>0</option>
-              <option value={1}>1</option>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-            </select>
-          </div>
-
-          {/* Size */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: 500,
-              }}
-            >
-              Size
-            </label>
-            <select
-              value={size}
-              onChange={(e) => setSize(e.target.value as any)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                backgroundColor: 'var(--bg-elevated)',
-                border: '1px solid var(--border-input)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="sm">Small</option>
-              <option value="md">Medium</option>
-              <option value="lg">Large</option>
-            </select>
-          </div>
+          <Input
+            type="number"
+            label="Sibling Count"
+            value={siblingCount}
+            min={-5}
+            onChange={(e) => setSiblingCount(Number(e.target.value))}
+            fullWidth
+          />
         </div>
 
-        {/* Checkboxes */}
-        <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ marginTop: "1.5rem", display: "flex", gap: "1.5rem" }}>
+          <label>
             <input
               type="checkbox"
               checked={showFirstLast}
               onChange={(e) => setShowFirstLast(e.target.checked)}
-            />
-            Show First/Last buttons
+            />{" "}
+            Show First/Last
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+          <label>
             <input
               type="checkbox"
               checked={showPrevNext}
               onChange={(e) => setShowPrevNext(e.target.checked)}
-            />
-            Show Prev/Next buttons
+            />{" "}
+            Show Prev/Next
           </label>
         </div>
 
-        {/* Last action indicator */}
-        {lastAction && (
-          <div
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem',
-              backgroundColor: 'var(--bg-elevated)',
-              borderRadius: 'var(--radius)',
-              color: 'var(--text-secondary)',
+        <div style={{ marginTop: "1.5rem" }}>
+          <Button
+            onClick={() => {
+              for (let i = 1; i <= 1000; i++) {
+                setTimeout(() => setCurrentPage(i), i * 50);
+              }
             }}
           >
-            <strong>Last action:</strong> {lastAction}
-          </div>
+            Stress Page Change
+          </Button>
+        </div>
+
+        {lastAction && (
+          <p style={{ marginTop: "1rem", opacity: 0.7 }}>
+            <strong>Last Action:</strong> {lastAction}
+          </p>
         )}
       </section>
 
       {/* Live Preview */}
-      <section
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: '2rem',
-          marginBottom: '2rem',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '120px',
-        }}
-      >
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          siblingCount={siblingCount}
-          showFirstLast={showFirstLast}
-          showPrevNext={showPrevNext}
-          size={size}
-        />
-      </section>
-
-      {/* Edge Cases Demo */}
-      <section
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <h2 style={{ marginBottom: '1rem' }}>Edge Cases</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div>
-            <h3 style={{ marginBottom: '0.5rem' }}>Single Page (totalPages=1)</h3>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <Pagination
-                currentPage={1}
-                totalPages={1}
-                onPageChange={() => {}}
-              />
-            </div>
-            <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              Should render nothing (returns null)
-            </p>
-          </div>
-
-          <div>
-            <h3 style={{ marginBottom: '0.5rem' }}>Few Pages (totalPages=3)</h3>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <Pagination
-                currentPage={2}
-                totalPages={3}
-                onPageChange={() => {}}
-              />
-            </div>
-          </div>
-
-          <div>
-            <h3 style={{ marginBottom: '0.5rem' }}>Many Pages (totalPages=50, siblingCount=2)</h3>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <Pagination
-                currentPage={25}
-                totalPages={50}
-                siblingCount={2}
-                onPageChange={() => {}}
-              />
-            </div>
-          </div>
+      <section style={sectionStyle}>
+        <h2>Live Preview</h2>
+        <div style={previewStyle}>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            siblingCount={siblingCount}
+            showFirstLast={showFirstLast}
+            showPrevNext={showPrevNext}
+            size={size}
+          />
         </div>
       </section>
 
+      {/* Edge Cases */}
+      <section style={sectionStyle}>
+        <h2>Edge Case Tests</h2>
+
+        {/* Invalid currentPage */}
+        <div style={previewStyle}>
+          <Pagination currentPage={0} totalPages={10} onPageChange={() => {}} />
+        </div>
+
+        <div style={previewStyle}>
+          <Pagination currentPage={-5} totalPages={10} onPageChange={() => {}} />
+        </div>
+
+        <div style={previewStyle}>
+          <Pagination currentPage={20} totalPages={10} onPageChange={() => {}} />
+        </div>
+
+        {/* Invalid totalPages */}
+        <div style={previewStyle}>
+          <Pagination currentPage={1} totalPages={0} onPageChange={() => {}} />
+        </div>
+
+        <div style={previewStyle}>
+          <Pagination currentPage={1} totalPages={-10} onPageChange={() => {}} />
+        </div>
+
+        {/* Huge totalPages */}
+        <div style={previewStyle}>
+          <Pagination
+            currentPage={5000}
+            totalPages={10000}
+            siblingCount={1}
+            onPageChange={() => {}}
+          />
+        </div>
+
+        {/* Extreme siblingCount */}
+        <div style={previewStyle}>
+          <Pagination
+            currentPage={5}
+            totalPages={10}
+            siblingCount={20}
+            onPageChange={() => {}}
+          />
+        </div>
+
+        <div style={previewStyle}>
+          <Pagination
+            currentPage={5}
+            totalPages={10}
+            siblingCount={-2}
+            onPageChange={() => {}}
+          />
+        </div>
+
+        {/* No navigation buttons */}
+        <div style={previewStyle}>
+          <Pagination
+            currentPage={5}
+            totalPages={20}
+            showFirstLast={false}
+            showPrevNext={false}
+            onPageChange={() => {}}
+          />
+        </div>
+
+        {/* Boundary positions */}
+        <div style={previewStyle}>
+          <Pagination currentPage={1} totalPages={50} onPageChange={() => {}} />
+        </div>
+
+        <div style={previewStyle}>
+          <Pagination currentPage={50} totalPages={50} onPageChange={() => {}} />
+        </div>
+
+        {/* Inside form test */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            alert("Form submitted!");
+          }}
+        >
+          <div style={previewStyle}>
+            <Pagination currentPage={5} totalPages={20} onPageChange={() => {}} />
+          </div>
+          <Button type="submit">Submit Form</Button>
+        </form>
+      </section>
+
       {/* Current Props Display */}
-      <section
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: '1.5rem',
-        }}
-      >
-        <h2 style={{ marginBottom: '1rem' }}>Current Props</h2>
+      <section style={sectionStyle}>
+        <h2>Current Props</h2>
         <CodeBlock
           language="tsx"
           code={`<Pagination
   currentPage={${currentPage}}
   totalPages={${totalPages}}
-  onPageChange={handlePageChange}
   siblingCount={${siblingCount}}
   showFirstLast={${showFirstLast}}
   showPrevNext={${showPrevNext}}
