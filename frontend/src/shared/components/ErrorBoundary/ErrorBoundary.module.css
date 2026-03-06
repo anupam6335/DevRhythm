@@ -3,36 +3,35 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1.5rem;
-  text-align: center;
+  min-height: 200px;
+  padding: 2rem;
   background-color: var(--bg-surface);
   border-radius: var(--radius);
   color: var(--text-primary);
+  text-align: center;
+  border: 1px solid var(--border);
 }
 
-.iconWrapper {
-  margin-bottom: 1rem;
+.icon {
   font-size: 3rem;
-  line-height: 1;
-  color: var(--text-muted);
+  color: var(--error);
+  margin-bottom: 1rem;
 }
 
 .title {
   font-family: var(--font-heading);
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: var(--text-primary);
 }
 
-.description {
+.message {
   font-family: var(--font-body);
-  font-size: 1rem;
   color: var(--text-secondary);
   max-width: 28rem;
-  margin: 0 auto 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.actionWrapper {
+.button {
   margin-top: 0.5rem;
 }
