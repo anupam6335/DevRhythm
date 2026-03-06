@@ -1,0 +1,25 @@
+/* src/app/test/multiple/page.module.css */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: var(--font-body);
+}
+
+.section {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.section h2 {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.section h3 {
+  margin: 1.5rem 0 0.5rem;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
