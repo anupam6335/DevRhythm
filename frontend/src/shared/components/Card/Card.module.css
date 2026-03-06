@@ -1,0 +1,102 @@
+.cardContainer {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius);
+  padding: 1.25rem; /* 20px */
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+}
+
+/* ===== Vertical rhythm ===== */
+/* Add margin-top to all elements that follow another element */
+.cardContainer > * + * {
+  margin-top: 1rem;
+}
+
+/* Headings */
+.cardContainer h1,
+.cardContainer h2,
+.cardContainer h3,
+.cardContainer h4,
+.cardContainer h5,
+.cardContainer h6 {
+  font-family: var(--font-heading);
+  margin-top: 0; /* reset default, rely on vertical rhythm */
+  margin-bottom: 0; /* reset default */
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+/* Paragraphs */
+.cardContainer p {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 1.6;
+}
+
+/* Lists */
+.cardContainer ul,
+.cardContainer ol {
+  padding-left: 0;
+  list-style-position: inside;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.cardContainer li {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.cardContainer li:first-of-type {
+  margin-top: 0;
+}
+
+/* Buttons (if you have Button component, it may have its own margins, but we add a little space) */
+.cardContainer button {
+  margin-top: 0.5rem; /* extra space before button, but vertical rhythm already gives 1rem */
+}
+
+/* Inline code or small elements */
+.cardContainer code {
+  font-family: var(--font-code);
+  background-color: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.cardContainer pre {
+  background-color: var(--code-bg);
+  color: var(--code-text);
+  padding: 1rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 0; /* let vertical rhythm handle spacing */
+}
+
+/* Blockquotes */
+.cardContainer blockquote {
+  margin: 0;
+  padding-left: 1rem;
+  border-left: 4px solid var(--accent-moss);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Images */
+.cardContainer img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+/* Horizontal rule */
+.cardContainer hr {
+  border: none;
+  border-top: 1px solid var(--divider);
+  margin: 1rem 0;
+}
