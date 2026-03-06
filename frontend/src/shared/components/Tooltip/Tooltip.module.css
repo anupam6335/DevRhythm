@@ -1,0 +1,91 @@
+/* Container for the trigger element – remains inline */
+.tooltipContainer {
+  position: relative;
+  display: inline-block;
+}
+
+/* Base tooltip styles – now absolutely positioned relative to viewport via inline styles */
+.tooltip {
+  position: absolute;
+  z-index: 1000;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.5;
+  padding: 0.5rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--shadow);
+  max-width: 360px;
+  min-width: 150px;
+  white-space: normal;
+  word-wrap: break-word;
+  text-align: center;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+
+.tooltipVisible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tooltipHidden {
+  opacity: 0;
+  transform: scale(0.98);
+  pointer-events: none;
+}
+
+/* Arrow using pseudo-element – positioned relative to the tooltip itself */
+.tooltip::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+/* Placement arrow styles (only arrow positioning, not the tooltip itself) */
+.tooltipTop::after {
+  top: 100%;
+  left: 50%;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-top-color: transparent;
+  border-left-color: transparent;
+}
+
+.tooltipBottom::after {
+  bottom: 100%;
+  left: 50%;
+  margin-left: -4px;
+  margin-bottom: -4px;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+
+.tooltipLeft::after {
+  left: 100%;
+  top: 50%;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.tooltipRight::after {
+  right: 100%;
+  top: 50%;
+  margin-right: -4px;
+  margin-top: -4px;
+  border-right-color: transparent;
+  border-top-color: transparent;
+}
+
+/* When hidden, hide the arrow as well */
+.tooltipHidden::after {
+  opacity: 0;
+}

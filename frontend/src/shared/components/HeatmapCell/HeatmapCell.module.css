@@ -1,0 +1,42 @@
+/* Cell wrapper – also acts as Tooltip container */
+.cellWrapper {
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The actual square cell */
+.cell {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: var(--transition);
+  padding: 0;
+  background: transparent;
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--accent-moss);
+  outline-offset: 1px;
+}
+
+/* Intensity levels – colours from global CSS variables */
+.level0 {
+  background-color: var(--heat-0);
+}
+.level1 {
+  background-color: var(--heat-1);
+}
+.level2 {
+  background-color: var(--heat-2);
+}
+.level3 {
+  background-color: var(--heat-3);
+}
+.level4 {
+  background-color: var(--heat-4);
+}
