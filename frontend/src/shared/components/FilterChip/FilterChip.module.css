@@ -1,0 +1,61 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 2rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.chip:hover:not(:disabled) {
+  background-color: var(--hover-surface);
+  border-color: var(--primary-action);
+}
+
+.chip.selected {
+  background-color: var(--primary-action);
+  border-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+}
+
+.chip.selected .count {
+  color: var(--primary-text-on-action);
+  opacity: 0.8;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent-moss);
+  outline-offset: 2px;
+}
+
+.chip.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.checkIcon {
+  font-size: 0.75rem;
+}
+
+.count {
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-radius: 1rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: 1.5rem;
+  text-align: center;
+  transition: var(--transition);
+}
+.chip.selected .count {
+  background-color: var(--primary-text-on-action);
+  color: var(--primary-action);
+}

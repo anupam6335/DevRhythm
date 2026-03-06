@@ -1,0 +1,99 @@
+.container {
+  position: relative;
+  width: 100%;
+  font-family: var(--font-body);
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--primary-action);
+  background-color: var(--hover-surface);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-moss);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  margin-left: 0.5rem;
+  transition: transform var(--transition);
+  color: var(--text-secondary);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.optionsList {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 15rem;
+  overflow-y: auto;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 10;
+  list-style: none;
+  padding: 0.25rem 0;
+  margin: 0;
+}
+
+.option {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background-color var(--transition);
+}
+
+.option:hover,
+.option.focused {
+  background-color: var(--hover-surface);
+}
+
+.option.selected {
+  background-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+}
+
+.error .button {
+  border-color: var(--error);
+}
+
+.error .button:focus-visible {
+  outline-color: var(--error);
+}
+
+.container.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
