@@ -1,0 +1,58 @@
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  font-family: var(--font-body);
+}
+
+.section {
+  margin-bottom: 2.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--bg-surface);
+}
+
+.section h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+}
+
+.section p {
+  margin-top: 1rem;
+  color: var(--text-secondary);
+}
+
+.list {
+  margin-top: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  background-color: var(--bg-elevated);
+}
+
+.list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.list li {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-primary);
+}
+
+.list li:last-child {
+  border-bottom: none;
+}
+
+.note {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem !important;
+}
