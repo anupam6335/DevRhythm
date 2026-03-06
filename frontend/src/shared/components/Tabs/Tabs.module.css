@@ -1,0 +1,111 @@
+/* Base container */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0.25rem;
+}
+
+/* Pills variant – no bottom border */
+.pills {
+  border-bottom: none;
+  gap: 0.5rem;
+}
+
+/* Full width – tabs stretch equally */
+.fullWidth {
+  width: 100%;
+}
+
+.fullWidth .tab {
+  flex: 1 1 0;
+}
+
+/* Tab button base */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  border-radius: 0;
+  position: relative;
+  white-space: nowrap;
+}
+
+.tab:hover:not(.disabled) {
+  color: var(--text-primary);
+  background-color: var(--hover-surface);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary-action);
+  outline-offset: -2px;
+}
+
+/* Underline active state */
+.underline .tab.active {
+  color: var(--text-primary);
+}
+
+.underline .tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--primary-action);
+}
+
+/* Pills active state */
+.pills .tab {
+  border-radius: var(--radius, 6px);
+}
+
+.pills .tab.active {
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+}
+
+.pills .tab.active:hover:not(.disabled) {
+  background-color: var(--primary-action-hover);
+}
+
+/* Disabled tab */
+.tab.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Size variants */
+.sm .tab {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.md .tab {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
+.lg .tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+}
+
+/* Icon styling */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.1em;
+}
