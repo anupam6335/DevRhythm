@@ -20,4 +20,11 @@
   /* Transitions & spacing */
   --transition: all 0.2s ease;
   --radius: 6px;
+
+  /* Spacing scale */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
 }

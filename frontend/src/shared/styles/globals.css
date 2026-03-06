@@ -53,6 +53,40 @@ code, pre {
   border-width: 0;
 }
 
+/* ===== DevRhythm Container ===== */
+.devRhythmContainer {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 0 1rem; /* optional side padding */
+  width: 100%;
+}
+
+/* ===== Custom Scrollbar for Webkit Browsers (Chrome, Safari, Edge) ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-moss);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg-surface);
+}
+
 /* ===== react-datepicker custom theme ===== */
 .react-datepicker {
   background-color: var(--bg-elevated) !important;
