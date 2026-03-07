@@ -1,0 +1,46 @@
+/* src/app/test/page.module.css */
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--divider);
+  padding-bottom: 0.5rem;
+}
+
+.section {
+  margin-bottom: 3rem;
+  padding: 1.5rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.section h2 {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.longText {
+  margin-top: 3rem;
+  padding: 1.5rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.longText p {
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}

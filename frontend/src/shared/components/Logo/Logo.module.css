@@ -1,0 +1,147 @@
+.logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-primary);
+  font-family: var(--font-code);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+/* Layout variants */
+.horizontal {
+  flex-direction: row;
+  gap: 0.75rem;
+}
+
+.vertical {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Size variants – define image size as CSS variable */
+.sm {
+  --image-size: 32px;
+}
+.sm .text {
+  font-size: 1.25rem;
+}
+.sm .imageWrapper {
+  width: 32px;
+  height: 32px;
+}
+
+.md {
+  --image-size: 40px;
+}
+.md .text {
+  font-size: 1.5rem;
+}
+.md .imageWrapper {
+  width: 40px;
+  height: 40px;
+}
+
+.lg {
+  --image-size: 56px;
+}
+.lg .text {
+  font-size: 2rem;
+}
+.lg .imageWrapper {
+  width: 56px;
+  height: 56px;
+}
+
+/* Image wrapper – fades on scroll if enabled */
+.imageWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.1s linear;
+}
+
+/* Both images are absolutely positioned inside the wrapper */
+.image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.2s ease;
+}
+
+/* Light image is visible in light theme */
+.lightImage {
+  opacity: 1;
+}
+.darkImage {
+  opacity: 0;
+}
+
+/* Dark image is visible in dark theme */
+:global(.dark) .lightImage {
+  opacity: 0;
+}
+:global(.dark) .darkImage {
+  opacity: 1;
+}
+
+/* Text container */
+.text {
+  display: inline-flex;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Each character – flat by default */
+.char {
+  display: inline-block;
+}
+
+/* Rhythmic pulse hover effect (gentle opacity change) */
+.logo:hover .text {
+  animation: rhythmicPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes rhythmicPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Initial load animation – slide out from behind the image */
+.animateReveal {
+  animation: slideFromBehind 0.8s ease-out 0.3s forwards;
+}
+
+.horizontal .animateReveal {
+  transform: translateX(calc(-1 * var(--image-size)));
+}
+
+.vertical .animateReveal {
+  transform: translateY(calc(-1 * var(--image-size)));
+}
+
+@keyframes slideFromBehind {
+  to {
+    transform: translate(0, 0);
+  }
+}
+
+/* Focus ring */
+.logo:focus-visible {
+  outline: 2px solid var(--accent-moss);
+  outline-offset: 4px;
+  border-radius: 4px;
+}

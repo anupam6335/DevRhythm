@@ -1,3 +1,4 @@
+'use client'
 import React, { useEffect, useState } from 'react';
 import { RxSun, RxMoon } from 'react-icons/rx';
 import { useTheme } from '@/shared/hooks/useTheme';
