@@ -40,7 +40,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="icon" href="/images/devrhythm-logo.png" type="image/png" />
+        <link rel="icon" href="/images/logos/dr-icon-dark-logo.png" type="image/png" />
       </head>
       <body>
         <ThemeProvider
