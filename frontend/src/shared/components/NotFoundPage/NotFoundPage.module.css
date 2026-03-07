@@ -1,21 +1,52 @@
 .container {
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-app);
+  min-height: 100vh;
   padding: 2rem;
-  animation: fadeIn 0.5s ease;
+  background-color: var(--bg-app);
+  position: relative;
+  overflow: hidden;
 }
 
 .content {
-  text-align: center;
   max-width: 600px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* Large background 404 – visible in both themes */
+.big404 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-heading);
+  font-size: 20vw;
+  font-weight: 800;
+  color: var(--text-primary);
+  opacity: 0.06; /* subtle in light, slightly more visible in dark */
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 1;
+  line-height: 1;
+}
+
+/* Increase opacity slightly in dark mode for better visibility */
+.dark .big404 {
+  opacity: 0.12;
 }
 
 .illustration {
   margin-bottom: 2rem;
-  animation: float 4s ease-in-out infinite;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .image {
@@ -23,78 +54,42 @@
   height: auto;
   max-width: 400px;
   margin: 0 auto;
-  filter: drop-shadow(0 4px 8px var(--shadow));
-  transition: filter 0.3s ease;
-}
-
-.image:hover {
-  filter: drop-shadow(0 8px 16px var(--shadow));
+  display: block;
+  filter: drop-shadow(0 10px 20px var(--shadow));
+  border-radius: 12px;
 }
 
 .title {
   font-family: var(--font-heading);
-  font-size: 6rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1;
-  margin-bottom: 0.5rem;
-  animation: slideUp 0.6s ease 0.1s both;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-moss) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
 }
 
 .message {
   font-family: var(--font-body);
   font-size: 1.25rem;
   color: var(--text-secondary);
-  margin-bottom: 2rem;
-  animation: slideUp 0.6s ease 0.2s both;
+  margin-bottom: 2.5rem;
+  line-height: 1.6;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.action {
-  margin-top: 1.5rem;
-  animation: slideUp 0.6s ease 0.3s both;
+/* The button container – we rely on Button's internal styles, but we can add margin if needed */
+.button {
+  margin-top: 0.5rem;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .title {
-    font-size: 4rem;
-  }
-
-  .message {
-    font-size: 1rem;
-  }
-
-  .image {
-    max-width: 300px;
+/* For users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .illustration {
+    animation: none;
   }
 }

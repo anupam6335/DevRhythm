@@ -4,12 +4,18 @@ import React from 'react';
 import Logo from '@/shared/components/Logo';
 import styles from './page.module.css';
 import ThemeToggle from '@/shared/components/ThemeToggle';
+import NotFoundPage from '@/shared/components/NotFoundPage';
 
 export default function TestPage() {
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Logo Component Test <ThemeToggle variant='both'/> </h1>
-
+<NotFoundPage
+  title="Ooops! Page not found"
+  message="The page you’re looking for doesn’t exist or may have been moved."
+  actionText="Go to dashboard"
+  actionHref="/dashboard"
+/>
       <section className={styles.section}>
         <h2>Default (horizontal, md, all animations enabled)</h2>
         <Logo />
