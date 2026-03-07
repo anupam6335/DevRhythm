@@ -25,6 +25,8 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
   actionText = 'Go back home',
   actionHref,
 }) => {
+  const preventDownload = (e: React.MouseEvent) => e.preventDefault();
+
   return (
     <div className={clsx(styles.container, className)}>
       <div className={styles.content}>
@@ -39,6 +41,8 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
             height={300}
             priority
             className={styles.image}
+            onContextMenu={preventDownload}
+            draggable={false}
           />
         </div>
 
