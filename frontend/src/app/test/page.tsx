@@ -1,82 +1,99 @@
-'use client';
-
 import React from 'react';
-import Logo from '@/shared/components/Logo';
+import { FaCode, FaFire, FaUsers, FaChartLine } from 'react-icons/fa';
+import StatCard from '@/shared/components/StatCard';
+import ProgressBar from '@/shared/components/ProgressBar';
 import styles from './page.module.css';
-import ThemeToggle from '@/shared/components/ThemeToggle';
-import NotFoundPage from '@/shared/components/NotFoundPage';
 
 export default function TestPage() {
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Logo Component Test <ThemeToggle variant='both'/> </h1>
-<NotFoundPage
-  title="Ooops! Page not found"
-  message="The page you’re looking for doesn’t exist or may have been moved."
-  actionText="Go to dashboard"
-  actionHref="/dashboard"
-/>
+      <h1 className={styles.title}>Component Showcase</h1>
+
+      {/* StatCard Section */}
       <section className={styles.section}>
-        <h2>Default (horizontal, md, all animations enabled)</h2>
-        <Logo />
+        <h2 className={styles.sectionTitle}>StatCard</h2>
+        <div className={styles.grid}>
+          <StatCard
+            label="Total Solved"
+            value="147"
+            icon={<FaCode />}
+            trend={{ value: 12, direction: 'up', label: 'vs last week' }}
+            description="Problems across all platforms"
+          />
+          <StatCard
+            label="Current Streak"
+            value="21"
+            icon={<FaFire />}
+            trend={{ value: 5, direction: 'up', label: 'days' }}
+            size="sm"
+          />
+          <StatCard
+            label="Followers"
+            value="89"
+            icon={<FaUsers />}
+            trend={{ value: 3, direction: 'down', label: 'this month' }}
+          />
+          <StatCard
+            label="Mastery Rate"
+            value="76%"
+            icon={<FaChartLine />}
+            description="Based on solved patterns"
+            size="sm"
+          />
+          <StatCard
+            label="Loading Example"
+            value="42"
+            isLoading
+            icon={<FaCode />}
+          />
+          <StatCard
+            label="Clickable Card"
+            value="Click me"
+            href="/dashboard"
+            icon={<FaChartLine />}
+            description="Navigates to dashboard"
+          />
+        </div>
       </section>
 
+      {/* ProgressBar Section */}
       <section className={styles.section}>
-        <h2>Vertical layout, large size</h2>
-        <Logo layout="vertical" size="lg" />
-      </section>
+        <h2 className={styles.sectionTitle}>ProgressBar</h2>
+        <div className={styles.progressGrid}>
+          <div className={styles.progressItem}>
+            <h3>Default (auto variant)</h3>
+            <ProgressBar value={75} label="Daily Goal" showValue />
+            <ProgressBar value={45} label="Weekly Goal" showValue valuePosition="right" />
+            <ProgressBar value={90} label="Almost done" showValue valuePosition="inside" />
+          </div>
 
-      <section className={styles.section}>
-        <h2>Small size, horizontal</h2>
-        <Logo size="sm" />
-      </section>
+          <div className={styles.progressItem}>
+            <ProgressBar value={60} label="Small" size="sm" />
+            <h3>Sizes</h3>
+            <ProgressBar value={60} label="Medium" size="md" />
+            <ProgressBar value={60} label="Large" size="lg" />
+          </div>
 
-      <section className={styles.section}>
-        <h2>Disabled initial animation (text appears immediately)</h2>
-        <Logo animateOnLoad={false} />
-      </section>
+          <div className={styles.progressItem}>
+            <h3>Variants</h3>
+            <ProgressBar value={30} label="Default" variant="default" />
+            <ProgressBar value={95} label="Success" variant="success" />
+            <ProgressBar value={60} label="Warning" variant="warning" />
+            <ProgressBar value={20} label="Danger" variant="danger" />
+          </div>
 
-      <section className={styles.section}>
-        <h2>Disabled scroll fade (image stays visible)</h2>
-        <Logo enableScrollFade={false} />
-      </section>
+          <div className={styles.progressItem}>
+            <h3>Indeterminate</h3>
+            <ProgressBar value={0} indeterminate label="Loading..." />
+          </div>
 
-      <section className={styles.section}>
-        <h2>Custom scroll fade threshold (300px)</h2>
-        <Logo scrollFadeThreshold={300} />
+          <div className={styles.progressItem}>
+            <h3>No label / no value</h3>
+            <ProgressBar value={80} showValue={false} />
+            <ProgressBar value={33} label="Only label" showValue={false} />
+          </div>
+        </div>
       </section>
-
-      <section className={styles.section}>
-        <h2>All props customised (vertical, small, both animations off)</h2>
-        <Logo
-          layout="vertical"
-          size="sm"
-          animateOnLoad={false}
-          enableScrollFade={false}
-        />
-      </section>
-
-      {/* Long text to enable scrolling */}
-      <div className={styles.longText}>
-        <p>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-        </p>
-        <p>
-          Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida. Duis ac tellus et risus vulputate vehicula. Donec lobortis risus a elit. Etiam tempor. Ut ullamcorper, ligula eu tempor congue, eros est euismod turpis, id tincidunt sapien risus a quam.
-        </p>
-        <p>
-          Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Proin vel ante a orci tempus eleifend ut et magna. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus luctus urna sed urna ultricies ac tempor dui sagittis. In condimentum facilisis porta. Sed nec diam eu diam mattis viverra. Nulla fringilla, orci ac euismod semper, magna diam porttitor mauris, quis sollicitudin sapien justo in libero.
-        </p>
-        <p>
-          Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Maecenas ullamcorper, dui et placerat feugiat, eros pede varius nisi, condimentum viverra felis nunc et lorem. Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus. Donec vitae sapien ut libero venenatis faucibus. Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt.
-        </p>
-        <p>
-          Aliquam erat volutpat. Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc, quis gravida magna mi a libero. Fusce vulputate eleifend sapien. Vestibulum purus quam, scelerisque ut, mollis sed, nonummy id, metus. Nullam accumsan lorem in dui. Cras ultricies mi eu turpis hendrerit fringilla. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae.
-        </p>
-        <p>
-          Donec vitae orci sed dolor rutrum auctor. Fusce egestas elit eget lorem. Suspendisse nisl elit, rhoncus eget, elementum ac, condimentum eget, diam. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam sit amet orci eget eros faucibus tincidunt. Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc, quis gravida magna mi a libero.
-        </p>
-      </div>
     </div>
   );
 }
