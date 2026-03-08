@@ -6,18 +6,20 @@
   </picture>
 </p>
 
-
 <h1 align="center">DevRhythm</h1>
 
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
-[![npm Version](https://img.shields.io/badge/npm-%3E%3D9-blue)](https://www.npmjs.com)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![GitHub Stars](https://img.shields.io/github/stars/anupam6335/DevRhythm?style=social)](https://github.com/anupam6335/DevRhythm/stargazers)
-[![Twitter Follow](https://img.shields.io/twitter/follow/anupam6335?style=social)](https://twitter.com/anupam6335)
+<p align="center">
+  <strong>Track, master, and share your coding journey.</strong><br>
+  A full‑stack productivity platform for programmers who want to log problems, schedule spaced‑repetition revisions, set goals, and connect with the community.
+</p>
 
-**Track, master, and share your coding journey.**  
-DevRhythm is a full‑stack productivity platform for programmers who want to **log problems**, **schedule spaced‑repetition revisions**, **set daily/weekly goals**, and **share progress** with the community. Built with a modern MERN stack (Express + MongoDB + Redis + Next.js) and designed for long‑term retention.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node Version"></a>
+  <a href="https://www.npmjs.com"><img src="https://img.shields.io/badge/npm-%3E%3D9-blue" alt="npm Version"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+  <a href="https://github.com/anupam6335/DevRhythm/stargazers"><img src="https://img.shields.io/github/stars/anupam6335/DevRhythm?style=social" alt="GitHub Stars"></a>
+</p>
 
 > 🚧 **Project Status**: Under active development – expect breaking changes and rapid iteration.
 
@@ -88,7 +90,6 @@ DevRhythm is a full‑stack productivity platform for programmers who want to **
    ```
 
 The backend runs on `http://localhost:5000`, frontend on `http://localhost:4000`.
-
 ---
 
 ## 🐳 Docker Deployment
@@ -179,16 +180,6 @@ npm run test:coverage
 cd frontend
 npm test
 ```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
-
-- Report bugs via [GitHub Issues](https://github.com/anupam6335/DevRhythm/issues)
-- Suggest features via [Discussions](https://github.com/anupam6335/DevRhythm/discussions)
-
 ---
 
 ## 📄 License
