@@ -1,99 +1,104 @@
-import React from 'react';
-import { FaCode, FaFire, FaUsers, FaChartLine } from 'react-icons/fa';
-import StatCard from '@/shared/components/StatCard';
-import ProgressBar from '@/shared/components/ProgressBar';
+'use client';
+
+import React, { useState } from 'react';
+import Navbar from '@/shared/components/Navbar';
 import styles from './page.module.css';
 
 export default function TestPage() {
+  const [pendingRevisions, setPendingRevisions] = useState(3);
+  const [goalProgress, setGoalProgress] = useState({ completed: 2, target: 3 });
+  const [streak, setStreak] = useState(7);
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
+
+  // Mock user
+  const mockUser = {
+    _id: '123',
+    username: 'testuser',
+    displayName: 'Test User',
+    avatarUrl: 'https://via.placeholder.com/40', // placeholder image
+  };
+
+  const handleLogout = () => {
+    alert('Logout clicked – would redirect');
+    setIsLoggedIn(false);
+  };
+
+  const handleQuickAdd = () => {
+    alert('Quick add clicked – open modal');
+  };
+
+  // Some controls to tweak props
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Component Showcase</h1>
+      <h1>Navbar Test Page</h1>
+      <p>Resize your browser to see mobile/desktop behaviour. The navbar is sticky/fixed accordingly.</p>
 
-      {/* StatCard Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>StatCard</h2>
-        <div className={styles.grid}>
-          <StatCard
-            label="Total Solved"
-            value="147"
-            icon={<FaCode />}
-            trend={{ value: 12, direction: 'up', label: 'vs last week' }}
-            description="Problems across all platforms"
+      <div className={styles.controls}>
+        <label>
+          Pending revisions:
+          <input
+            type="number"
+            value={pendingRevisions}
+            onChange={(e) => setPendingRevisions(Number(e.target.value))}
+            min={0}
+            max={99}
           />
-          <StatCard
-            label="Current Streak"
-            value="21"
-            icon={<FaFire />}
-            trend={{ value: 5, direction: 'up', label: 'days' }}
-            size="sm"
-          />
-          <StatCard
-            label="Followers"
-            value="89"
-            icon={<FaUsers />}
-            trend={{ value: 3, direction: 'down', label: 'this month' }}
-          />
-          <StatCard
-            label="Mastery Rate"
-            value="76%"
-            icon={<FaChartLine />}
-            description="Based on solved patterns"
-            size="sm"
-          />
-          <StatCard
-            label="Loading Example"
-            value="42"
-            isLoading
-            icon={<FaCode />}
-          />
-          <StatCard
-            label="Clickable Card"
-            value="Click me"
-            href="/dashboard"
-            icon={<FaChartLine />}
-            description="Navigates to dashboard"
-          />
-        </div>
-      </section>
+        </label>
 
-      {/* ProgressBar Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>ProgressBar</h2>
-        <div className={styles.progressGrid}>
-          <div className={styles.progressItem}>
-            <h3>Default (auto variant)</h3>
-            <ProgressBar value={75} label="Daily Goal" showValue />
-            <ProgressBar value={45} label="Weekly Goal" showValue valuePosition="right" />
-            <ProgressBar value={90} label="Almost done" showValue valuePosition="inside" />
-          </div>
+        <label>
+          Daily goal completed:
+          <input
+            type="number"
+            value={goalProgress.completed}
+            onChange={(e) => setGoalProgress({ ...goalProgress, completed: Number(e.target.value) })}
+            min={0}
+            max={goalProgress.target}
+          />
+        </label>
 
-          <div className={styles.progressItem}>
-            <ProgressBar value={60} label="Small" size="sm" />
-            <h3>Sizes</h3>
-            <ProgressBar value={60} label="Medium" size="md" />
-            <ProgressBar value={60} label="Large" size="lg" />
-          </div>
+        <label>
+          Daily goal target:
+          <input
+            type="number"
+            value={goalProgress.target}
+            onChange={(e) => setGoalProgress({ ...goalProgress, target: Number(e.target.value) })}
+            min={1}
+            max={10}
+          />
+        </label>
 
-          <div className={styles.progressItem}>
-            <h3>Variants</h3>
-            <ProgressBar value={30} label="Default" variant="default" />
-            <ProgressBar value={95} label="Success" variant="success" />
-            <ProgressBar value={60} label="Warning" variant="warning" />
-            <ProgressBar value={20} label="Danger" variant="danger" />
-          </div>
+        <label>
+          Streak count:
+          <input
+            type="number"
+            value={streak}
+            onChange={(e) => setStreak(Number(e.target.value))}
+            min={0}
+            max={999}
+          />
+        </label>
 
-          <div className={styles.progressItem}>
-            <h3>Indeterminate</h3>
-            <ProgressBar value={0} indeterminate label="Loading..." />
-          </div>
+        <button onClick={() => setIsLoggedIn(!isLoggedIn)}>
+          {isLoggedIn ? 'Log out (simulate)' : 'Log in (simulate)'}
+        </button>
+      </div>
 
-          <div className={styles.progressItem}>
-            <h3>No label / no value</h3>
-            <ProgressBar value={80} showValue={false} />
-            <ProgressBar value={33} label="Only label" showValue={false} />
-          </div>
-        </div>
-      </section>
+      <Navbar
+        user={isLoggedIn ? mockUser : null}
+        pendingRevisionsCount={pendingRevisions}
+        dailyGoalProgress={goalProgress}
+        streakCount={streak}
+        onLogout={handleLogout}
+        onQuickAdd={handleQuickAdd}
+      />
+
+      {/* Spacer to create scrollable area */}
+      <div className={styles.content}>
+        <p>Scroll down to see the navbar behaviour (desktop sticky, mobile fixed bottom).</p>
+        {Array.from({ length: 50 }, (_, i) => (
+          <p key={i}>Scrollable content line {i + 1}</p>
+        ))}
+      </div>
     </div>
   );
 }

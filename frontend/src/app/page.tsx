@@ -84,7 +84,7 @@ console.log(quickSort(unsorted));`);
   };
 
   return (
-    <main style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+    <main className="devRhythmContainer">
       <style>{`
         .custom-code-block {
           border: 2px solid red;

@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
-import { ThemeProvider } from 'next-themes';
-import { ToastProvider } from '@/shared/components/Toast';
-import '@/shared/styles/globals.css'; 
+import { RootLayoutClient } from '@/providers/RootLayoutClient';
+import '@/shared/styles/globals.css';
 
 const commissioner = Commissioner({
   subsets: ['latin'],
@@ -43,16 +42,7 @@ export default function RootLayout({
         <link rel="icon" href="/images/logos/dr-icon-dark-logo.png" type="image/png" />
       </head>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ToastProvider position="top-center">
-            {children}
-          </ToastProvider>
-        </ThemeProvider>
+        <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
   );
