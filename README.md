@@ -201,35 +201,6 @@ For detailed frontend instructions, see frontend/README.md.
 
 ---
 
-🔧 Environment Variables
-
-Backend (.env)
-
-Variable Description Example
-PORT Port the server runs on 5000
-MONGODB_URI MongoDB connection string mongodb://localhost:27017/
-REDIS_URL Redis connection URL redis://localhost:6379
-JWT_SECRET Secret for signing JWT tokens your-secret-key
-JWT_REFRESH_SECRET Secret for refresh tokens another-secret
-GOOGLE_CLIENT_ID Google OAuth client ID xxx.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET Google OAuth client secret xxx
-GITHUB_CLIENT_ID GitHub OAuth client ID xxx
-GITHUB_CLIENT_SECRET GitHub OAuth client secret xxx
-CLOUDINARY_CLOUD_NAME Cloudinary cloud name devrhythm
-CLOUDINARY_API_KEY Cloudinary API key xxx
-CLOUDINARY_API_SECRET Cloudinary API secret xxx
-FRONTEND_URL Frontend URL (for OAuth redirects) http://localhost:4000
-BACKEND_URL Backend public URL (for share links) http://localhost:5000
-NODE_ENV Environment (development/production) development
-
-Frontend (.env.local)
-
-Variable Description Example
-NEXT_PUBLIC_API_BASE_URL Base URL of the backend API http://localhost:5000/api/v1
-NEXT_PUBLIC_APP_URL Frontend URL (for OAuth redirects) http://localhost:4000
-
----
-
 🧪 Testing
 
 Backend
