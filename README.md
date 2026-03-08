@@ -14,11 +14,39 @@
 </p>
 
 <p align="center">
+  <!-- License & Status -->
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node Version"></a>
   <a href="https://www.npmjs.com"><img src="https://img.shields.io/badge/npm-%3E%3D9-blue" alt="npm Version"></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
   <a href="https://github.com/anupam6335/DevRhythm/stargazers"><img src="https://img.shields.io/github/stars/anupam6335/DevRhythm?style=social" alt="GitHub Stars"></a>
+  <br>
+  <!-- Backend technologies -->
+  <img src="https://img.shields.io/badge/Express.js-000000?logo=express&logoColor=white" alt="Express.js">
+  <img src="https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white" alt="MongoDB">
+  <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/Mongoose-880000?logo=mongoose&logoColor=white" alt="Mongoose">
+  <img src="https://img.shields.io/badge/Passport-34E27A?logo=passport&logoColor=white" alt="Passport">
+  <img src="https://img.shields.io/badge/JWT-000000?logo=json-web-tokens&logoColor=white" alt="JWT">
+  <img src="https://img.shields.io/badge/Winston-231F20?logo=winston&logoColor=white" alt="Winston">
+  <img src="https://img.shields.io/badge/Jest-C21325?logo=jest&logoColor=white" alt="Jest">
+  <br>
+  <!-- Frontend technologies -->
+  <img src="https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white" alt="Next.js">
+  <img src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React_Query-FF4154?logo=react-query&logoColor=white" alt="React Query">
+  <img src="https://img.shields.io/badge/Axios-5A29E4?logo=axios&logoColor=white" alt="Axios">
+  <img src="https://img.shields.io/badge/Zod-3E67B1?logo=zod&logoColor=white" alt="Zod">
+  <img src="https://img.shields.io/badge/date--fns-7700AA?logo=date-fns&logoColor=white" alt="date-fns">
+  <img src="https://img.shields.io/badge/CSS_Modules-000000?logo=css-modules&logoColor=white" alt="CSS Modules">
+  <br>
+  <!-- Code quality -->
+  <img src="https://img.shields.io/badge/ESLint-4B32C3?logo=eslint&logoColor=white" alt="ESLint">
+  <img src="https://img.shields.io/badge/Prettier-F7B93E?logo=prettier&logoColor=white" alt="Prettier">
+  <!-- Docker & Deployment (optional, not from package.json but nice to have) -->
+  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/Railway-0B0D0E?logo=railway&logoColor=white" alt="Railway">
 </p>
 
 > 🚧 **Project Status**: Under active development – expect breaking changes and rapid iteration.
@@ -180,6 +208,16 @@ npm run test:coverage
 cd frontend
 npm test
 ```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
+
+- Report bugs via [GitHub Issues](https://github.com/anupam6335/DevRhythm/issues)
+- Suggest features via [Discussions](https://github.com/anupam6335/DevRhythm/discussions)
+
 ---
 
 ## 📄 License
