@@ -1,5 +1,3 @@
-DevRhythm
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3fa4d2aa-4e89-4e0d-a7e6-0a2f4da8dbfb">
@@ -272,7 +270,7 @@ DevRhythm features two carefully crafted themes for optimal readability and eye 
 · Zen Paper (Light) – warm, paper‑like background.
 · Zen Charcoal (Dark) – soft charcoal for night coding.
 
-All colors, fonts, and spacing are defined as CSS variables, making theming consistent and easy to extend. The heatmap uses a GitHub‑inspired colour scale (green shades).
+All colors, fonts, and spacing are defined as CSS variables, making theming consistent and easy to extend. The heatmap uses a GitHub‑inspired colour scale (green 
 
 Font Role Font Family
 Body Commissioner
