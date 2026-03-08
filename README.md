@@ -1,4 +1,3 @@
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3fa4d2aa-4e89-4e0d-a7e6-0a2f4da8dbfb">
@@ -7,161 +6,49 @@
   </picture>
 </p>
 
+
 <h1 align="center">DevRhythm</h1>
 
-<p align="center">
-  <strong>Master your coding patterns with intelligent spaced repetition.</strong><br>
-  Track, revise, and level up your problem‑solving skills – all in one elegant platform.
-</p>
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![npm Version](https://img.shields.io/badge/npm-%3E%3D9-blue)](https://www.npmjs.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub Stars](https://img.shields.io/github/stars/anupam6335/DevRhythm?style=social)](https://github.com/anupam6335/DevRhythm/stargazers)
+[![Twitter Follow](https://img.shields.io/twitter/follow/anupam6335?style=social)](https://twitter.com/anupam6335)
 
-<p align="center">
-  <!-- Backend status -->
-  <a href="https://github.com/anupam6335/DevRhythm/actions/workflows/backend.yml"><img src="https://img.shields.io/github/actions/workflow/status/anupam6335/DevRhythm/backend.yml?branch=main&label=Backend%20CI&logo=github&style=flat-square" alt="Backend CI"></a>
-  <a href="https://codecov.io/gh/anupam6335/DevRhythm"><img src="https://img.shields.io/codecov/c/github/anupam6335/DevRhythm?flag=backend&logo=codecov&label=Backend%20Coverage&style=flat-square" alt="Backend Coverage"></a>
-  <!-- Frontend status -->
-  <a href="https://github.com/anupam6335/DevRhythm/actions/workflows/frontend.yml"><img src="https://img.shields.io/github/actions/workflow/status/anupam6335/DevRhythm/frontend.yml?branch=main&label=Frontend%20CI&logo=github&style=flat-square" alt="Frontend CI"></a>
-  <a href="https://codecov.io/gh/anupam6335/DevRhythm"><img src="https://img.shields.io/codecov/c/github/anupam6335/DevRhythm?flag=frontend&logo=codecov&label=Frontend%20Coverage&style=flat-square" alt="Frontend Coverage"></a>
-  <!-- Tech stack badges -->
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?logo=node.js&style=flat-square" alt="Node"></a>
-  <a href="https://expressjs.com"><img src="https://img.shields.io/badge/Express-4.18-lightgrey?logo=express&style=flat-square" alt="Express"></a>
-  <a href="https://mongodb.com"><img src="https://img.shields.io/badge/MongoDB-7.0-green?logo=mongodb&style=flat-square" alt="MongoDB"></a>
-  <a href="https://redis.io"><img src="https://img.shields.io/badge/Redis-7.2-red?logo=redis&style=flat-square" alt="Redis"></a>
-  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-15.1-black?logo=next.js&style=flat-square" alt="Next.js"></a>
-  <a href="https://reactjs.org"><img src="https://img.shields.io/badge/React-19-blue?logo=react&style=flat-square" alt="React"></a>
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&style=flat-square" alt="TypeScript"></a>
-  <!-- Deployment badges -->
-  <a href="https://railway.app"><img src="https://img.shields.io/badge/deployed%20on-Railway-0B0D0E?logo=railway&style=flat-square" alt="Railway"></a>
-  <a href="https://vercel.com"><img src="https://img.shields.io/badge/deployed%20on-Vercel-000000?logo=vercel&style=flat-square" alt="Vercel"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="MIT"></a>
-</p>
+**Track, master, and share your coding journey.**  
+DevRhythm is a full‑stack productivity platform for programmers who want to **log problems**, **schedule spaced‑repetition revisions**, **set daily/weekly goals**, and **share progress** with the community. Built with a modern MERN stack (Express + MongoDB + Redis + Next.js) and designed for long‑term retention.
 
----
-
-📖 **Table of Contents**
-
-- [Why DevRhythm?](#why-devrhythm)
-- [✨ Features](#-features)
-- [🧱 Tech Stack](#-tech-stack)
-- [📁 Project Structure](#-project-structure)
-- [🚀 Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-- [🧪 Testing](#-testing)
-- [🚢 Deployment](#-deployment)
-- [📚 API Documentation](#-api-documentation)
-- [🎨 Design & Theming](#-design--theming)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙌 Acknowledgements](#-acknowledgements)
-
----
-
-## 🌟 Why DevRhythm?
-
-Most developers solve problems but forget them within days.  
-DevRhythm combines:
-
-- **Spaced repetition** – never let a learned problem slip away.
-- **Visual heatmaps** – see your consistency at a glance.
-- **Pattern mastery** – track your proficiency in algorithmic patterns.
-- **Social accountability** – follow friends, join study groups, share progress.
-
-Whether you're preparing for coding interviews or just want to build a lasting habit, DevRhythm helps you stay in rhythm.
+> 🚧 **Project Status**: Under active development – expect breaking changes and rapid iteration.
 
 ---
 
 ## ✨ Features
 
-| Category       | Highlights                                                                                                                                                                                                 |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 📝 Questions   | Add, search, filter by platform, difficulty, tags, patterns. Soft‑delete and restore.                                                                                                                       |
-| 📊 Progress    | Track status (Not Started → Attempted → Solved → Mastered). Record attempts, notes, code, confidence.                                                                                                      |
-| 🔄 Revisions   | Automatic spaced repetition schedules (1‑3‑7‑14‑30 days). Today’s pending, upcoming, overdue views.                                                                                                        |
-| 🎯 Goals       | Set daily/weekly targets. Auto‑create goals. Track streaks and completion rates.                                                                                                                            |
-| 🔥 Heatmap     | Year‑round activity visualisation (like GitHub). Filter by platform, difficulty, or activity type. Export as JSON/CSV.                                                                                      |
-| 📈 Pattern Mastery | Analyse your performance by algorithmic pattern. Get recommendations for weakest patterns.                                                                                                                  |
-| 👥 Social      | Follow/unfollow users. See followers/following lists. Mutual follows and suggestions.                                                                                                                        |
-| 📤 Shares      | Create public or link‑only share pages of your solved problems (profile or custom period).                                                                                                                  |
-| 👥 Study Groups | Form groups, set collective goals, create challenges, see leaderboards.                                                                                                                                     |
-| 🌗 Themes      | Zen Paper (light) and Zen Charcoal (dark) – carefully crafted for long coding sessions.                                                                                                                      |
+- **📚 Problem Tracking** – Log problems from LeetCode, HackerRank, Codeforces and more. Tag by platform, difficulty, pattern.
+- **🔄 Spaced Repetition** – Automatically schedule revisions (1‑3‑7‑14‑30 days) for each solved problem.
+- **🎯 Goals & Streaks** – Set daily/weekly targets, track completion, maintain streaks.
+- **📊 Heatmap** – Visualise your activity over the year, filter by platform/difficulty, export data.
+- **👥 Social** – Follow other developers, see their public progress, join study groups and challenges.
+- **📤 Share** – Create shareable snapshots of your profile or a specific time period.
+- **🧠 Pattern Mastery** – Analyse your confidence across problem patterns, get recommendations.
+- **🌗 Zen‑inspired Themes** – Warm “Zen Paper” light mode and soft “Zen Charcoal” dark mode for long coding sessions.
+- **⚡ Performance First** – Redis caching, rate limiting, MongoDB indexes, and efficient aggregation pipelines.
 
 ---
 
-## 🧱 Tech Stack
+## 🛠 Tech Stack
 
-<details>
-<summary><strong>Backend</strong> (Node.js + Express)</summary>
-
-- **Runtime:** Node.js 18+
-- **Framework:** Express 4.18
-- **Database:** MongoDB (Mongoose 7.5) with indexes for performance
-- **Caching:** Redis 7.2 (sessions, rate limiting, API cache)
-- **Authentication:** Passport.js (Google OAuth 2.0, GitHub OAuth) + JWT
-- **Validation:** Joi
-- **File Uploads:** Cloudinary (Multer)
-- **Background Jobs:** node‑cron
-- **Logging:** Winston + Morgan
-- **Testing:** Jest + Supertest
-- **Deployment:** Railway (Docker ready)
-
-</details>
-
-<details>
-<summary><strong>Frontend</strong> (Next.js + TypeScript)</summary>
-
-- **Framework:** Next.js 15 (App Router)
-- **Language:** TypeScript 5.7
-- **Styling:** CSS Modules + CSS variables (fully themeable)
-- **State Management:** React Query (@tanstack/react-query)
-- **Forms:** React Hook Form + Zod
-- **HTTP Client:** Axios (with typed API client)
-- **Date Handling:** date‑fns
-- **UI Components:** 100% custom (no UI library) – Button, Avatar, Badge, Modal, etc.
-- **Icons:** React Icons
-- **Markdown:** react‑markdown + remark‑gfm
-- **Code Highlighting:** react‑syntax‑highlighter
-- **Toast Notifications:** react‑hot‑toast
-- **Deployment:** Vercel
-
-</details>
-
----
-
-## 📁 Project Structure
-
-The repository is split into two independent applications – backend and frontend – both inside a single monorepo.  
-Each has its own detailed README with file‑by‑file explanations.
-
-```
-
-DevRhythm/
-├── backend/          # Express.js backend
-│   ├── src/
-│   │   ├── config/       # DB, Redis, Cloudinary, OAuth
-│   │   ├── controllers/  # Request handlers
-│   │   ├── models/       # Mongoose schemas
-│   │   ├── routes/       # API routes (v1)
-│   │   ├── services/     # Business logic
-│   │   ├── middleware/   # Auth, cache, rate‑limiting, error handling
-│   │   ├── utils/        # Validators, helpers, errors
-│   │   └── jobs/         # Cron jobs
-│   ├── tests/            # Unit & integration tests
-│   ├── scripts/          # Seed, backup, cleanup
-│   ├── Dockerfile
-│   ├── railway.toml
-│   └── package.json
-└── frontend/         # Next.js frontend
-├── src/
-│   ├── app/          # App router pages
-│   ├── features/     # Feature‑based modules (auth, user, question, etc.)
-│   ├── shared/       # Reusable components, hooks, lib, types, styles
-│   ├── providers/    # Context providers
-│   └── middleware.ts # Auth middleware
-├── public/
-└── package.json
-
-```
+| Backend | Frontend |
+|--------|----------|
+| Node.js 18+ | Next.js 15 (App Router) |
+| Express | TypeScript |
+| MongoDB (Mongoose) | React 19 |
+| Redis (caching, rate‑limiting) | React Query |
+| Passport (OAuth2 – Google/GitHub) | React Hook Form + Zod |
+| JWT | CSS Modules + CSS Variables |
+| Winston (logging) | date‑fns, React Markdown |
+| Jest (testing) | Recharts (for heatmap) |
 
 ---
 
@@ -169,152 +56,156 @@ DevRhythm/
 
 ### Prerequisites
 
-- Node.js 18+ and npm 9+
-- MongoDB 7.0+ (local or Atlas)
-- Redis 7.2+ (local or Redis Cloud)
-- Cloudinary account (for avatar uploads)
-- Google and GitHub OAuth credentials
+- Node.js ≥ 18
+- npm ≥ 9 or yarn
+- MongoDB (local or Atlas)
+- Redis (local or Upstash/Railway)
 
-### Backend Setup
+### Installation
 
-```bash
-git clone https://github.com/anupam6335/DevRhythm.git
-cd DevRhythm/backend
-npm install
-cp .env.example .env   # edit with your own values
-npm run dev            # starts on http://localhost:5000
-```
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/anupam6335/DevRhythm.git
+   cd DevRhythm
+   ```
 
-For detailed backend instructions, see backend/README.md.
+2. **Backend setup**
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Fill in your environment variables (see below)
+   npm install
+   npm run dev
+   ```
 
-Frontend Setup
+3. **Frontend setup**
+   ```bash
+   cd ../frontend
+   cp .env.local.example .env.local
+   # Fill in frontend variables
+   npm install
+   npm run dev
+   ```
 
-```bash
-cd ../frontend
-npm install
-cp .env.local.example .env.local   # set NEXT_PUBLIC_API_BASE_URL
-npm run dev                         # starts on http://localhost:4000
-```
-
-For detailed frontend instructions, see frontend/README.md.
+The backend runs on `http://localhost:5000`, frontend on `http://localhost:4000`.
 
 ---
 
-🧪 Testing
+## 🐳 Docker Deployment
 
-Backend
+Both services are containerised. A `Dockerfile` is provided in the backend root, and the frontend can be built as a standalone Next.js app.
 
 ```bash
+# Build and run backend with Docker
 cd backend
-npm test                 # run all tests
-npm run test:watch       # watch mode
-npm run test:ci          # CI mode with coverage
+docker build -t devrhythm-backend .
+docker run -p 5000:5000 --env-file .env devrhythm-backend
 ```
 
-Frontend
+For production, consider using **Railway** (see `railway.toml` in backend) or a similar platform.
+
+---
+
+## 📁 Project Structure
+
+### Backend (`/backend`)
+```
+devrhythm-backend/
+├── src/
+│   ├── app.js                 # Express app setup
+│   ├── server.js               # Entry point
+│   ├── config/                 # DB, Redis, Cloudinary, OAuth
+│   ├── middleware/             # auth, cache, rateLimiter, errorHandler
+│   ├── models/                 # Mongoose schemas (User, Question, Progress...)
+│   ├── controllers/            # Business logic
+│   ├── routes/                 # API routes (v1)
+│   ├── services/               # Reusable services (heatmap, leaderboard, export)
+│   ├── utils/                  # helpers, validators, constants, errors
+│   ├── jobs/                   # Cron jobs (snapshots, notifications)
+│   └── scripts/                # seed, backup, cleanup
+├── tests/                       # Unit & integration tests
+├── Dockerfile
+├── railway.toml
+└── .env.example
+```
+
+### Frontend (`/frontend`)
+```
+frontend/
+├── src/
+│   ├── app/                    # Next.js App Router (routes grouped by feature)
+│   │   ├── (auth)/              # login, callback
+│   │   ├── (main)/              # dashboard, profile, questions, revisions...
+│   │   └── layout.tsx
+│   ├── features/                # Feature-based modules (auth, user, question...)
+│   │   ├── auth/
+│   │   ├── user/
+│   │   ├── question/
+│   │   └── ...
+│   ├── shared/                  # Reusable UI, hooks, lib, types, styles
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   ├── types/
+│   │   ├── styles/
+│   │   └── config/
+│   ├── providers/                # Context providers (Auth, Theme, Query)
+│   └── middleware.ts             # Next.js middleware (auth, redirects)
+├── public/
+├── .env.local
+└── next.config.js
+```
+
+---
+
+## 📚 API Documentation
+
+API documentation is auto‑generated using **Swagger** (when you run the backend).  
+Visit `http://localhost:5000/api-docs` in development.
+
+All endpoints are prefixed with `/api/v1`. A health check is available at `/api/v1/health`.
+
+---
+
+## 🧪 Running Tests
 
 ```bash
+# Backend tests (Jest)
+cd backend
+npm test
+npm run test:coverage
+
+# Frontend tests (coming soon)
 cd frontend
-npm run lint             # ESLint
-npm run format           # Prettier
+npm test
 ```
 
 ---
 
-🚢 Deployment
+## 🤝 Contributing
 
-Backend (Railway)
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.
 
-1. Push your code to a GitHub repository.
-2. Create a new project on Railway and connect the repo.
-3. Set all environment variables from .env.example.
-4. Railway automatically uses the provided Dockerfile and railway.toml.
-
-Frontend (Vercel)
-
-1. Connect your frontend directory to Vercel.
-2. Add the environment variables (NEXT_PUBLIC_API_BASE_URL, etc.).
-3. Deploy – Vercel automatically detects Next.js.
+- Report bugs via [GitHub Issues](https://github.com/anupam6335/DevRhythm/issues)
+- Suggest features via [Discussions](https://github.com/anupam6335/DevRhythm/discussions)
 
 ---
 
-📚 API Documentation
+## 📄 License
 
-Interactive API documentation is available as a Postman collection (in backend/postman).
-After starting the backend, you can explore endpoints via:
-
-```
-GET http://localhost:5000/api/v1/health
-```
-
-All responses follow a consistent format:
-
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Operation successful",
-  "data": { ... },
-  "meta": { ... },
-  "error": null
-}
-```
-
-For detailed request/response schemas, see the shared TypeScript types – these are used by both frontend and backend.
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
 ---
 
-🎨 Design & Theming
+## 🙌 Acknowledgements
 
-DevRhythm features two carefully crafted themes for optimal readability and eye comfort.
-
-· Zen Paper (Light) – warm, paper‑like background.
-· Zen Charcoal (Dark) – soft charcoal for night coding.
-
-All colors, fonts, and spacing are defined as CSS variables, making theming consistent and easy to extend. The heatmap uses a GitHub‑inspired colour scale (green intensity).
-
-Font Role Font Family
-Body Commissioner
-Headings Outfit
-Code Cascadia Mono
-Notes Patrick Hand
-
----
-
-🤝 Contributing
-
-We ❤️ contributions! Whether it’s a bug report, feature idea, or pull request – you're welcome.
-
-1. Fork the repository.
-2. Create a feature branch (git checkout -b feature/amazing).
-3. Commit your changes (git commit -m 'Add amazing feature').
-4. Push to the branch (git push origin feature/amazing).
-5. Open a Pull Request.
-
-Please read our Contributing Guidelines for code style, commit messages, and testing requirements.
-
----
-
-📄 License
-
-This project is licensed under the MIT License – see the LICENSE file for details.
-
----
-
-🙌 Acknowledgements
-
-· Inspired by GitHub’s contribution graph and Anki’s spaced repetition.
-· Fonts: Commissioner, Outfit, Patrick Hand, Cascadia Code.
-· Icons: React Icons (Feather, Font Awesome).
+- Inspired by spaced repetition systems (Anki, SuperMemo)
+- Heatmap design inspired by GitHub contributions graph
+- Fonts: [Commissioner](https://fonts.google.com/specimen/Commissioner), [Outfit](https://fonts.google.com/specimen/Outfit), [Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand), Cascadia Mono
 
 ---
 
 <p align="center">
-  <strong>Keep your coding rhythm. 🥁</strong>
+  Made with ❤️ by <a href="https://github.com/anupam6335">Anupam</a> and the DevRhythm community.
 </p>
-
-<!-- 
-<p align="center">
-  <a href="https://devrhythm.vercel.app">devrhythm.vercel.app</a> · 
-  <a href="https://twitter.com/devrhythm">@devrhythm</a> · 
-  <a href="mailto:hello@devrhythm.com">hello@devrhythm.com</a>
+```
