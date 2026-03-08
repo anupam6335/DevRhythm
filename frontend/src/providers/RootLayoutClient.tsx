@@ -5,7 +5,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { queryClient } from '@/shared/lib/react-query';
 import { ToastProvider } from '@/shared/components/Toast';
+import { useMediaQuery } from '@/shared/hooks';
 import Navbar from '@/shared/components/Navbar';
+import Footer from '@/shared/components/Footer';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
 import { useCurrentGoalProgress } from '@/features/goal/hooks/useCurrentGoalProgress';
@@ -20,6 +22,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { pendingCount } = usePendingRevisions();
   const { progress } = useCurrentGoalProgress();
+  const isDesktop = useMediaQuery('(min-width: 940px)'); // matches --breakpoint-desktop
 
   const handleLogout = () => {
     logout();
@@ -40,6 +43,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         onQuickAdd={handleQuickAdd}
       />
       <main className="devRhythmContainer">{children}</main>
+      {isDesktop && <Footer />}
       <AddProgressModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

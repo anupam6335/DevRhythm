@@ -251,29 +251,32 @@
 }
 
 /* Login link */
-.loginLink {
+.loginCta {
+  font-size: 0.95rem;
+  color: var(--text-primary); 
+  text-decoration: none;
+  padding: 0 1rem;
+  border-radius: 40px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  font-weight: 500;
+  white-space: nowrap;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 1.5rem;
-  background-color: var(--primary-action);
-  color: var(--primary-text-on-action);
-  border-radius: 40px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px var(--shadow);
-  height: 40px;
   line-height: 1;
-  white-space: nowrap;
+  box-sizing: border-box;
 }
 
-.loginLink:hover {
-  background-color: var(--primary-action-hover);
+.loginCta:hover {
+  color: var(--accent-moss);
+  background-color: var(--hover-surface);
+  border-color: var(--accent-moss);
   transform: translateY(-2px);
-  box-shadow: 0 6px 14px var(--shadow);
+  box-shadow: 0 4px 12px var(--shadow);
 }
-
 /* ===== Mobile Header (top bar) ===== */
 .mobileHeader {
   display: flex;
