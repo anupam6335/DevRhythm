@@ -235,7 +235,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
-              <Link href={ROUTES.LOGIN} className={styles.loginLink}>
+               <Link href={ROUTES.LOGIN} className={styles.loginLink}>
                 Login
               </Link>
             )}

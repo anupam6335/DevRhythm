@@ -1,0 +1,34 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+  background-color: var(--color-background-secondary);
+  border-radius: var(--border-radius-lg);
+  min-height: 200px;
+  width: 100%;
+}
+
+.iconWrapper {
+  margin-bottom: 1rem;
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--color-icon-muted);
+}
+
+.defaultIcon {
+  /* No extra styles needed; size comes from parent */
+}
+
+.message {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  max-width: 300px;
+}
+
+.retryButton {
+  margin-top: 0.5rem;
+}
