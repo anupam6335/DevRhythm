@@ -1,74 +1,68 @@
 .container {
-  max-width: 1200px;
+  padding: 1rem;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
-  background-color: var(--bg-app);
+}
+
+
+.controls {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.controls input {
+  width: 70px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
   font-family: var(--font-body);
 }
 
-.title {
-  font-family: var(--font-heading);
-  font-size: 2.5rem;
-  font-weight: 600;
-  margin-bottom: 2rem;
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--divider);
-  padding-bottom: 1rem;
+.controls button {
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background-color 0.2s;
 }
 
-.section {
-  margin-bottom: 3rem;
+.controls button:hover {
+  background-color: var(--primary-action-hover);
 }
 
-.sectionTitle {
-  font-family: var(--font-heading);
-  font-size: 1.75rem;
-  font-weight: 500;
-  margin-bottom: 1.5rem;
-  color: var(--text-secondary);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.progressGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.progressItem {
+.content {
+  margin-top: 2rem;
+  padding: 1rem;
   background-color: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem;
-  transition: var(--transition);
+  max-height: 500px;
+  overflow-y: auto;
 }
 
-.progressItem:hover {
-  border-color: var(--accent-sand);
-  box-shadow: 0 4px 8px var(--shadow);
-}
-
-.progressItem h3 {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-
-/* For smaller screens */
+/* Ensure the mobile spacer works inside test page */
 @media (max-width: 768px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
-  .progressGrid {
-    grid-template-columns: 1fr;
+  .content {
+    margin-bottom: 80px; /* make room for fixed bottom bar */
   }
 }
