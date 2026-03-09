@@ -27,20 +27,14 @@ import Logo from '@/shared/components/Logo';
 import { Avatar } from '@/shared/components/Avatar';
 import ThemeToggle from '@/shared/components/ThemeToggle';
 import Button from '@/shared/components/Button';
+import { useSession } from '@/features/auth/hooks/useSession';
 
 import styles from './Navbar.module.css';
 
 export interface NavbarProps {
-  user: {
-    _id: string;
-    username: string;
-    displayName?: string;
-    avatarUrl?: string;
-  } | null;
   pendingRevisionsCount?: number;
   dailyGoalProgress?: { completed: number; target: number };
   streakCount?: number;
-  onLogout: () => void;
   onQuickAdd: () => void;
   className?: string;
 }
@@ -48,40 +42,45 @@ export interface NavbarProps {
 type DropdownId = 'questions' | 'progress' | 'groups' | 'profile' | null;
 
 export const Navbar: React.FC<NavbarProps> = ({
-  user,
   pendingRevisionsCount = 0,
   dailyGoalProgress = { completed: 0, target: 3 },
   streakCount = 0,
-  onLogout,
   onQuickAdd,
   className,
 }) => {
+  const { user, logout } = useSession();
   const pathname = usePathname();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [openDropdown, setOpenDropdown] = useState<DropdownId>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useClickOutside(dropdownRef, () => setOpenDropdown(null));
+  const questionsRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const groupsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  // Scroll listener for shadow effect
+  useClickOutside(questionsRef, () => {
+    if (openDropdown === 'questions') setOpenDropdown(null);
+  });
+  useClickOutside(progressRef, () => {
+    if (openDropdown === 'progress') setOpenDropdown(null);
+  });
+  useClickOutside(groupsRef, () => {
+    if (openDropdown === 'groups') setOpenDropdown(null);
+  });
+  useClickOutside(profileRef, () => {
+    if (openDropdown === 'profile') setOpenDropdown(null);
+  });
+
   useEffect(() => {
-    const handleScroll = () => {
-      const offset = window.scrollY;
-      if (offset > 10) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
-    };
-
+    const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const toggleDropdown = (id: DropdownId) => {
-    setOpenDropdown(prev => (prev === id ? null : id));
+    setOpenDropdown((prev) => (prev === id ? null : id));
   };
 
   const isActive = (href: string) => pathname === href;
@@ -95,7 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className={styles.navLinks}>
             {/* Questions dropdown */}
-            <div className={styles.dropdownWrapper} ref={dropdownRef}>
+            <div className={styles.dropdownWrapper} ref={questionsRef}>
               <Button
                 variant="ghost"
                 className={clsx(styles.navLink, openDropdown === 'questions' && styles.active)}
@@ -122,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Progress dropdown with badge and goal pill */}
-            <div className={styles.dropdownWrapper}>
+            {/* Progress dropdown */}
+            <div className={styles.dropdownWrapper} ref={progressRef}>
               <Button
                 variant="ghost"
                 className={clsx(styles.navLink, openDropdown === 'progress' && styles.active)}
@@ -140,7 +139,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 )}
               </Button>
-              {/* Daily goal pill */}
               <button
                 className={styles.goalPill}
                 onClick={onQuickAdd}
@@ -168,7 +166,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Groups dropdown */}
-            <div className={styles.dropdownWrapper}>
+            <div className={styles.dropdownWrapper} ref={groupsRef}>
               <Button
                 variant="ghost"
                 className={clsx(styles.navLink, openDropdown === 'groups' && styles.active)}
@@ -195,12 +193,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Theme Toggle */}
             <ThemeToggle variant="icon" className={styles.themeToggle} />
 
-            {/* Avatar / Profile section */}
             {user ? (
-              <div className={styles.dropdownWrapper}>
+              <div className={styles.dropdownWrapper} ref={profileRef}>
                 <Button
                   variant="ghost"
                   className={clsx(styles.avatarButton, openDropdown === 'profile' && styles.active)}
@@ -208,13 +204,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   aria-expanded={openDropdown === 'profile'}
                   aria-haspopup="true"
                 >
-                  <Avatar src={user.avatarUrl} name={user.displayName || user.username} size="sm" />
-                  {streakCount > 0 && (
-                    <span className={styles.streakFlame} aria-label={`${streakCount} day streak`}>
-                      <FaFire />
-                      <span>{streakCount}</span>
-                    </span>
-                  )}
+                  <Avatar
+                    src={user.avatarUrl}
+                    name={user.displayName || user.username}
+                    size="md"
+                  />
                 </Button>
                 {openDropdown === 'profile' && (
                   <div className={styles.dropdownMenu} style={{ right: 0, left: 'auto' }}>
@@ -228,14 +222,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <FiSettings /> Settings
                     </Link>
                     <div className={styles.dropdownDivider} />
-                    <button onClick={onLogout} className={styles.dropdownItem}>
+                    <button onClick={logout} className={styles.dropdownItem}>
                       <FiLogOut /> Logout
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-               <Link href={ROUTES.LOGIN} className={styles.loginLink}>
+              <Link href={ROUTES.LOGIN} className={styles.loginLink}>
                 Login
               </Link>
             )}
@@ -245,10 +239,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     );
   }
 
-  // Mobile navigation (top bar + bottom nav + drawer)
+  // Mobile navigation
   return (
     <>
-      {/* Mobile top bar with logo and hamburger */}
       <header className={clsx(styles.mobileHeader, scrolled && styles.scrolled)}>
         <Logo size="sm" layout="horizontal" />
         <Button
@@ -260,7 +253,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
       </header>
 
-      {/* Slide‑out drawer */}
       {isDrawerOpen && (
         <div className={styles.drawerOverlay} onClick={() => setIsDrawerOpen(false)}>
           <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
@@ -352,7 +344,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       variant="ghost"
                       className={styles.drawerLogout}
                       onClick={() => {
-                        onLogout();
+                        logout();
                         setIsDrawerOpen(false);
                       }}
                       leftIcon={<FiLogOut />}
@@ -373,7 +365,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      {/* Bottom navigation */}
       <nav className={clsx(styles.mobileNavbar, className)}>
         <div className={styles.mobileNavLinks}>
           <Link
@@ -425,7 +416,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Spacer for bottom nav */}
       <div className={styles.mobileSpacer} />
     </>
   );
