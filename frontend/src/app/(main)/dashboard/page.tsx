@@ -22,8 +22,7 @@ export default function DashboardPage() {
   if (!user) return <div className="devRhythmContainer">Not authenticated</div>;
 
   return (
-    <div className="devRhythmContainer">
-      <div className={styles.container}>
+<div className={styles.container}>
         <h1 className={styles.title}>Welcome back, {user.displayName}! 👋</h1>
 
         {/* Construction card with breathing animation */}
@@ -55,6 +54,5 @@ export default function DashboardPage() {
           <Button onClick={logout} variant="outline">Logout</Button>
         </div>
       </div>
-    </div>
   );
 }
