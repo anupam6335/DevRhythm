@@ -429,7 +429,7 @@
   letter-spacing: 0.5px;
   color: var(--text-muted);
   margin-bottom: 0.75rem;
-  font-family: var(--font-heading);
+  font-family: var(--font-code);
 }
 
 /* Standard drawer links (not buttons) */
@@ -568,7 +568,7 @@
 
 .mobileLabel {
   font-size: 0.7rem;
-  font-family: var(--font-body);
+  font-family: var(--font-code);
 }
 
 .mobileBadge {
