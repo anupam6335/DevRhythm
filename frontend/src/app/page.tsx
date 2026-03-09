@@ -85,7 +85,7 @@ console.log(quickSort(unsorted));`);
   };
 
   return (
-    <main className="devRhythmContainer">
+    <main>
       <style>{`
         .custom-code-block {
           border: 2px solid red;

@@ -208,8 +208,8 @@
 /* Avatar button – using Button, minimal overrides */
 .avatarButton {
   position: relative;
-  height: 40px;
-  width: 40px;
+  height: 48px;
+  width: 48px;
   border-radius: 50% !important;
   padding: 0 !important;
   background: transparent !important;
@@ -621,7 +621,7 @@
 }
 
 .mobileSpacer {
-  height: 80px;
+  /* height: 80px; */
 }
 
 /* ===== Responsive adjustments ===== */

@@ -1,0 +1,30 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.loading,
+.error {
+  background-color: var(--bg-elevated);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px var(--shadow);
+  max-width: 400px;
+  width: 100%;
+}
+
+.error {
+  border-left: 4px solid var(--error);
+}
+
+.error h2 {
+  color: var(--error);
+  margin-bottom: 16px;
+}
+
+.error p {
+  color: var(--text-secondary);
+}

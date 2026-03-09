@@ -22,7 +22,7 @@ html,
 body {
   max-width: 100vw;
   min-height: 100vh;
-  background-color: var(--bg-app);
+  background-color: var(--bg-surface);
   color: var(--text-primary);
   font-family: var(--font-body);
   line-height: 1.5;
@@ -57,7 +57,7 @@ code, pre {
 .devRhythmContainer {
   max-width: 940px;
   margin: 0 auto;
-  padding: 0 1rem; /* optional side padding */
+  padding: 0 1rem;
   width: 100%;
 }
 

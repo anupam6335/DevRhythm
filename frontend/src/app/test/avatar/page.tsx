@@ -1,4 +1,3 @@
-// frontend/src/app/test/avatar/page.tsx
 "use client";
 
 import React from "react";

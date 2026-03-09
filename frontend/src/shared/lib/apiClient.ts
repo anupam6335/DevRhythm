@@ -14,7 +14,6 @@ const getBaseUrl = (): string => {
 
 /**
  * Retrieves the authentication token from localStorage.
- * This can be replaced with a more sophisticated token manager later.
  */
 const getToken = (): string | null => {
   if (typeof window === 'undefined') return null; // server-side
@@ -40,6 +39,28 @@ export const buildQueryString = (params?: Record<string, any>): string => {
   const queryString = searchParams.toString();
   return queryString ? `?${queryString}` : '';
 };
+
+/**
+ * Custom response type returned by our interceptor.
+ */
+export interface ApiClientResponse<T = any> {
+  data: T;
+  meta: Record<string, any>;
+  status: number;
+  statusText: string;
+  headers: any;
+  config: InternalAxiosRequestConfig;
+}
+
+/**
+ * Type guard to check if a response has pagination metadata.
+ * Useful for components that need to access pagination info.
+ */
+export function isPaginatedResponse<T>(
+  response: ApiClientResponse<T>
+): response is ApiClientResponse<T> & { meta: { pagination: NonNullable<PaginatedResponse<T>['meta']['pagination']> } } {
+  return !!response.meta?.pagination;
+}
 
 /**
  * Axios instance with base configuration.
@@ -69,20 +90,19 @@ apiClient.interceptors.request.use(
 /**
  * Response interceptor:
  * - Checks for `success: false` in the response data and throws an error.
- * - On success, unwraps the `data` field and returns `{ data, meta }`.
+ * - On success, unwraps the `data` field and returns `{ data, meta }` (ApiClientResponse).
  * - Handles network errors and other HTTP errors.
  */
 apiClient.interceptors.response.use(
   (response) => {
     const apiResponse = response.data as ApiResponse;
     if (apiResponse.success === false) {
-      // Construct an error similar to an Axios error with the response data
       const error = new Error(apiResponse.message || 'Request failed');
       (error as any).response = response;
       (error as any).isApiError = true;
       throw error;
     }
-    // Return unwrapped data and meta
+    // Return unwrapped data and meta, matching ApiClientResponse shape
     return {
       data: apiResponse.data,
       meta: apiResponse.meta,
@@ -90,10 +110,9 @@ apiClient.interceptors.response.use(
       statusText: response.statusText,
       headers: response.headers,
       config: response.config,
-    };
+    } as ApiClientResponse;
   },
   (error: AxiosError) => {
-    // Enhance error with more context if needed
     if (error.response) {
       const apiError = error.response.data as ApiResponse;
       error.message = apiError?.message || error.message;

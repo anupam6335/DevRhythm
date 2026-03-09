@@ -1,5 +1,3 @@
-// frontend/src/shared/hooks/useTheme.ts
-
 import { useTheme as useNextTheme } from 'next-themes';
 import { useCallback, useMemo } from 'react';
 
