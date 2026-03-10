@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { VscGithub } from 'react-icons/vsc';
@@ -20,7 +18,7 @@ export const OAuthButtons: React.FC<OAuthButtonsProps> = ({
   return (
     <div className={styles.container}>
       <Button
-        variant="outline"
+        variant="primary"
         size="lg"
         fullWidth
         leftIcon={<FcGoogle />}
@@ -31,7 +29,7 @@ export const OAuthButtons: React.FC<OAuthButtonsProps> = ({
         Continue with Google
       </Button>
       <Button
-        variant="outline"
+        variant="primary"
         size="lg"
         fullWidth
         leftIcon={<VscGithub />}

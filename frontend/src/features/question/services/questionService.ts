@@ -1,0 +1,86 @@
+import apiClient, { buildQueryString } from '@/shared/lib/apiClient';
+import type { Question } from '@/shared/types';
+import type { QuestionListResponse, QuestionStatistics } from '../types/question.types';
+
+export const questionService = {
+  async getQuestions(params?: {
+    page?: number;
+    limit?: number;
+    platform?: string;
+    difficulty?: string;
+    pattern?: string;
+    tags?: string[];
+    search?: string;
+  }) {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<QuestionListResponse>(`/questions${query}`);
+    return response.data;
+  },
+
+  async getQuestionById(id: string) {
+    const response = await apiClient.get<{ question: Question }>(`/questions/${id}`);
+    return response.data.question;
+  },
+
+  async getQuestionByPlatformId(platform: string, platformQuestionId: string) {
+    const response = await apiClient.get<{ question: Question }>(`/questions/platform/${platform}/${platformQuestionId}`);
+    return response.data.question;
+  },
+
+  async getSimilarQuestions(id: string) {
+    const response = await apiClient.get<{ similarQuestions: Question[] }>(`/questions/similar/${id}`);
+    return response.data.similarQuestions;
+  },
+
+  async getPatterns() {
+    const response = await apiClient.get<{ patterns: string[] }>('/questions/patterns');
+    return response.data.patterns;
+  },
+
+  async getTags() {
+    const response = await apiClient.get<{ tags: string[] }>('/questions/tags');
+    return response.data.tags;
+  },
+
+  async getStatistics() {
+    const response = await apiClient.get<{ statistics: QuestionStatistics }>('/questions/statistics');
+    return response.data.statistics;
+  },
+
+  async getDeletedQuestions(params?: {
+    page?: number;
+    limit?: number;
+    platform?: string;
+    difficulty?: string;
+    pattern?: string;
+    tags?: string[];
+    search?: string;
+  }) {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<QuestionListResponse>(`/questions/deleted${query}`);
+    return response.data;
+  },
+
+  async createQuestion(data: any) {
+    const response = await apiClient.post<{ question: Question }>('/questions', data);
+    return response.data.question;
+  },
+
+  async updateQuestion(id: string, data: any) {
+    const response = await apiClient.put<{ question: Question }>(`/questions/${id}`, data);
+    return response.data.question;
+  },
+
+  async deleteQuestion(id: string) {
+    await apiClient.delete(`/questions/${id}`);
+  },
+
+  async restoreQuestion(id: string) {
+    const response = await apiClient.post<{ question: Question }>(`/questions/${id}/restore`);
+    return response.data.question;
+  },
+
+  async permanentDeleteQuestion(id: string) {
+    await apiClient.delete(`/questions/${id}/permanent`);
+  }
+};

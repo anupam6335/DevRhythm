@@ -5,8 +5,8 @@ import { goalKeys } from '@/shared/lib/react-query';
 export function useTodayProgress() {
   const { data, isLoading, error } = useQuery({
     queryKey: goalKeys.current(),
-    queryFn: goalService.getCurrentGoals,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryFn: () => goalService.getCurrentGoals(),
+    staleTime: 2 * 60 * 1000,
   });
 
   return {

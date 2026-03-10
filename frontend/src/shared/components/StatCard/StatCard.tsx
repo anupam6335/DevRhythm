@@ -94,7 +94,7 @@ export const StatCard = forwardRef<HTMLDivElement, StatCardProps>(
           className
         )}
         {...(href ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-        {...rest}
+        {...(rest as any)} // Cast rest to any to avoid type conflicts between div and a props
       >
         {renderContent()}
       </Container>

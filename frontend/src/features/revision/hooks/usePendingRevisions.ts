@@ -6,7 +6,7 @@ export function usePendingRevisions() {
   const { data = 0, isLoading, error } = useQuery({
     queryKey: revisionKeys.overdue({ limit: 1 }),
     queryFn: revisionService.getOverdueRevisionsCount,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
   return {
