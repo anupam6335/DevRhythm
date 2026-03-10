@@ -139,14 +139,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 )}
               </Button>
-              <button
+              {/* <button
                 className={styles.goalPill}
                 onClick={onQuickAdd}
                 aria-label={`Daily goal: ${dailyGoalProgress.completed}/${dailyGoalProgress.target} solved`}
               >
                 <FiTarget className={styles.goalPillIcon} />
                 <span>{dailyGoalProgress.completed}/{dailyGoalProgress.target}</span>
-              </button>
+              </button> */}
               {openDropdown === 'progress' && (
                 <div className={styles.dropdownMenu}>
                   <Link href={ROUTES.PROGRESS} className={styles.dropdownItem}>
@@ -353,11 +353,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </Button>
                   </div>
 
-                  {streakCount > 0 && (
+                  {/* {streakCount > 0 && (
                     <div className={styles.drawerStreak}>
                       <FaFire /> {streakCount} day streak
                     </div>
-                  )}
+                  )} */}
                 </>
               )}
             </div>
