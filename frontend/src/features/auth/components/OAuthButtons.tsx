@@ -18,7 +18,7 @@ export const OAuthButtons: React.FC<OAuthButtonsProps> = ({
   return (
     <div className={styles.container}>
       <Button
-        variant="outline"
+        variant="primary"
         size="lg"
         fullWidth
         leftIcon={<FcGoogle />}
@@ -29,7 +29,7 @@ export const OAuthButtons: React.FC<OAuthButtonsProps> = ({
         Continue with Google
       </Button>
       <Button
-        variant="outline"
+        variant="primary"
         size="lg"
         fullWidth
         leftIcon={<VscGithub />}
