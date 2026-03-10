@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import { FaSpinner } from 'react-icons/fa';
 import clsx from 'clsx';
@@ -69,10 +67,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     if (asChild && React.isValidElement(children)) {
       const child = React.Children.only(children) as React.ReactElement;
+      // Cast commonProps to any to avoid type conflicts when spreading into the child
       return React.cloneElement(child, {
-        ref,
-        ...commonProps,
-        className: clsx(commonProps.className, (child.props as { className?: string }).className),
+        ...(commonProps as any),
+        className: clsx(commonProps.className, (child.props as any).className),
       });
     }
 

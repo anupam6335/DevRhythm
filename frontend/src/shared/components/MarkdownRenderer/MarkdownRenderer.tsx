@@ -130,7 +130,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <blockquote className={styles.blockquote} {...props} />
           ),
           // Code (inline and block)
-          code: ({ node, inline, className, children, ...props }) => {
+          code: (props) => {
+            // Destructure safely with a type assertion to access 'inline'
+            const { node, className, children } = props as any;
+            const inline = (props as any).inline;
             const match = /language-(\S+)/.exec(className || '');
             const language = match ? match[1] : '';
             if (!inline && language) {

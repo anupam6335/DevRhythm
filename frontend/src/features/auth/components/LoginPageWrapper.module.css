@@ -8,8 +8,8 @@
   overflow: hidden;
 }
 
-/* Ripple background – three expanding circles */
-.rippleBackground {
+/* Capillary waves background – hidden animation by default */
+.capillaryBackground {
   position: absolute;
   top: 0;
   left: 0;
@@ -19,41 +19,141 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02), transparent 70%);
 }
 
-.ripple {
+.capillaryRing {
   position: absolute;
-  width: 200px;
-  height: 200px;
   border-radius: 50%;
-  border: 2px solid var(--accent-moss);
+  border: 1px solid rgba(var(--accent-moss-rgb), 0.35);
   opacity: 0;
-  animation: rippleAnimation 8s infinite ease-out;
-}
-.ripple:nth-child(1) {
-  animation-delay: 0s;
-  width: 300px;
-  height: 300px;
+  /* animation removed by default – will be triggered on hover */
+  box-shadow: 0 0 15px rgba(var(--accent-moss-rgb), 0.1);
+  will-change: transform, opacity;
 }
 
-.ripple:nth-child(2) {
-  animation-delay: 2s;
-  width: 400px;
-  height: 400px;
+/* 10 rings with staggered sizes and delays – animation starts on card hover */
+.card:hover ~ .capillaryBackground .capillaryRing {
+  animation: rippleFast 3.5s ease-out;
 }
 
-.ripple:nth-child(3) {
-  animation-delay: 4s;
-  width: 500px;
-  height: 500px;
+/* Staggered delays (0.35s apart for smooth overlap) */
+.capillaryRing:nth-child(1)  { animation-delay: 0.00s; width: 80px;  height: 80px; }
+.capillaryRing:nth-child(2)  { animation-delay: 0.35s; width: 140px; height: 140px; }
+.capillaryRing:nth-child(3)  { animation-delay: 0.70s; width: 200px; height: 200px; }
+.capillaryRing:nth-child(4)  { animation-delay: 1.05s; width: 260px; height: 260px; }
+.capillaryRing:nth-child(5)  { animation-delay: 1.40s; width: 320px; height: 320px; }
+.capillaryRing:nth-child(6)  { animation-delay: 1.75s; width: 380px; height: 380px; }
+.capillaryRing:nth-child(7)  { animation-delay: 2.10s; width: 440px; height: 440px; }
+.capillaryRing:nth-child(8)  { animation-delay: 2.45s; width: 500px; height: 500px; }
+.capillaryRing:nth-child(9)  { animation-delay: 2.80s; width: 560px; height: 560px; }
+.capillaryRing:nth-child(10) { animation-delay: 3.15s; width: 620px; height: 620px; }
+
+@keyframes rippleFast {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.8;
+    border-width: 2.5px;
+    border-color: rgba(var(--accent-moss-rgb), 0.6);
+  }
+  30% {
+    opacity: 0.5;
+    border-width: 1.8px;
+    border-color: rgba(var(--accent-moss-rgb), 0.45);
+  }
+  60% {
+    opacity: 0.25;
+    border-width: 1.2px;
+    border-color: rgba(var(--accent-moss-rgb), 0.25);
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+    border-width: 0.5px;
+    border-color: rgba(var(--accent-moss-rgb), 0.1);
+  }
 }
 
-.ripple:nth-child(4) {
-  animation-delay: 6s;
-  width: 600px;
-  height: 600px;
+/* ===== REDESIGNED CARD – modern glass morphism ===== */
+.card {
+  background-color: rgba(var(--bg-elevated-rgb), 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 32px;
+  width: 100%;
+  max-width: 500px;
+  position: relative;
+  z-index: 2;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 20px 40px -12px var(--shadow), 0 0 0 1px rgba(var(--accent-moss-rgb), 0.1) inset;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 30px 60px -16px var(--shadow), 0 0 0 1px rgba(var(--accent-moss-rgb), 0.2) inset;
+}
+
+/* Gradient border effect using pseudo-element */
+.card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border-radius: 33px;
+  padding: 1px;
+  background: linear-gradient(145deg, rgba(var(--accent-moss-rgb), 0.5), rgba(var(--accent-moss-rgb), 0.1) 80%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.cardInner {
+  padding: 3rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  position: relative;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 20% 30%,
+    rgba(var(--accent-moss-rgb), 0.04),
+    transparent 60%
+  );
+}
+
+/* Headline – refined with gradient highlight */
+.title {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  font-weight: 350;
+  line-height: 1.2;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+}
+
+.highlight {
+  background: linear-gradient(135deg, var(--accent-moss), rgba(var(--accent-moss-rgb), 0.7));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 8px rgba(var(--accent-moss-rgb), 0.25);
+  display: inline-block;
+}
+
+/* Subheadline – used by RotatingQuote */
 .subtitle {
   font-size: 1.1rem;
   color: var(--text-secondary);
@@ -76,89 +176,7 @@
   opacity: 1;
 }
 
-@keyframes rippleAnimation {
-  0% {
-    transform: scale(0.5);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-
-/* Card – clean, elevated, with a subtle pattern */
-.card {
-  background-color: var(--bg-elevated);
-  border-radius: 32px;
-  width: 100%;
-  max-width: 500px;
-  position: relative;
-  z-index: 2;
-  border: 1px solid var(--border);
-  backdrop-filter: blur(4px);
-  transition: transform 0.3s ease;
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 25px 50px -12px var(--shadow);
-}
-
-.cardInner {
-  padding: 3rem 2.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  position: relative;
-  background: radial-gradient(
-    circle at 20% 30%,
-    rgba(var(--accent-moss-rgb), 0.03),
-    transparent 50%
-  );
-  border-radius: inherit;
-}
-
-/* Headline – bold, storytelling */
-.title {
-  font-family: var(--font-heading);
-  font-size: 2.5rem;
-  font-weight: 300;
-  line-height: 1.2;
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.02em;
-  text-transform: lowercase;
-}
-
-.highlight {
-  color: var(--accent-moss);
-  position: relative;
-  display: inline-block;
-}
-
-.highlight::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 0;
-  right: 0;
-  height: 10px;
-  background: var(--accent-moss);
-  opacity: 0.15;
-  border-radius: 5px;
-  z-index: -1;
-}
-
-/* Subheadline */
-.subtitle {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* OAuth buttons container */
+/* OAuth buttons container – keep spacing */
 .buttons {
   margin-top: 0.5rem;
 }
@@ -175,13 +193,31 @@
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s;
+  position: relative;
 }
 
 .link:hover {
-  text-decoration: underline;
+  color: var(--accent-moss);
+  text-decoration: none;
 }
 
-/* Metronome – three dots pulsing in sequence */
+.link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.link:hover::after {
+  transform: scaleX(1);
+}
+
+/* Metronome – three dots with a smoother pulse */
 .metronome {
   display: flex;
   justify-content: center;
@@ -196,28 +232,16 @@
   border-radius: 50%;
   opacity: 0.3;
   animation: metronomePulse 1.5s infinite ease-in-out;
+  filter: drop-shadow(0 0 2px rgba(var(--accent-moss-rgb), 0.3));
 }
 
-.metronomeDot:nth-child(1) {
-  animation-delay: 0s;
-}
-.metronomeDot:nth-child(2) {
-  animation-delay: 0.5s;
-}
-.metronomeDot:nth-child(3) {
-  animation-delay: 1s;
-}
+.metronomeDot:nth-child(1) { animation-delay: 0s; }
+.metronomeDot:nth-child(2) { animation-delay: 0.5s; }
+.metronomeDot:nth-child(3) { animation-delay: 1s; }
 
 @keyframes metronomePulse {
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.3);
-  }
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
 }
 
 /* ===== Responsive adjustments ===== */
@@ -249,14 +273,24 @@
   .card {
     border-radius: 24px;
   }
+  .card::before {
+    border-radius: 25px;
+  }
   .cardInner {
     padding: 2rem 1.5rem;
   }
   .title {
     font-size: 1.8rem;
   }
-  .ripple {
-    width: 150px;
-    height: 150px;
-  }
+  /* Scale down rings on mobile */
+  .capillaryRing:nth-child(1)  { width: 60px;  height: 60px; }
+  .capillaryRing:nth-child(2)  { width: 100px; height: 100px; }
+  .capillaryRing:nth-child(3)  { width: 140px; height: 140px; }
+  .capillaryRing:nth-child(4)  { width: 180px; height: 180px; }
+  .capillaryRing:nth-child(5)  { width: 220px; height: 220px; }
+  .capillaryRing:nth-child(6)  { width: 260px; height: 260px; }
+  .capillaryRing:nth-child(7)  { width: 300px; height: 300px; }
+  .capillaryRing:nth-child(8)  { width: 340px; height: 340px; }
+  .capillaryRing:nth-child(9)  { width: 380px; height: 380px; }
+  .capillaryRing:nth-child(10) { width: 420px; height: 420px; }
 }

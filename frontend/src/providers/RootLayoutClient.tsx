@@ -19,14 +19,10 @@ import { AddProgressModal } from '@/features/progress/components/AddProgressModa
  */
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { pendingCount } = usePendingRevisions();
   const { progress } = useCurrentGoalProgress();
-  const isDesktop = useMediaQuery('(min-width: 940px)'); // matches --breakpoint-desktop
-
-  const handleLogout = () => {
-    logout();
-  };
+  const isDesktop = useMediaQuery('(min-width: 940px)');
 
   const handleQuickAdd = () => {
     setIsAddModalOpen(true);
@@ -35,11 +31,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Navbar
-        user={user}
         pendingRevisionsCount={pendingCount}
         dailyGoalProgress={progress}
         streakCount={user?.streak?.current || 0}
-        onLogout={handleLogout}
         onQuickAdd={handleQuickAdd}
       />
       <main className="devRhythmContainer">{children}</main>

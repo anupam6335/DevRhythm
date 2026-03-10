@@ -1,4 +1,4 @@
-import apiClient, { buildQueryString } from '@/shared/lib/apiClient';
+import apiClient, { buildQueryString, ApiClientResponse } from '@/shared/lib/apiClient';
 
 export interface OverdueRevisionsResponse {
   revisions: any[];
@@ -15,13 +15,8 @@ export const revisionService = {
     const query = buildQueryString({ page: 1, limit: 1 });
     const response = await apiClient.get<OverdueRevisionsResponse>(
       `/revisions/overdue${query}`
-    );
+    ) as ApiClientResponse<OverdueRevisionsResponse>;
     // total count is in meta.pagination.total
     return response.meta?.pagination?.total ?? 0;
   },
-
-  /**
-   * Alternative: get today's pending revisions and count them.
-   * We'll use the above for simplicity.
-   */
 };
