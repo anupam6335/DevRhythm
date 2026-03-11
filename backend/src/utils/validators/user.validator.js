@@ -17,7 +17,7 @@ const updateUser = Joi.object({
 });
 
 const getUserByUsername = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).required()
+  username: Joi.string().pattern(/^[a-zA-Z0-9._-]+$/).min(3).max(30).required()
 });
 
 const searchUsers = Joi.object({
@@ -32,7 +32,7 @@ const topUsers = Joi.object({
 });
 
 const checkUsername = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).required()
+  username: Joi.string().pattern(/^[a-zA-Z0-9._-]+$/).min(3).max(30).required()
 });
 
 const followUser = Joi.object({

@@ -308,6 +308,7 @@ export interface User extends Timestamp {
   followingCount: number;
   privacy: Privacy;
   isActive: boolean;
+  isOnline?: boolean;
 }
 
 export interface Question extends Timestamp {

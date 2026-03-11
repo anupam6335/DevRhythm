@@ -118,7 +118,7 @@ export const Footer: React.FC<FooterProps> = ({
         icon={<FiAward />}
         value={streak}
         label="day streak"
-        href={isLoggedIn ? ROUTES.PROFILE.ROOT : undefined}
+        href={isLoggedIn ? ROUTES.USER_PROFILE.OWN(user!.username) : undefined}
       />
       <StatDisplay
         icon={<FiCheckCircle />}
@@ -177,7 +177,7 @@ export const Footer: React.FC<FooterProps> = ({
           <LinkGroup
             title="Account"
             links={[
-              { label: 'Profile', href: ROUTES.PROFILE.ROOT },
+              { label: 'Profile', href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN },
               { label: 'Shares', href: ROUTES.SHARES.ROOT },
               { label: 'Settings', href: '/settings' },
             ]}

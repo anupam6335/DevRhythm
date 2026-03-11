@@ -9,6 +9,8 @@ const getCurrentUser = async (req, res, next) => {
   try {
     const user = req.user.toObject();
     delete user.__v;
+    // Online if last activity within 5 minutes
+    user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
     res.json(formatResponse('User profile retrieved successfully', { user }));
   } catch (error) {
     next(error);
@@ -44,7 +46,10 @@ const getUserByUsername = async (req, res, next) => {
     
     if (!user) throw new AppError('User not found or profile is private', 404);
     
-    res.json(formatResponse('User profile retrieved successfully', { user }));
+    const userObj = user.toObject();
+    userObj.isOnline = (Date.now() - new Date(userObj.lastOnline).getTime()) < 1 * 60 * 1000;
+    
+    res.json(formatResponse('User profile retrieved successfully', { user: userObj }));
   } catch (error) {
     next(error);
   }

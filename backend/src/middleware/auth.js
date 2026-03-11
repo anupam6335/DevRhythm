@@ -20,7 +20,17 @@ const auth = async (req, res, next) => {
     const user = await User.findById(decoded.userId).select('-__v');
     if (!user) throw new AppError('User not found', 404);
     if (!user.isActive) throw new AppError('Account deactivated', 403);
+
+    // Update lastOnline to now and attach to request
+    const now = new Date();
+    user.lastOnline = now;
     req.user = user;
+
+    // Fire-and-forget database update (does not block the response)
+    User.updateOne({ _id: user._id }, { lastOnline: now }).exec().catch(err => {
+      console.error('Failed to update lastOnline:', err);
+    });
+
     next();
   } catch (error) {
     next(error);

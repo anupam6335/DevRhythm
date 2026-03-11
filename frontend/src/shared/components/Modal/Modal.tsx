@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useRef, useCallback, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IoClose } from 'react-icons/io5';

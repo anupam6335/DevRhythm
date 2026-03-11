@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useRef, useEffect, forwardRef, useId, useCallback } from 'react';
 import clsx from 'clsx';
 import { FaCheck } from 'react-icons/fa';

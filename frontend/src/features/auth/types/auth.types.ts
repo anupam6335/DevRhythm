@@ -33,16 +33,5 @@ export interface User {
   followingCount: number;
   privacy: 'public' | 'private' | 'link-only';
   isActive: boolean;
-}
-
-export interface AuthTokens {
-  token: string;
-  refreshToken: string;
-  userId: string;
-}
-
-export interface Session {
-  user: User | null;
-  isLoading: boolean;
-  error: Error | null;
+  isOnline?: boolean;
 }

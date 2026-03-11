@@ -1,0 +1,382 @@
+/* frontend/src/features/user/components/ProfileHeader.module.css */
+
+.container {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--spacing-xl);
+}
+
+/* ===== Avatar ===== */
+.avatarWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar {
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.02);
+}
+
+.ripple {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-moss);
+  opacity: 0;
+  animation: ripple 2s infinite;
+  pointer-events: none;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* ===== Trunk (solved count) ===== */
+.trunk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-moss) 0%, transparent 80%);
+  border-radius: 60px 60px 30px 30px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 120px;
+  box-shadow: 0 4px 12px var(--shadow);
+  font-family: var(--font-notes);
+  line-height: 1.2;
+  transition: all 0.3s ease;
+}
+
+.trunk:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+.trunkValue {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.trunkLabel {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+/* ===== Name Section ===== */
+.nameSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.displayName {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.username {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.memberSince {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.settingsButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-left: auto; /* pushes to the right in flex row */
+}
+
+.settingsButton:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+}
+
+/* ===== Stat Pills ===== */
+.statPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.statPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--bg-elevated);
+  border-radius: 30px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.statPill:hover {
+  background-color: var(--hover-surface);
+  transform: scale(1.02);
+}
+
+.statPillIcon {
+  color: var(--accent-moss);
+  font-size: 1rem;
+}
+
+.statPillValue {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.statPillLabel {
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+/* ===== Badges ===== */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: var(--bg-elevated);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.badgeIcon {
+  color: var(--accent-moss);
+}
+
+/* ===== Desktop Layout (≥940px = --breakpoint-desktop) ===== */
+@media (min-width: 940px) {
+  .container {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+    gap: var(--spacing-lg);
+  }
+
+  .avatarWrapper {
+    grid-row: 1 / span 2;
+  }
+
+  .trunk {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: var(--spacing-md);
+  }
+
+  .statPills {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 0;
+  }
+
+  .nameSection {
+    grid-column: 3;
+    grid-row: 1;
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .nameRow {
+    justify-content: flex-end;
+  }
+
+  .badges {
+    grid-column: 3;
+    grid-row: 2;
+    margin-top: 0;
+    justify-content: flex-end;
+  }
+}
+
+/* ===== Tablet Layout (≥768px and <940px = --breakpoint-tablet) ===== */
+@media (min-width: 768px) and (max-width: 939px) {
+  .container {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--spacing-lg);
+  }
+
+  .avatarWrapper {
+    grid-row: 1 / span 2;
+  }
+
+  .nameSection {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .trunk {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+  }
+
+  .statPills {
+    grid-column: 2;
+    grid-row: 3;
+    margin-top: var(--spacing-sm);
+  }
+
+  .badges {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    margin-top: var(--spacing-md);
+    justify-content: center;
+  }
+}
+
+/* ===== Mobile Layout (≤480px = --breakpoint-mobile) ===== */
+@media (max-width: 480px) {
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--spacing-md);
+  }
+
+  .avatarWrapper {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .nameSection {
+    align-items: center;
+  }
+
+  .nameRow {
+    justify-content: center;
+  }
+
+  .statPills {
+    justify-content: center;
+  }
+
+  .badges {
+    justify-content: center;
+  }
+}
+
+/* Settings Modal specific adjustments */
+.settingsModal {
+  /* optional container styling */
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md); /* reduced from lg for compactness */
+  padding: var(--spacing-md) 0;
+  max-height: 50vh;        /* limit height */
+  overflow-y: auto;        /* make form scrollable */
+  padding-right: calc(var(--spacing-sm) + 4px); /* extra space for scrollbar */
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.formGroup label {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.formGroup input,
+.formGroup select {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-input);
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.notifications {
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.notifications legend {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.9rem;
+}
+
+.themeSection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalActions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-md); /* reduced from lg */
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--divider);
+}
