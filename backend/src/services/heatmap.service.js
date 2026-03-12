@@ -5,7 +5,7 @@ const Goal = require('../models/Goal');
 const StudyGroup = require('../models/StudyGroup');
 const Question = require('../models/Question');
 const User = require('../models/User');
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
 const { getStartOfDay, getEndOfDay, formatDate, isSameDay } = require('../utils/helpers/date');
 
 const calculateIntensityLevel = (activityCount) => {

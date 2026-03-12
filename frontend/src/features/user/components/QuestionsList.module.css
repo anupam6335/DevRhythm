@@ -1,0 +1,280 @@
+.container {
+  width: 100%;
+  margin: var(--spacing-lg) 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px dashed var(--border);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap; 
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+/* Timeline container – the river */
+.timeline {
+  position: relative;
+  margin-left: 20px;          /* space for the node and connector */
+  border-left: 1px dashed var(--border);
+  padding-left: 24px;          /* space between river and content */
+}
+
+/* Each item */
+.item {
+  position: relative;
+  margin-bottom: var(--spacing-xl);
+}
+
+/* The node – positioned on the river line */
+.node {
+  position: absolute;
+  left: -30px;                 /* half width + offset to center on border */
+  top: 0.15em;                 /* align with date text baseline */
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--accent-moss);
+  box-shadow: 0 0 0 0 rgba(108, 122, 110, 0);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  z-index: 2;
+}
+
+.node:hover {
+  transform: scale(1.2);
+}
+
+/* Confidence glow – controlled via inline style (--glow) */
+.node-glow {
+  box-shadow: 0 0 var(--glow-spread, 0px) var(--glow-size, 0px) rgba(108, 122, 110, var(--glow-opacity, 0.3));
+}
+
+/* Date line – same baseline as node */
+.date {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+/* Title line: connector + title + link */
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.connector {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-family: monospace;      /* ensures ╰─ displays correctly */
+  user-select: none;
+}
+
+.titleLink {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.titleLink:hover {
+  text-decoration: underline;
+  color: var(--accent-moss);
+}
+
+.linkIcon {
+  color: var(--text-muted);
+  font-size: 1rem;
+  transition: color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-left: auto;          
+}
+
+.status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  padding: 2px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-left: auto;
+}
+.linkIcon:hover {
+  color: var(--accent-moss);
+}
+
+/* Meta line: difficulty + pattern */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.difficulty {
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.easy {
+  color: #2e7d32;
+  border-color: #2e7d32;
+}
+
+.medium {
+  color: #ed6c02;
+  border-color: #ed6c02;
+}
+
+.hard {
+  color: #d32f2f;
+  border-color: #d32f2f;
+}
+
+.pattern {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Tags row */
+.tagsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  transition: background 0.2s ease;
+}
+
+.tag:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+}
+
+/* Metrics row */
+.metricsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metricIcon {
+  color: var(--accent-moss);
+  font-size: 0.9rem;
+}
+
+/* Notes (own profile only) */
+.notes {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px dashed var(--border);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.notesIcon {
+  font-size: 1rem;
+  color: var(--accent-moss);
+}
+
+.notesText {
+  font-family: var(--font-notes);
+  font-style: italic;
+  flex: 1;
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+  .timeline {
+    margin-left: 10px;
+    padding-left: 16px;
+  }
+
+  .node {
+    left: -23px;
+    width: 12px;
+    height: 12px;
+  }
+
+  .titleLink {
+    font-size: 1rem;
+  }
+
+  .meta, .metricsRow, .tagsRow {
+    font-size: 0.8rem;
+  }
+}
+
+/* Empty / loading states */
+.emptyIcon {
+  font-size: 3rem;
+  opacity: 0.5;
+  display: block;
+  margin-bottom: var(--spacing-sm);
+}
+
+.skeletonItem {
+  height: 80px;
+  margin-bottom: var(--spacing-lg);
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

@@ -40,6 +40,7 @@ export const userKeys = {
   topStreaks: (params: Record<string, any>) => [...userKeys.all, 'topStreaks', params] as const,
   topSolved: (params: Record<string, any>) => [...userKeys.all, 'topSolved', params] as const,
   search: (query: string) => [...userKeys.all, 'search', query] as const,
+  progress: (userId: string, params?: Record<string, any>) => [...userKeys.all, 'progress', userId, params] as const,
 };
 
 export const progressKeys = {

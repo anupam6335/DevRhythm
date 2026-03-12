@@ -15,9 +15,17 @@ if (config.isProduction) {
   connectionOptions.readPreference = 'secondaryPreferred';
 }
 
-mongoose.connect(config.database.uri, connectionOptions)
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+const connectDB = async () => {
+  try {
+    await mongoose.connect(config.database.uri, connectionOptions);
+    console.log('MongoDB connected successfully');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  }
+};
+
+const connectionPromise = connectDB();
 
 mongoose.connection.on('connected', () => console.log('Mongoose connected to database'));
 mongoose.connection.on('error', (err) => console.error('Mongoose connection error:', err));
@@ -29,3 +37,4 @@ process.on('SIGINT', async () => {
 });
 
 module.exports = mongoose;
+module.exports.ready = connectionPromise;

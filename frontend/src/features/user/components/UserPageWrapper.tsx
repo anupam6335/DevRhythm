@@ -45,7 +45,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Milestones + Stats – two columns */}
       <div className={styles.twoColumns}>
-        <QuestionsList />
+        <QuestionsList userId={user._id} isOwnProfile={isOwnProfile} limit={6} />
         <StatsPanel />
       </div>
 

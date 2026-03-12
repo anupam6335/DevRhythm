@@ -1,9 +1,23 @@
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
+
+// Helper to get keys by pattern using KEYS command (use SCAN for production with many keys)
+const getKeys = async (pattern) => {
+  if (!redisClient) return [];
+  try {
+    const result = await redisClient.sendCommand(['KEYS', pattern]);
+    // sendCommand returns an array of strings
+    return result;
+  } catch (err) {
+    console.warn('Error getting keys:', err);
+    return [];
+  }
+};
 
 const cache = (duration = 60, keyPrefix = '') => {
   return async (req, res, next) => {
+    if (!redisClient) return next();
     if (req.method !== 'GET') return next();
-    
+
     let cacheKey = '';
     try {
       if (req.user && req.user._id) {
@@ -11,12 +25,12 @@ const cache = (duration = 60, keyPrefix = '') => {
       } else {
         cacheKey = `devrhythm:cache:${keyPrefix}:${req.originalUrl}`;
       }
-      
+
       const cached = await redisClient.get(cacheKey);
       if (cached) {
         return res.json(JSON.parse(cached));
       }
-      
+
       const originalJson = res.json;
       res.json = function(data) {
         redisClient.setEx(cacheKey, duration, JSON.stringify(data));
@@ -31,8 +45,9 @@ const cache = (duration = 60, keyPrefix = '') => {
 };
 
 const invalidateCache = async (pattern) => {
+  if (!redisClient) return;
   try {
-    const keys = await redisClient.keys(`devrhythm:cache:${pattern}*`);
+    const keys = await getKeys(`devrhythm:cache:${pattern}*`);
     if (keys.length > 0) {
       await redisClient.del(keys);
     }
@@ -65,4 +80,10 @@ const invalidateProgressCache = async (userId) => {
   await invalidateCache(`progress:question:*:user:${userId}:*`);
 };
 
-module.exports = { cache, invalidateCache, invalidateUserCache, invalidateQuestionCache, invalidateProgressCache };
+module.exports = {
+  cache,
+  invalidateCache,
+  invalidateUserCache,
+  invalidateQuestionCache,
+  invalidateProgressCache
+};

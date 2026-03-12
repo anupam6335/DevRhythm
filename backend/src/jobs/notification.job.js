@@ -2,6 +2,7 @@ const cron = require('cron');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Follow = require('../models/Follow');
+const { sendNotificationEmail } = require('../services/email.service');
 
 const sendDailyRevisionReminders = async () => {
   try {
@@ -17,11 +18,26 @@ const sendDailyRevisionReminders = async () => {
         title: 'Daily Revision Reminder',
         message: 'Check your pending revisions for today',
         data: { revisionCount: 0, overdueCount: 0 },
-        channel: 'in-app',
+        channel: 'both',
         status: 'pending',
         scheduledAt: new Date()
       });
       await notification.save();
+
+      // Send email if channel includes email
+      if (notification.channel === 'both' || notification.channel === 'email') {
+        try {
+          await sendNotificationEmail(user._id, notification);
+          notification.status = 'sent';
+          notification.sentAt = new Date();
+          await notification.save();
+        } catch (emailError) {
+          console.error(`Failed to send email for notification ${notification._id}:`, emailError);
+          // Optionally mark as failed
+          notification.status = 'failed';
+          await notification.save();
+        }
+      }
     }
     
     console.log(`Daily revision reminders queued for ${users.length} users`);
@@ -44,11 +60,24 @@ const sendWeeklyReports = async () => {
         title: 'Weekly Progress Report',
         message: 'Your weekly progress report is ready',
         data: {},
-        channel: 'in-app',
+        channel: 'both',
         status: 'pending',
         scheduledAt: new Date()
       });
       await notification.save();
+
+      if (notification.channel === 'both' || notification.channel === 'email') {
+        try {
+          await sendNotificationEmail(user._id, notification);
+          notification.status = 'sent';
+          notification.sentAt = new Date();
+          await notification.save();
+        } catch (emailError) {
+          console.error(`Failed to send email for notification ${notification._id}:`, emailError);
+          notification.status = 'failed';
+          await notification.save();
+        }
+      }
     }
     
     console.log(`Weekly reports queued for ${users.length} users`);
@@ -74,11 +103,25 @@ const sendNewFollowerNotifications = async () => {
           title: 'New Follower',
           message: `${follow.followerId.username} started following you`,
           data: { followerId: follow.followerId._id, followerName: follow.followerId.username },
-          channel: 'in-app',
+          channel: 'both',
           status: 'pending',
           scheduledAt: new Date()
         });
         await notification.save();
+
+        if (notification.channel === 'both' || notification.channel === 'email') {
+          try {
+            await sendNotificationEmail(user._id, notification);
+            notification.status = 'sent';
+            notification.sentAt = new Date();
+            await notification.save();
+          } catch (emailError) {
+            console.error(`Failed to send email for notification ${notification._id}:`, emailError);
+            notification.status = 'failed';
+            await notification.save();
+          }
+        }
+
         follow.notificationSent = true;
         await follow.save();
       }
