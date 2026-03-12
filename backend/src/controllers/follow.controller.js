@@ -4,6 +4,8 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
+// const { followerQueue } = require('../services/queue.service');
+const { jobQueue } = require('../services/queue.service');
 
 const getFollowing = async (req, res, next) => {
   try {
@@ -76,6 +78,14 @@ const followUser = async (req, res, next) => {
     await invalidateCache(`follow:*:user:${req.user._id}:*`);
     await invalidateCache(`follow:*:user:${followedId}:*`);
     await invalidateCache(`users:*:public:*`);
+
+    // Emit event for new follower
+    await jobQueue.add({
+      type: 'follower.new',
+      followerId: req.user._id,
+      followedId,
+      createdAt: follow.createdAt
+    });
 
     const counts = {
       followingCount: req.user.followingCount + 1,

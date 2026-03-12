@@ -1,6 +1,6 @@
 {
   "name": "devrhythm-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production backend for DevRhythm",
   "main": "src/server.js",
   "scripts": {
@@ -46,7 +46,8 @@
     "multer-storage-cloudinary": "^4.0.0",
     "axios": "^1.5.0",
     "uuid": "^9.0.0",
-    "rate-limit-redis": "^4.0.1"
+    "rate-limit-redis": "^4.0.1",
+    "bull": "^4.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",

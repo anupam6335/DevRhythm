@@ -11,6 +11,11 @@ const studyGroupRoutes = require('./studyGroup.routes');
 const followRoutes = require('./follow.routes');
 const heatmapRoutes = require('./heatmap.routes');
 const patternMasteryRoutes = require('./patternMastery.routes');
+const activityRoutes = require('./activity.routes');
+const leaderboardRoutes = require('./leaderboard.routes');
+const notificationRoutes = require('./notification.routes');
+const progressSnapshotRoutes = require('./progressSnapshot.routes');
+const userStatsRoutes = require('./userStats.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -44,5 +49,10 @@ router.use('/study-groups', studyGroupRoutes);
 router.use('/follow', followRoutes);
 router.use('/heatmap', heatmapRoutes);
 router.use('/pattern-mastery', patternMasteryRoutes);
+router.use('/activity', activityRoutes);
+router.use('/leaderboard', leaderboardRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/progress-snapshots', progressSnapshotRoutes);
+router.use('/user-stats', userStatsRoutes);
 
 module.exports = router;

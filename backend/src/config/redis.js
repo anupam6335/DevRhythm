@@ -24,23 +24,6 @@ const createRedisClient = () => {
     client.on('reconnecting', () => console.log('Redis client reconnecting'));
     client.on('end', () => console.log('Redis client disconnected'));
 
-    client.connect()
-      .then(() => {
-        console.log('Redis connected successfully');
-        
-        if (process.env.NODE_ENV === 'development') {
-          client.flushAll()
-            .then(() => console.log('Redis cache cleared for development'))
-            .catch(err => console.error('Error clearing Redis cache:', err));
-        }
-      })
-      .catch(err => console.error('Redis connection error:', err));
-
-    process.on('SIGINT', async () => {
-      await client.quit();
-      process.exit(0);
-    });
-
     return client;
   } catch (error) {
     console.error('Failed to create Redis client:', error);
@@ -50,4 +33,25 @@ const createRedisClient = () => {
 
 const client = createRedisClient();
 
-module.exports = client;
+// Wait for Redis to be ready
+const waitForRedis = async () => {
+  if (!client) throw new Error('Redis client not created');
+  try {
+    await client.connect();
+    console.log('Redis connected successfully');
+    if (process.env.NODE_ENV === 'development') {
+      await client.flushAll();
+      console.log('Redis cache cleared for development');
+    }
+  } catch (err) {
+    console.error('Redis connection error:', err);
+    throw err;
+  }
+};
+
+process.on('SIGINT', async () => {
+  if (client) await client.quit();
+  process.exit(0);
+});
+
+module.exports = { client, waitForRedis };

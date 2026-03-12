@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const UserQuestionProgress = require('../models/UserQuestionProgress');
 const AppError = require('../utils/errors/AppError');
 const { generateToken } = require('../middleware/auth');
 const { invalidateUserCache } = require('../middleware/cache');
@@ -11,6 +12,12 @@ const getCurrentUser = async (req, res, next) => {
     delete user.__v;
     // Online if last activity within 5 minutes
     user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
+    
+    // Round masteryRate to 2 decimal places
+    if (user.stats && user.stats.masteryRate) {
+      user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
+    }
+    
     res.json(formatResponse('User profile retrieved successfully', { user }));
   } catch (error) {
     next(error);
@@ -31,6 +38,12 @@ const updateCurrentUser = async (req, res, next) => {
     ).select('-__v');
     
     await invalidateUserCache(req.user._id);
+    
+    // Round masteryRate for response
+    if (user.stats && user.stats.masteryRate) {
+      user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
+    }
+    
     res.json(formatResponse('User profile updated successfully', { user }));
   } catch (error) {
     next(error);
@@ -48,6 +61,11 @@ const getUserByUsername = async (req, res, next) => {
     
     const userObj = user.toObject();
     userObj.isOnline = (Date.now() - new Date(userObj.lastOnline).getTime()) < 1 * 60 * 1000;
+    
+    // Round masteryRate
+    if (userObj.stats && userObj.stats.masteryRate) {
+      userObj.stats.masteryRate = Math.round(userObj.stats.masteryRate * 100) / 100;
+    }
     
     res.json(formatResponse('User profile retrieved successfully', { user: userObj }));
   } catch (error) {
@@ -70,6 +88,12 @@ const getUserStats = async (req, res, next) => {
         weeklyProgress: 0
       }
     };
+    
+    // Round masteryRate if present
+    if (stats.stats && stats.stats.masteryRate) {
+      stats.stats.masteryRate = Math.round(stats.stats.masteryRate * 100) / 100;
+    }
+    
     res.json(formatResponse('User statistics retrieved successfully', stats));
   } catch (error) {
     next(error);
@@ -108,10 +132,19 @@ const searchUsers = async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
     
+    // Round masteryRate for each user
+    const usersWithRoundedStats = users.map(user => {
+      const u = user.toObject();
+      if (u.stats && u.stats.masteryRate) {
+        u.stats.masteryRate = Math.round(u.stats.masteryRate * 100) / 100;
+      }
+      return u;
+    });
+    
     const total = await User.countDocuments(query);
     const pagination = paginate(total, page, limit);
     
-    res.json(formatResponse('Users retrieved successfully', { users }, pagination));
+    res.json(formatResponse('Users retrieved successfully', { users: usersWithRoundedStats }, pagination));
   } catch (error) {
     next(error);
   }
@@ -126,10 +159,18 @@ const getTopStreaks = async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
     
+    const usersWithRoundedStats = users.map(user => {
+      const u = user.toObject();
+      if (u.stats && u.stats.masteryRate) {
+        u.stats.masteryRate = Math.round(u.stats.masteryRate * 100) / 100;
+      }
+      return u;
+    });
+    
     const total = await User.countDocuments({ privacy: { $in: ['public', 'link-only'] } });
     const pagination = paginate(total, page, limit);
     
-    res.json(formatResponse('Top streak users retrieved successfully', { users }, pagination));
+    res.json(formatResponse('Top streak users retrieved successfully', { users: usersWithRoundedStats }, pagination));
   } catch (error) {
     next(error);
   }
@@ -144,10 +185,18 @@ const getTopSolved = async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
     
+    const usersWithRoundedStats = users.map(user => {
+      const u = user.toObject();
+      if (u.stats && u.stats.masteryRate) {
+        u.stats.masteryRate = Math.round(u.stats.masteryRate * 100) / 100;
+      }
+      return u;
+    });
+    
     const total = await User.countDocuments({ privacy: { $in: ['public', 'link-only'] } });
     const pagination = paginate(total, page, limit);
     
-    res.json(formatResponse('Top solved users retrieved successfully', { users }, pagination));
+    res.json(formatResponse('Top solved users retrieved successfully', { users: usersWithRoundedStats }, pagination));
   } catch (error) {
     next(error);
   }
@@ -175,6 +224,66 @@ const checkUsernameAvailability = async (req, res, next) => {
   }
 };
 
+const getUserPublicProgress = async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+    const limit = Math.min(parseInt(req.query.limit) || 6, 6);
+    const { sortBy = 'solvedAt', sortOrder = 'desc' } = req.query;
+
+    // Map frontend sort field to actual MongoDB field path
+    let sortField;
+    if (sortBy === 'solvedAt') {
+      sortField = 'attempts.solvedAt';
+    } else if (sortBy === 'lastAttemptAt') {
+      sortField = 'attempts.lastAttemptAt';
+    } else if (sortBy === 'confidenceLevel') {
+      sortField = 'confidenceLevel';
+    } else if (sortBy === 'totalTimeSpent') {
+      sortField = 'totalTimeSpent';
+    } else {
+      sortField = 'attempts.solvedAt'; // fallback
+    }
+
+    const sort = { [sortField]: sortOrder === 'asc' ? 1 : -1 };
+
+    // Find user and check privacy
+    const user = await User.findById(userId).select('privacy username displayName avatarUrl');
+    if (!user) throw new AppError('User not found', 404);
+    if (user.privacy !== 'public') throw new AppError('User progress is private', 403);
+
+    // Fetch solved questions – no longer filter by solvedAt existence
+    const progress = await UserQuestionProgress.find({
+      userId,
+      status: 'Solved'
+    })
+      .sort(sort)
+      .limit(limit)
+      .populate('questionId', '_id title problemLink platform difficulty tags pattern')
+      .select('_id questionId status attempts.solvedAt attempts.count attempts.lastAttemptAt attempts.firstAttemptAt revisionCount totalTimeSpent confidenceLevel')
+      .lean();
+
+    // Format response
+    const formattedProgress = progress.map(p => ({
+      _id: p._id,
+      questionId: p.questionId,
+      status: p.status,
+      solvedAt: p.attempts?.solvedAt,
+      attempts: {
+        count: p.attempts?.count || 0,
+        lastAttemptAt: p.attempts?.lastAttemptAt,
+        firstAttemptAt: p.attempts?.firstAttemptAt
+      },
+      revisionCount: p.revisionCount || 0,
+      totalTimeSpent: p.totalTimeSpent,
+      confidenceLevel: p.confidenceLevel
+    }));
+
+    res.json(formatResponse('User public progress retrieved successfully', { progress: formattedProgress }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
@@ -185,5 +294,6 @@ module.exports = {
   getTopStreaks,
   getTopSolved,
   deleteCurrentUser,
-  checkUsernameAvailability
+  checkUsernameAvailability,
+  getUserPublicProgress
 };
