@@ -1,0 +1,204 @@
+.container {
+  width: 100%;
+  margin: var(--spacing-xl) 0;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-md);
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Consistency score */
+.consistency {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.consistencyValue {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.consistencyLabel {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.legendColor {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background-color: currentColor;
+}
+
+/* Right side title + dropdown */
+.title {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.yearSelectWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.yearSelect {
+  appearance: none;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 6px 30px 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.yearSelect:hover {
+  border-color: var(--accent-moss);
+  background-color: var(--hover-surface);
+}
+
+.yearSelect:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.selectIcon {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+/* Custom skeleton for the heatmap area */
+.heatmapSkeleton {
+  width: 100%;
+  border-radius: var(--radius);
+  /* height is passed via the height prop, so no need to set here */
+}
+
+/* Error state */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-xl);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.error span {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.retryButton {
+  margin-top: var(--spacing-md);
+  background: none;
+  border: 1px solid var(--border);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  background-color: var(--hover-surface);
+  border-color: var(--accent-moss);
+}
+
+/* ===== Tablet adjustments (768px–939px) ===== */
+@media (max-width: 939px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .left {
+    width: 100%;
+  }
+
+  .right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .title {
+    white-space: normal;
+  }
+}
+
+/* ===== Mobile adjustments (≤480px) ===== */
+@media (max-width: 480px) {
+  .legend {
+    gap: var(--spacing-xs);
+  }
+
+  .legendItem {
+    font-size: 0.75rem;
+  }
+
+  .legendColor {
+    width: 10px;
+    height: 10px;
+  }
+
+  .yearSelect {
+    font-size: 0.9rem;
+    padding: 4px 24px 4px 8px;
+  }
+
+  .consistencyValue {
+    font-size: 1.3rem;
+  }
+}

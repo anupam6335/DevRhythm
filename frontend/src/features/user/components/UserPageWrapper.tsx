@@ -34,7 +34,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Heatmap */}
       <section className={styles.section}>
-        <HeatmapSection />
+        <HeatmapSection user={user} isOwnProfile={isOwnProfile} />
       </section>
 
       {/* Followers / Following – two columns on desktop */}
