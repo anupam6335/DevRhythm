@@ -4,9 +4,11 @@ const PatternMastery = require('../../models/PatternMastery');
 const ActivityLog = require('../../models/ActivityLog');
 const Notification = require('../../models/Notification');
 const { invalidateUserCache, invalidateCache } = require('../../middleware/cache');
+const { parseDate } = require('../../utils/helpers/date');  
 
 const handleQuestionMastered = async (job) => {
-  const { userId, questionId, progressId, masteredAt = new Date() } = job.data;
+  const { userId, questionId, progressId, masteredAt } = job.data;
+  const masteredDate = parseDate(masteredAt);                
 
   try {
     const question = await Question.findById(questionId);
@@ -32,7 +34,7 @@ const handleQuestionMastered = async (job) => {
         ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100)
         : 0;
 
-      pattern.lastPracticed = masteredAt;
+      pattern.lastPracticed = masteredDate;
       pattern.lastUpdated = new Date();
 
       // Update recentQuestions entry for this question if it exists
@@ -49,9 +51,9 @@ const handleQuestionMastered = async (job) => {
           problemLink: question.problemLink,
           platform: question.platform,
           difficulty: question.difficulty,
-          solvedAt: masteredAt,
+          solvedAt: masteredDate,          
           status: 'Mastered',
-          timeSpent: 0, // Time spent may not be available here
+          timeSpent: 0,
         });
         if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
       }
@@ -86,7 +88,7 @@ const handleQuestionMastered = async (job) => {
         platform: question.platform,
         pattern: question.pattern,
       },
-      createdAt: masteredAt,
+      createdAt: masteredDate,            
     });
 
     // 4. Notification for mastery milestone

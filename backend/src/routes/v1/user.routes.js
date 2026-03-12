@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../../controllers/user.controller');
 const followController = require('../../controllers/follow.controller');
+const heatmapController = require('../../controllers/heatmap.controller');   
 const { auth } = require('../../middleware/auth');
 const validate = require('../../middleware/validator');
 const userValidator = require('../../utils/validators/user.validator');
 const rateLimiters = require('../../middleware/rateLimiter');
 const { cache } = require('../../middleware/cache');
+const Joi = require('joi');   
 
 router.get('/me', auth, userController.getCurrentUser);
 router.put('/me', auth, validate(userValidator.updateUser), userController.updateCurrentUser);
@@ -22,6 +24,17 @@ router.get('/:userId/following', auth, rateLimiters.userLimiter, validate(userVa
 router.get('/:userId/followers', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, 'user:public:followers'), followController.getPublicFollowers);
 
 router.get('/:userId/progress', validate(userValidator.getUserPublicProgress, 'params'), cache(30, 'user:public:progress'), userController.getUserPublicProgress);
+
+// Public heatmap – no authentication required
+router.get('/:userId/heatmap/:year',
+  rateLimiters.publicLimiter,                     // make sure this limiter exists
+  cache(300, 'user:heatmap:public'),
+  validate(Joi.object({
+    userId: Joi.string().hex().length(24).required(),
+    year: Joi.number().integer().min(2000).max(2100).required()
+  }), 'params'),
+  heatmapController.getPublicUserHeatmap
+);
 
 router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
 router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);

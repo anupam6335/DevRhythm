@@ -1,5 +1,6 @@
 const { handleQuestionSolved } = require('./questionSolved.handler');
 const { handleQuestionMastered } = require('./questionMastered.handler');
+const { handleQuestionAttempted } = require('./questionAttempted.handler'); 
 const { handleGoalCompleted } = require('./goalCompleted.handler');
 const { handleFollowerNew } = require('./followerNew.handler');
 const { handleRevisionCompleted } = require('./revisionCompleted.handler');
@@ -14,6 +15,9 @@ const processJob = async (job) => {
       break;
     case 'question.mastered':
       await handleQuestionMastered(job);
+      break;
+    case 'question.attempted':                      
+      await handleQuestionAttempted(job);
       break;
     case 'goal.completed':
       await handleGoalCompleted(job);

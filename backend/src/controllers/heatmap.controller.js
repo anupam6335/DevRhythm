@@ -1,4 +1,5 @@
 const HeatmapData = require('../models/HeatmapData');
+const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Goal = require('../models/Goal');
@@ -341,6 +342,52 @@ const downloadExport = async (req, res, next) => {
   }
 };
 
+const getPublicUserHeatmap = async (req, res, next) => {
+  try {
+    const { userId, year } = req.params;
+    const simple = req.query.simple === 'true';
+    const includeCache = req.query.includeCache !== 'false';
+    const parsedYear = parseInt(year);
+    if (isNaN(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
+      throw new AppError('Invalid year', 400);
+    }
+
+    const user = await User.findById(userId).select('_id');
+    if (!user) throw new AppError('User not found', 404);
+
+    const heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear);
+    if (!heatmap) throw new AppError('Heatmap data not found', 404);
+
+    let response;
+    if (simple) {
+      response = heatmapService.extractMinimalHeatmap(heatmap);
+    } else {
+      response = {
+        year: heatmap.year,
+        weekCount: heatmap.weekCount,
+        firstDate: heatmap.firstDate,
+        lastDate: heatmap.lastDate,
+        dailyData: heatmap.dailyData,
+        performance: heatmap.performance,
+        consistency: heatmap.consistency,
+        statsPanel: heatmap.statsPanel,
+      };
+      if (includeCache && heatmap.cachedRenderData) {
+        response.cachedRenderData = heatmap.cachedRenderData;
+      }
+    }
+
+    res.json(formatResponse('Public heatmap retrieved successfully', response, {
+      userId,
+      year: parsedYear,
+      lastUpdated: heatmap.lastUpdated,
+    }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   getHeatmap,
   getHeatmapByYear,
@@ -348,5 +395,6 @@ module.exports = {
   getHeatmapStats,
   getFilteredHeatmap,
   exportHeatmap,
-  downloadExport
+  downloadExport,
+  getPublicUserHeatmap
 };

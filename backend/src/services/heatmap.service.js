@@ -574,11 +574,30 @@ const warmHeatmapCache = async (userId) => {
   }
 };
 
+const getOrCreateHeatmap = async (userId, year) => {
+  let heatmap = await HeatmapData.findOne({ userId, year }).lean();
+  if (!heatmap) {
+    heatmap = await generateHeatmapData(userId, year);
+  }
+  return heatmap;
+};
+const extractMinimalHeatmap = (heatmap) => {
+  const dates = heatmap.dailyData.map(day => day.date.toISOString().split('T')[0]);
+  const intensities = heatmap.dailyData.map(day => day.intensityLevel);
+  return {
+    year: heatmap.year,
+    dates,
+    intensities
+  };
+};
+
 module.exports = {
   calculateIntensityLevel,
   generateHeatmapData,
   regenerateHeatmapData,
   calculateFilteredData,
   convertToCSV,
-  warmHeatmapCache
+  warmHeatmapCache,
+  getOrCreateHeatmap,
+  extractMinimalHeatmap
 };

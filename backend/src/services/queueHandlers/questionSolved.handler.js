@@ -7,13 +7,13 @@ const ActivityLog = require('../../models/ActivityLog');
 const HeatmapData = require('../../models/HeatmapData');
 const Notification = require('../../models/Notification');
 const { invalidateUserCache, invalidateCache } = require('../../middleware/cache');
-const { getStartOfDay } = require('../../utils/helpers/date');
+const { getStartOfDay, parseDate } = require('../../utils/helpers/date');
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
 
   // Convert solvedAt to Date object
-  const solvedDate = solvedAt instanceof Date ? solvedAt : new Date(solvedAt);
+  const solvedDate = parseDate(solvedAt);
   if (isNaN(solvedDate.getTime())) {
     throw new Error(`Invalid solvedAt date: ${solvedAt}`);
   }
@@ -164,6 +164,7 @@ const handleQuestionSolved = async (job) => {
       if (dayEntry) {
         dayEntry.newProblemsSolved += 1;
         dayEntry.totalActivities += 1;
+        dayEntry.totalSubmissions += 1;
         dayEntry.totalTimeSpent += timeSpent;
         dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }

@@ -1,24 +1,25 @@
-const User = require('../../models/User');
-const UserQuestionProgress = require('../../models/UserQuestionProgress');
 const HeatmapData = require('../../models/HeatmapData');
+const User = require('../../models/User');
 const { invalidateCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
-const { parseDate } = require('../../utils/helpers/date'); // import helper
+const { parseDate } = require('../../utils/helpers/date');
 
-const handleRevisionCompleted = async (job) => {
-  const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
+const handleQuestionAttempted = async (job) => {
+  const { userId, questionId, progressId, timeSpent = 0, attemptedAt } = job.data;
 
-  // Parse the date robustly
-  const revisionDate = parseDate(completedAt);
+  const attemptDate = parseDate(attemptedAt);
+  if (isNaN(attemptDate.getTime())) {
+    throw new Error(`Invalid attemptedAt date: ${attemptedAt}`);
+  }
+
+  console.log(`[question.attempted] Started for user ${userId}, question ${questionId}`);
 
   try {
-    // --- Update user streak and revision count ---
+    // --- Update user streak and active days ---
+    const today = new Date();
+    const todayStr = today.toDateString();
     const user = await User.findById(userId);
     if (user) {
-      user.stats.totalRevisions += 1;
-
-      const today = new Date();
-      const todayStr = today.toDateString();
       const lastActive = user.streak.lastActiveDate ? new Date(user.streak.lastActiveDate).toDateString() : null;
       if (!lastActive) {
         user.streak.current = 1;
@@ -36,31 +37,22 @@ const handleRevisionCompleted = async (job) => {
         user.stats.activeDays += 1;
       }
       user.streak.lastActiveDate = today;
-
       await user.save();
       await invalidateCache(`user:${userId}:profile`);
     }
 
-    // --- Update question progress (revision count) ---
-    const progress = await UserQuestionProgress.findOne({ userId, questionId });
-    if (progress) {
-      progress.revisionCount += 1;
-      progress.lastRevisedAt = revisionDate;
-      await progress.save();
-      await invalidateCache(`progress:*:user:${userId}:*`);
-    }
-
     // --- Update heatmap ---
-    const year = revisionDate.getFullYear();
+    const year = attemptDate.getFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
       heatmap = await heatmapService.generateHeatmapData(userId, year);
     }
     if (heatmap) {
-      const dayEntry = heatmap.dailyData.find(d => new Date(d.date).toDateString() === revisionDate.toDateString());
+      const dayEntry = heatmap.dailyData.find(d => new Date(d.date).toDateString() === attemptDate.toDateString());
       if (dayEntry) {
-        dayEntry.revisionProblems += 1;
         dayEntry.totalActivities += 1;
+        dayEntry.totalSubmissions += 1;               // track total submissions
+        dayEntry.totalTimeSpent += timeSpent;
         dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }
       heatmap.lastUpdated = new Date();
@@ -68,11 +60,11 @@ const handleRevisionCompleted = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
-    console.log(`Revision completed event processed for user ${userId}`);
+    console.log(`[question.attempted] Completed for user ${userId}`);
   } catch (error) {
-    console.error('Error processing revision.completed:', error);
+    console.error(`[question.attempted] Error:`, error);
     throw error;
   }
 };
 
-module.exports = { handleRevisionCompleted };
+module.exports = { handleQuestionAttempted };
