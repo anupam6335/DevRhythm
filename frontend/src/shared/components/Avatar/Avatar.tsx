@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, forwardRef } from "react";
 import { FaUser } from "react-icons/fa";
 import clsx from "clsx";

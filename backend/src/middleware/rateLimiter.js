@@ -1,5 +1,5 @@
 const rateLimit = require('express-rate-limit');
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
 const config = require('../config');
 
 const createMemoryLimiter = (windowMs, max) => {

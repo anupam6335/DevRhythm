@@ -1,4 +1,4 @@
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
 
 const CACHE_PREFIX = 'devrhythm:cache';
 const TTL_ONE_MINUTE = 60;

@@ -168,7 +168,7 @@ const updateQuestionConfidence = async (userId, questionId, confidenceLevel) => 
 
 const getUserRecentProgress = async (userId, limit = 10) => {
   return await UserQuestionProgress.find({ userId })
-    .populate('questionId', '_id title platform difficulty tags pattern')
+    .populate('questionId', '_id title problemLink platform difficulty tags pattern')
     .sort({ updatedAt: -1 })
     .limit(limit)
     .lean();

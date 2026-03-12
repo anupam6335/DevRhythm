@@ -1,5 +1,5 @@
 import apiClient, { buildQueryString, ApiClientResponse } from '@/shared/lib/apiClient';
-import type { User } from '@/shared/types';
+import type { User, PublicProgressItem } from '@/shared/types';
 
 export const userService = {
   async getCurrentUser(): Promise<User> {
@@ -64,5 +64,23 @@ export const userService = {
   async checkUsernameAvailability(username: string): Promise<{ available: boolean; username: string }> {
     const response = await apiClient.get(`/users/${username}/availability`);
     return response.data;
+  },
+
+  /**
+   * Get public progress for a user (solved questions).
+   * @param userId - The user's ID
+   * @param options - Optional parameters: limit, sortBy, sortOrder
+   */
+  async getUserPublicProgress(
+    userId: string,
+    options?: { limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }
+  ): Promise<PublicProgressItem[]> {
+    const params: Record<string, any> = {};
+    if (options?.limit) params.limit = options.limit;
+    if (options?.sortBy) params.sortBy = options.sortBy;
+    if (options?.sortOrder) params.sortOrder = options.sortOrder;
+    const query = buildQueryString(params);
+    const response = await apiClient.get<{ progress: PublicProgressItem[] }>(`/users/${userId}/progress${query}`);
+    return response.data.progress;
   }
 };

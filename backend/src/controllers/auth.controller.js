@@ -1,6 +1,6 @@
 const passport = require('passport');
 const crypto = require('crypto');
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
 const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const { invalidateUserCache } = require('../middleware/cache');
 const { formatResponse } = require('../utils/helpers/response');

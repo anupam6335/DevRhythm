@@ -16,11 +16,12 @@ export const ROUTES = {
   // Main authenticated area
   DASHBOARD: '/dashboard',
 
-  PROFILE: {
-    ROOT: '/profile',
-    FOLLOWING: '/profile/following',
-    FOLLOWERS: '/profile/followers',
-    FOLLOW_SUGGESTIONS: '/profile/follow-suggestions',
+  // User profile pages
+  USER_PROFILE: {
+    /** Public profile (any user) */
+    PUBLIC: (username: string) => `/user/${username}`,
+    /** Own profile (requires authentication) */
+    OWN: (username: string) => `/user/u/${username}`,
   },
 
   USERS: {

@@ -308,6 +308,7 @@ export interface User extends Timestamp {
   followingCount: number;
   privacy: Privacy;
   isActive: boolean;
+  isOnline?: boolean;
 }
 
 export interface Question extends Timestamp {
@@ -328,7 +329,15 @@ export interface Question extends Timestamp {
 export interface UserQuestionProgress extends Timestamp {
   _id: ID;
   userId: ID;
-  questionId: ID;
+  questionId: {
+    _id: ID;
+    title: string;
+    problemLink: string;
+    platform: Platform;
+    difficulty: Difficulty;
+    tags: string[];
+    pattern?: string;
+  };
   status: QuestionStatus;
   attempts: Attempts;
   notes?: string;
@@ -336,8 +345,31 @@ export interface UserQuestionProgress extends Timestamp {
   savedCode?: SavedCode;
   lastRevisedAt?: ISODateString;
   revisionCount: number;
-  totalTimeSpent: number; // in minutes
-  confidenceLevel: number; // 1-5
+  totalTimeSpent: number;
+  confidenceLevel: number;
+}
+
+export interface PublicProgressItem {
+  _id: ID;
+  questionId: {
+    _id: ID;
+    title: string;
+    problemLink: string;
+    platform: Platform;
+    difficulty: Difficulty;
+    tags: string[];
+    pattern?: string;
+  };
+  status: 'Solved' | 'Mastered';
+  solvedAt: ISODateString;
+  attempts: {
+    count: number;
+    lastAttemptAt: ISODateString;
+    firstAttemptAt: ISODateString;
+  };
+  revisionCount: number;
+  totalTimeSpent: number;
+  confidenceLevel: number;
 }
 
 export interface Goal extends Timestamp {

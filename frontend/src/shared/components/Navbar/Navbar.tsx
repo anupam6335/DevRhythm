@@ -137,14 +137,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 )}
               </Button>
-              {/* <button
-                className={styles.goalPill}
-                onClick={onQuickAdd}
-                aria-label={`Daily goal: ${dailyGoalProgress.completed}/${dailyGoalProgress.target} solved`}
-              >
-                <FiTarget className={styles.goalPillIcon} />
-                <span>{dailyGoalProgress.completed}/{dailyGoalProgress.target}</span>
-              </button> */}
               {openDropdown === 'progress' && (
                 <div className={styles.dropdownMenu}>
                   <Link href={ROUTES.PROGRESS} className={styles.dropdownItem}>
@@ -210,7 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Button>
                 {openDropdown === 'profile' && (
                   <div className={styles.dropdownMenu} style={{ right: 0, left: 'auto' }}>
-                    <Link href={ROUTES.PROFILE.ROOT} className={styles.dropdownItem}>
+                    <Link href={ROUTES.USER_PROFILE.OWN(user.username)} className={styles.dropdownItem}>
                       <FiUser /> Profile
                     </Link>
                     <Link href={ROUTES.SHARES.ROOT} className={styles.dropdownItem}>
@@ -329,7 +321,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <>
                   <div className={styles.drawerSection}>
                     <h3>Profile</h3>
-                    <Link href={ROUTES.PROFILE.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                    <Link href={ROUTES.USER_PROFILE.OWN(user.username)} onClick={() => setIsDrawerOpen(false)}>
                       Profile
                     </Link>
                     <Link href={ROUTES.SHARES.ROOT} onClick={() => setIsDrawerOpen(false)}>
@@ -350,12 +342,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       Logout
                     </Button>
                   </div>
-
-                  {/* {streakCount > 0 && (
-                    <div className={styles.drawerStreak}>
-                      <FaFire /> {streakCount} day streak
-                    </div>
-                  )} */}
                 </>
               )}
             </div>
@@ -400,8 +386,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
 
           <Link
-            href={user ? ROUTES.PROFILE.ROOT : ROUTES.LOGIN}
-            className={clsx(styles.mobileNavItem, isActive(ROUTES.PROFILE.ROOT) && styles.active)}
+            href={user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN}
+            className={clsx(styles.mobileNavItem, isActive(ROUTES.USER_PROFILE.OWN(user?.username || '')) && styles.active)}
             aria-label={user ? 'Profile' : 'Login'}
           >
             {user ? (

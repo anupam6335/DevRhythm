@@ -17,7 +17,7 @@ const updateUser = Joi.object({
 });
 
 const getUserByUsername = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).required()
+  username: Joi.string().pattern(/^[a-zA-Z0-9._-]+$/).min(3).max(30).required()
 });
 
 const searchUsers = Joi.object({
@@ -32,7 +32,7 @@ const topUsers = Joi.object({
 });
 
 const checkUsername = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).required()
+  username: Joi.string().pattern(/^[a-zA-Z0-9._-]+$/).min(3).max(30).required()
 });
 
 const followUser = Joi.object({
@@ -45,6 +45,13 @@ const getPublicFollowing = Joi.object({
   limit: Joi.number().integer().min(1).max(50).default(20)
 });
 
+const getUserPublicProgress = Joi.object({
+  userId: Joi.string().hex().length(24).required(),
+  limit: Joi.number().integer().min(1).max(6).default(6),
+  sortBy: Joi.string().valid('solvedAt', 'lastAttemptAt', 'confidenceLevel', 'totalTimeSpent').default('solvedAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+});
+
 module.exports = {
   updateUser,
   getUserByUsername,
@@ -52,5 +59,6 @@ module.exports = {
   topUsers,
   checkUsername,
   followUser,
-  getPublicFollowing
+  getPublicFollowing,
+  getUserPublicProgress
 };

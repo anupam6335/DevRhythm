@@ -5,6 +5,7 @@ const { paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate } 
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
+const { jobQueue } = require('../services/queue.service');
 
 const calculateSpacedRepetitionSchedule = (baseDate, schedule = [1, 3, 7, 14, 30]) => {
   return schedule.map(days => {
@@ -247,42 +248,52 @@ const createRevision = async (req, res, next) => {
 const completeRevision = async (req, res, next) => {
   try {
     const { completedAt = new Date(), status = 'completed', confidenceLevel } = req.body;
-    
+
     const revision = await RevisionSchedule.findOne({
       _id: req.params.revisionId,
       userId: req.user._id,
     });
-    
-    if (!revision) {
-      throw new AppError('Revision schedule not found', 404);
-    }
-    
+
+    if (!revision) throw new AppError('Revision schedule not found', 404);
     if (revision.currentRevisionIndex >= revision.schedule.length) {
       throw new AppError('All revisions already completed', 400);
     }
-    
+
     const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-    
+
     revision.completedRevisions.push({
       date: scheduledDate,
       completedAt,
       status,
     });
-    
-    revision.currentRevisionIndex += 1;
-    
-    if (revision.currentRevisionIndex >= revision.schedule.length) {
+
+    // Only increment if there are more revisions left
+    if (revision.currentRevisionIndex < revision.schedule.length - 1) {
+      revision.currentRevisionIndex += 1;
+    } else {
+      // This was the last revision, mark as completed
       revision.status = 'completed';
     }
-    
+
     revision.updatedAt = new Date();
     await revision.save();
-    
+
+    // Emit event
+    if (jobQueue) {
+      await jobQueue.add({
+        type: 'revision.completed',
+        userId: req.user._id,
+        revisionId: revision._id,
+        questionId: revision.questionId,
+        completedAt,
+        revisionIndex: revision.currentRevisionIndex - 1, // index that was just completed
+        status,
+      });
+    }
+
     await invalidateCache(`revisions:*:user:${req.user._id}:*`);
-    
-    res.json(formatResponse('Revision marked as completed', {
-      revision,
-    }));
+
+    res.json(formatResponse('Revision marked as completed', { revision }));
   } catch (error) {
     next(error);
   }
@@ -292,7 +303,7 @@ const completeQuestionRevision = async (req, res, next) => {
   try {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
-    
+
     const revision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -302,34 +313,45 @@ const completeQuestionRevision = async (req, res, next) => {
         $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
       },
     });
-    
-    if (!revision) {
-      throw new AppError('No pending revision for today', 404);
-    }
-    
+
+    if (!revision) throw new AppError('No pending revision for today', 404);
+
     const { completedAt = new Date(), status = 'completed', confidenceLevel } = req.body;
     const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-    
+
     revision.completedRevisions.push({
       date: scheduledDate,
       completedAt,
       status,
     });
-    
-    revision.currentRevisionIndex += 1;
-    
-    if (revision.currentRevisionIndex >= revision.schedule.length) {
+
+    // Only increment if there are more revisions left
+    if (revision.currentRevisionIndex < revision.schedule.length - 1) {
+      revision.currentRevisionIndex += 1;
+    } else {
       revision.status = 'completed';
     }
-    
+
     revision.updatedAt = new Date();
     await revision.save();
-    
+
+    // Emit event
+    const { jobQueue } = require('../services/queue.service');
+    if (jobQueue) {
+      await jobQueue.add({
+        type: 'revision.completed',
+        userId: req.user._id,
+        revisionId: revision._id,
+        questionId: revision.questionId,
+        completedAt,
+        revisionIndex: revision.currentRevisionIndex - 1,
+        status,
+      });
+    }
+
     await invalidateCache(`revisions:*:user:${req.user._id}:*`);
-    
-    res.json(formatResponse('Revision marked as completed', {
-      revision,
-    }));
+
+    res.json(formatResponse('Revision marked as completed', { revision }));
   } catch (error) {
     next(error);
   }

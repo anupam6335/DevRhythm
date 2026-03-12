@@ -6,6 +6,7 @@ const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
 const { invalidateProgressCache } = require('../middleware/cache');
+const { jobQueue } = require('../services/queue.service');
 
 const updateProgressPatternMastery = async (userId, questionId) => {
   try {
@@ -38,7 +39,7 @@ const getProgress = async (req, res, next) => {
 
     const [progress, total] = await Promise.all([
       UserQuestionProgress.find(query)
-        .populate('questionId', '_id title platform difficulty tags pattern')
+        .populate('questionId', '_id title problemLink platform difficulty tags pattern')
         .skip(skip)
         .limit(limit)
         .sort(sort)
@@ -73,7 +74,8 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (!question) throw new AppError('Question not found', 404);
 
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
-    
+    const oldStatus = progress ? progress.status : null;
+
     const updateData = {
       updatedAt: new Date()
     };
@@ -83,18 +85,18 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
     if (confidenceLevel) updateData.confidenceLevel = confidenceLevel;
 
+    // If status is being set to Solved and it wasn't Solved before, set solvedAt
+    if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {
+      updateData['attempts.solvedAt'] = new Date();
+    }
+
     if (timeSpent) {
       updateData.$inc = { totalTimeSpent: timeSpent };
     }
 
-    if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {
-      updateData.$set = { ...updateData.$set, 'attempts.solvedAt': new Date() };
-    } else if (status === 'Mastered' && (!progress || progress.status !== 'Mastered')) {
-      updateData.$set = { ...updateData.$set, 'attempts.masteredAt': new Date() };
-    }
-
+    let newProgress;
     if (progress) {
-      progress = await UserQuestionProgress.findOneAndUpdate(
+      newProgress = await UserQuestionProgress.findOneAndUpdate(
         { userId, questionId },
         updateData,
         { new: true }
@@ -105,9 +107,11 @@ const createOrUpdateProgress = async (req, res, next) => {
         attemptData.firstAttemptAt = new Date();
         attemptData.lastAttemptAt = new Date();
         attemptData.count = 1;
+        if (status === 'Solved') {
+          attemptData.solvedAt = new Date();
+        }
       }
-
-      progress = await UserQuestionProgress.create({
+      newProgress = await UserQuestionProgress.create({
         userId,
         questionId,
         status: status || 'Not Started',
@@ -120,26 +124,61 @@ const createOrUpdateProgress = async (req, res, next) => {
       });
     }
 
+    // Emit events after the progress is saved
+    if (newProgress) {
+      if (status === 'Solved' && oldStatus !== 'Solved') {
+        if (!jobQueue) {
+          console.error('jobQueue is not available, cannot add job');
+        } else {
+          await jobQueue.add({
+            type: 'question.solved',
+            userId,
+            questionId,
+            progressId: newProgress._id,
+            timeSpent: timeSpent || 0,
+            solvedAt: new Date(),
+          });
+        }
+      } else if (status === 'Mastered' && oldStatus !== 'Mastered') {
+        if (!jobQueue) {
+          console.error('jobQueue is not available, cannot add job');
+        } else {
+          await jobQueue.add({
+            type: 'question.mastered',
+            userId,
+            questionId,
+            progressId: newProgress._id,
+            masteredAt: new Date(),
+          });
+        }
+      }
+    }
+
     await invalidateProgressCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
-    const statusCode = progress.createdAt === progress.updatedAt ? 201 : 200;
+    const statusCode = newProgress.createdAt === newProgress.updatedAt ? 201 : 200;
     res.status(statusCode).json(formatResponse(
-      progress.createdAt === progress.updatedAt ? 'Progress created successfully' : 'Progress updated successfully',
-      { progress }
+      newProgress.createdAt === newProgress.updatedAt ? 'Progress created successfully' : 'Progress updated successfully',
+      { progress: newProgress }
     ));
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateStatus = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const questionId = req.params.questionId;
-    
+
+    const oldProgress = await UserQuestionProgress.findOne({ userId, questionId });
+    const oldStatus = oldProgress ? oldProgress.status : null;
+
     const progress = await UserQuestionProgress.findOneAndUpdate(
       { userId, questionId },
-      { 
-        $set: { 
+      {
+        $set: {
           status: req.body.status,
           updatedAt: new Date()
         }
@@ -147,11 +186,41 @@ const updateStatus = async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
+    // Emit events
+    if (req.body.status === 'Solved' && oldStatus !== 'Solved') {
+      if (!jobQueue) {
+        console.error('jobQueue is not available, cannot add job');
+      } else {
+        await jobQueue.add({
+          type: 'question.solved',
+          userId,
+          questionId,
+          progressId: progress._id,
+          timeSpent: 0,
+          solvedAt: new Date()
+        });
+      }
+    } else if (req.body.status === 'Mastered' && oldStatus !== 'Mastered') {
+      if (!jobQueue) {
+        console.error('jobQueue is not available, cannot add job');
+      } else {
+        await jobQueue.add({
+          type: 'question.mastered',
+          userId,
+          questionId,
+          progressId: progress._id,
+          masteredAt: new Date()
+        });
+      }
+    }
+
     await invalidateProgressCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Status updated successfully', { progress }));
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateCode = async (req, res, next) => {

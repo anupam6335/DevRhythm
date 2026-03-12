@@ -138,7 +138,7 @@ const getProgress = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
   status: Joi.string().valid('Not Started', 'Attempted', 'Solved', 'Mastered'),
   questionId: Joi.string().hex().length(24),
-  sortBy: Joi.string().valid('updatedAt', 'createdAt', 'lastRevisedAt', 'attempts.count', 'confidenceLevel').default('updatedAt'),
+  sortBy: Joi.string().valid('updatedAt', 'createdAt', 'lastRevisedAt', 'attempts.count', 'attempts.solvedAt', 'confidenceLevel').default('updatedAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
   minConfidence: Joi.number().integer().min(1).max(5),
   maxConfidence: Joi.number().integer().min(1).max(5)

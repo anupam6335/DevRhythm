@@ -5,6 +5,8 @@ const { invalidateCache } = require("../middleware/cache");
 const cacheService = require("../services/cache.service");
 const AppError = require("../utils/errors/AppError");
 const constants = require("../config/constants");
+const { goalCompletedQueue } = require('../services/queue.service');
+const { jobQueue } = require('../services/queue.service');
 
 const getGoals = async (req, res, next) => {
   try {
@@ -161,6 +163,17 @@ const incrementGoal = async (req, res, next) => {
     if (goal.completedCount > goal.targetCount) goal.completedCount = goal.targetCount;
     
     await goal.save();
+    
+    // Emit event if just completed
+    await jobQueue.add({
+      type: 'goal.completed',
+      userId,
+      goalId: goal._id,
+      completedAt: goal.achievedAt || new Date(),
+      goalType: goal.goalType,
+      targetCount: goal.targetCount,
+      completedCount: goal.completedCount
+    });
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);

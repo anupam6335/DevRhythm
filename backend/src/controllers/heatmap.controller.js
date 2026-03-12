@@ -10,7 +10,7 @@ const { getStartOfDay, getEndOfDay, formatDate } = require('../utils/helpers/dat
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
-const redisClient = require('../config/redis');
+const { client: redisClient } = require('../config/redis');
 
 const getHeatmap = async (req, res, next) => {
   try {
