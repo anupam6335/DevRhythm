@@ -24,6 +24,7 @@ const userLimiter = createMemoryLimiter(15 * 60 * 1000, 100);
 const progressSnapshotLimiter = createMemoryLimiter(15 * 60 * 1000, 30);
 const notificationReadLimiter = createMemoryLimiter(15 * 60 * 1000, 60);
 const leaderboardLimiter = createMemoryLimiter(15 * 60 * 1000, 100);
+const publicLimiter = createMemoryLimiter(60 * 1000, 30);
 
 const createRedisLimiter = async (windowMs, max, keyPrefix) => {
   try {
@@ -58,6 +59,7 @@ module.exports = {
   progressSnapshotLimiter,
   notificationReadLimiter,
   leaderboardLimiter,
+  publicLimiter,        
   createRedisLimiter,
   createMemoryLimiter
 };
