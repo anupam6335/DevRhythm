@@ -56,6 +56,24 @@ const getDaysBetween = (startDate, endDate) => {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
+const parseDate = (input) => {
+  if (!input) return new Date();
+  if (input instanceof Date) return input;
+  if (typeof input === 'number') {
+    // If timestamp is in seconds (less than 10^11, i.e., before year 5138), convert to milliseconds
+    if (input < 10000000000) {
+      return new Date(input * 1000);
+    }
+    return new Date(input);
+  }
+  if (typeof input === 'string') {
+    const date = new Date(input);
+    if (!isNaN(date.getTime())) return date;
+  }
+  throw new Error(`Invalid date input: ${input}`);
+};
+
+
 module.exports = {
   getStartOfDay,
   getEndOfDay,
@@ -65,5 +83,6 @@ module.exports = {
   getEndOfMonth,
   formatDate,
   isSameDay,
-  getDaysBetween
+  getDaysBetween,
+  parseDate
 };

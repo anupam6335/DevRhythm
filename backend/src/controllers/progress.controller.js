@@ -6,7 +6,7 @@ const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
 const { invalidateProgressCache } = require('../middleware/cache');
-const { jobQueue } = require('../services/queue.service');
+const { jobQueue } = require('../services/queue.service'); 
 
 const updateProgressPatternMastery = async (userId, questionId) => {
   try {
@@ -298,7 +298,7 @@ const recordAttempt = async (req, res, next) => {
     const { timeSpent, successful } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
-    
+
     const update = {
       $inc: { 'attempts.count': 1, totalTimeSpent: timeSpent },
       $set: { 
@@ -307,7 +307,11 @@ const recordAttempt = async (req, res, next) => {
       }
     };
 
-    if (!successful) {
+    if (successful) {
+      // Successful attempt → mark as solved
+      update.$set.status = 'Solved';
+      update.$set['attempts.solvedAt'] = new Date();
+    } else {
       update.$set.status = 'Attempted';
     }
 
@@ -322,11 +326,36 @@ const recordAttempt = async (req, res, next) => {
       await progress.save();
     }
 
+    // Add job to queue
+    if (jobQueue) {
+      if (successful) {
+        await jobQueue.add({
+          type: 'question.solved',
+          userId,
+          questionId,
+          progressId: progress._id,
+          timeSpent,
+          solvedAt: new Date(),
+        });
+      } else {
+        await jobQueue.add({
+          type: 'question.attempted',
+          userId,
+          questionId,
+          progressId: progress._id,
+          timeSpent,
+          attemptedAt: new Date(),
+        });
+      }
+    }
+
     await invalidateProgressCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 const recordRevision = async (req, res, next) => {
