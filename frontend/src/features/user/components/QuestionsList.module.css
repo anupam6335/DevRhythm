@@ -266,8 +266,8 @@
 /* Empty / loading states */
 .emptyIcon {
   font-size: 3rem;
-  opacity: 0.5;
-  display: block;
+  color: var(--text-muted);
+  opacity: 0.7;
   margin-bottom: var(--spacing-sm);
 }
 

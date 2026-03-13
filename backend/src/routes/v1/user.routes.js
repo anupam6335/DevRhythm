@@ -3,6 +3,7 @@ const router = express.Router();
 const userController = require('../../controllers/user.controller');
 const followController = require('../../controllers/follow.controller');
 const heatmapController = require('../../controllers/heatmap.controller');   
+const studyGroupController = require('../../controllers/studyGroup.controller');
 const { auth } = require('../../middleware/auth');
 const validate = require('../../middleware/validator');
 const userValidator = require('../../utils/validators/user.validator');
@@ -25,15 +26,26 @@ router.get('/:userId/followers', auth, rateLimiters.userLimiter, validate(userVa
 
 router.get('/:userId/progress', validate(userValidator.getUserPublicProgress, 'params'), cache(30, 'user:public:progress'), userController.getUserPublicProgress);
 
-// Public heatmap – no authentication required
 router.get('/:userId/heatmap/:year',
-  rateLimiters.publicLimiter,                     // make sure this limiter exists
+  rateLimiters.publicLimiter,
   cache(300, 'user:heatmap:public'),
   validate(Joi.object({
     userId: Joi.string().hex().length(24).required(),
     year: Joi.number().integer().min(2000).max(2100).required()
   }), 'params'),
   heatmapController.getPublicUserHeatmap
+);
+
+router.get('/:userId/groups',
+  rateLimiters.publicLimiter,
+  validate(Joi.object({ userId: Joi.string().hex().length(24).required() }), 'params'),
+  validate(Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(20).default(5),
+    sortBy: Joi.string().valid('lastActivityAt', 'createdAt', 'name').default('lastActivityAt'),
+    sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+  }), 'query'),
+  studyGroupController.getUserPublicGroups
 );
 
 router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);

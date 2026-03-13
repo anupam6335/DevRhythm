@@ -3,6 +3,7 @@ const User = require('../models/User');
 const AppError = require('../utils/errors/AppError');
 const { formatResponse, paginate } = require('../utils/helpers');
 const { invalidateCache } = require('../middleware/cache');
+const { jobQueue } = require('../services/queue.service');
 
 const checkGroupAccess = async (groupId, userId, requireAdmin = false) => {
   const group = await StudyGroup.findById(groupId);
@@ -122,9 +123,20 @@ const joinGroup = async (req, res, next) => {
     if (group.privacy === 'private') throw new AppError('This group is private', 403);
     const existing = group.members.find(m => m.userId.toString() === req.user._id.toString());
     if (existing) throw new AppError('Already a member', 409);
+    
     group.members.push({ userId: req.user._id, role: 'member' });
     group.lastActivityAt = new Date();
     await group.save();
+
+    // 🔔 Emit job for activity log
+    await jobQueue.add({
+      type: 'group.joined',
+      userId: req.user._id,
+      groupId: group._id,
+      groupName: group.name,
+      timestamp: new Date()
+    });
+
     await invalidateCache(`study-group:${groupId}`);
     await invalidateCache('study-groups:list:*');
     await invalidateCache(`study-groups:user:${req.user._id}:membership`);
@@ -219,9 +231,41 @@ const updateGoalProgress = async (req, res, next) => {
     if (progress < 0 || progress > goal.targetCount) {
       throw new AppError(`Progress must be between 0 and ${goal.targetCount}`, 400);
     }
+
+    const oldProgress = participant.progress;
+    const wasCompleted = participant.completed;
+
     participant.progress = progress;
     group.lastActivityAt = new Date();
     await group.save();
+
+    // If progress increased, emit progress job
+    if (progress > oldProgress) {
+      await jobQueue.add({
+        type: 'group.goal_progress',
+        userId: req.user._id,
+        groupId,
+        goalId,
+        delta: progress - oldProgress,
+        newProgress: progress,
+        target: goal.targetCount,
+        timestamp: new Date()
+      });
+    }
+
+    // If completion status changed to true, emit completion job
+    if (!wasCompleted && participant.completed) {
+      await jobQueue.add({
+        type: 'group.goal_completed',
+        userId: req.user._id,
+        groupId,
+        goalId,
+        completedAt: new Date(),
+        goalDescription: goal.description,
+        targetCount: goal.targetCount
+      });
+    }
+
     await invalidateCache(`study-group:${groupId}`);
     res.json(formatResponse('Goal progress updated', { goal }));
   } catch (error) {
@@ -274,9 +318,41 @@ const updateChallengeProgress = async (req, res, next) => {
     if (progress < 0 || progress > 100) {
       throw new AppError('Progress must be between 0 and 100', 400);
     }
+
+    const oldProgress = participant.progress;
+    const wasCompleted = participant.completed;
+
     participant.progress = progress;
     group.lastActivityAt = new Date();
     await group.save();
+
+    // If progress increased, emit progress job
+    if (progress > oldProgress) {
+      await jobQueue.add({
+        type: 'group.challenge_progress',
+        userId: req.user._id,
+        groupId,
+        challengeId,
+        delta: progress - oldProgress,
+        newProgress: progress,
+        target: challenge.target,
+        timestamp: new Date()
+      });
+    }
+
+    // If completion status changed to true, emit completion job
+    if (!wasCompleted && participant.completed) {
+      await jobQueue.add({
+        type: 'group.challenge_completed',
+        userId: req.user._id,
+        groupId,
+        challengeId,
+        completedAt: new Date(),
+        challengeName: challenge.name,
+        target: challenge.target
+      });
+    }
+
     await invalidateCache(`study-group:${groupId}`);
     res.json(formatResponse('Challenge progress updated', { challenge }));
   } catch (error) {
@@ -397,6 +473,58 @@ const getGroupStats = async (req, res, next) => {
   }
 };
 
+/**
+ * Get public groups that a user is a member of (for profile snapshot)
+ * Accessible without authentication, but respects group privacy
+ */
+const getUserPublicGroups = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { page = 1, limit = 5, sortBy = 'lastActivityAt', sortOrder = 'desc' } = req.query;
+
+    // Check if user exists (optional but good practice)
+    const userExists = await User.exists({ _id: userId });
+    if (!userExists) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Build query: user is a member and group is public or invite-only
+    const query = {
+      'members.userId': userId,
+      privacy: { $in: ['public', 'invite-only'] }
+    };
+
+    const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+
+    const [groups, total] = await Promise.all([
+      StudyGroup.find(query)
+        .select('name description members privacy lastActivityAt createdAt') // only needed fields
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit))
+        .lean(),
+      StudyGroup.countDocuments(query)
+    ]);
+
+    // Add memberCount to each group (from members array length)
+    const groupsWithCount = groups.map(group => ({
+      _id: group._id,
+      name: group.name,
+      description: group.description,
+      privacy: group.privacy,
+      memberCount: group.members.length,
+      lastActivityAt: group.lastActivityAt,
+      createdAt: group.createdAt
+    }));
+
+    const pagination = paginate(total, page, limit);
+    res.json(formatResponse('User groups retrieved successfully', { groups: groupsWithCount }, pagination));
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   getGroups,
   createGroup,
@@ -414,5 +542,6 @@ module.exports = {
   updateChallengeProgress,
   getMyGroups,
   getGroupActivity,
-  getGroupStats
+  getGroupStats,
+  getUserPublicGroups
 };

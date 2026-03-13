@@ -31,7 +31,7 @@ const FollowSection: React.FC<FollowSectionProps> = ({
   const { user: currentUser } = useAuth();
   const isDesktop = useMediaQuery('(min-width: 940px)');
 
-  const avatarMax = 3;
+  const avatarMax = 7;
 
   const currentUserId = currentUser?._id;
   const { followers, following, mutuals, isLoading, error } = useFollowData({

@@ -1,9 +1,14 @@
 const { handleQuestionSolved } = require('./questionSolved.handler');
 const { handleQuestionMastered } = require('./questionMastered.handler');
-const { handleQuestionAttempted } = require('./questionAttempted.handler'); 
+const { handleQuestionAttempted } = require('./questionAttempted.handler');
 const { handleGoalCompleted } = require('./goalCompleted.handler');
 const { handleFollowerNew } = require('./followerNew.handler');
 const { handleRevisionCompleted } = require('./revisionCompleted.handler');
+const { handleGroupJoined } = require('./groupJoined.handler');
+const { handleGroupGoalProgress } = require('./groupGoalProgress.handler');
+const { handleGroupGoalCompleted } = require('./groupGoalCompleted.handler');
+const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handler');
+const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -16,7 +21,7 @@ const processJob = async (job) => {
     case 'question.mastered':
       await handleQuestionMastered(job);
       break;
-    case 'question.attempted':                      
+    case 'question.attempted':
       await handleQuestionAttempted(job);
       break;
     case 'goal.completed':
@@ -27,6 +32,21 @@ const processJob = async (job) => {
       break;
     case 'revision.completed':
       await handleRevisionCompleted(job);
+      break;
+    case 'group.joined':
+      await handleGroupJoined(job);
+      break;
+    case 'group.goal_progress':
+      await handleGroupGoalProgress(job);
+      break;
+    case 'group.goal_completed':
+      await handleGroupGoalCompleted(job);
+      break;
+    case 'group.challenge_progress':
+      await handleGroupChallengeProgress(job);
+      break;
+    case 'group.challenge_completed':
+      await handleGroupChallengeCompleted(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);

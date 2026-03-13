@@ -107,6 +107,7 @@ export const groupKeys = {
   lists: () => [...groupKeys.all, 'list'] as const,
   list: (filters: Record<string, any>) => [...groupKeys.lists(), filters] as const,
   my: (filters?: Record<string, any>) => [...groupKeys.all, 'my', filters] as const,
+  userPublic: (userId: string, filters?: Record<string, any>) => [...groupKeys.all, 'user', userId, filters] as const,
   detail: (id: string) => [...groupKeys.all, 'detail', id] as const,
   activity: (groupId: string, limit?: number) => [...groupKeys.all, 'activity', groupId, limit] as const,
   stats: (groupId: string) => [...groupKeys.all, 'stats', groupId] as const,

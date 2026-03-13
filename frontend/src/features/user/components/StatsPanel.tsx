@@ -36,7 +36,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ user, isOwnProfile = false, cla
   if (isLoading) {
     return (
       <div className={clsx(styles.container, className)}>
-        <div className={styles.header}>echoes · stats</div>
+        <div className={styles.header}>Echoes · Stats</div>
         <div className={styles.grid}>
           <SkeletonLoader variant="custom" height={120} />
           <SkeletonLoader variant="custom" height={120} />
@@ -51,7 +51,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ user, isOwnProfile = false, cla
   if (error || !stats) {
     return (
       <div className={clsx(styles.container, className)}>
-        <div className={styles.header}>echoes · stats</div>
+        <div className={styles.header}>Echoes · Stats</div>
         <p className={styles.error}>Could not load stats</p>
       </div>
     );
@@ -81,7 +81,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ user, isOwnProfile = false, cla
 
   return (
     <div className={clsx(styles.container, className)}>
-      <div className={styles.header}>echoes · stats</div>
+      <div className={styles.header}>Echoes · Stats</div>
 
       <div className={styles.grid}>
         {/* Mastery block */}
