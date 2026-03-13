@@ -16,6 +16,7 @@ import { truncate } from '@/shared/lib/stringUtils';
 import type { PublicProgressItem, UserQuestionProgress } from '@/shared/types';
 
 import styles from './QuestionsList.module.css';
+import Button from '@/shared/components/Button';
 
 export interface QuestionsListProps {
   userId?: string;
@@ -103,7 +104,6 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  console.log("================ Data : ", data);
 
   const showSkeleton = isLoading || (isFetching && !data);
 
@@ -168,12 +168,13 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h2 className={styles.title}>the path of solved</h2>
+        <h2 className={styles.title}>The path of solved</h2>
         <Link
           href={isOwnProfile ? '/progress' : `/users/${userId}/progress`}
           className={styles.viewAll}
         >
-          view all →
+          <Button variant='ghost' size="sm">View All →</Button>
+          
         </Link>
       </div>
       <div className={styles.timeline}>

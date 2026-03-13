@@ -8,9 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function OwnUserPage({ params }: { params: Promise<{ username: string }> }) {
-  // Unwrap params even if not used, to comply with Next.js requirements.
-  use(params);
-
+  const { username } = use(params);
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
@@ -19,6 +17,13 @@ export default function OwnUserPage({ params }: { params: Promise<{ username: st
       router.push('/login');
     }
   }, [user, isLoading, router]);
+
+  useEffect(() => {
+    // After user is loaded, check if the URL username matches
+    if (!isLoading && user && user.username !== username) {
+      router.replace(`/user/${user.username}`);
+    }
+  }, [isLoading, user, username, router]);
 
   if (isLoading) {
     return (

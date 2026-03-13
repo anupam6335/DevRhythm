@@ -2,7 +2,6 @@
 
 import { use } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { notFound } from 'next/navigation';
 import { userService } from '@/features/user/services/userService';
 import { UserPageWrapper } from '@/features/user/components';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
@@ -26,7 +25,7 @@ export default function PublicUserPage({ params }: { params: Promise<{ username:
   }
 
   if (error || !user) {
-    return <NotFoundPage />;
+    return <NotFoundPage title={`User ${username} not found`} message='Please Check the username and try again'/>;
   }
 
   return <UserPageWrapper user={user} isOwnProfile={false} />;

@@ -1,4 +1,3 @@
-'use client';
 
 import React from 'react';
 import clsx from 'clsx';
@@ -39,14 +38,13 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Followers / Following – two columns on desktop */}
       <div className={styles.twoColumns}>
-        <FollowSection />
-        <FollowSection />
+       <FollowSection user={user} isOwnProfile={isOwnProfile} />
       </div>
 
       {/* Milestones + Stats – two columns */}
       <div className={styles.twoColumns}>
         <QuestionsList userId={user._id} isOwnProfile={isOwnProfile} limit={6} />
-        <StatsPanel />
+        <StatsPanel user={user} isOwnProfile={isOwnProfile} />
       </div>
 
       {/* Patterns + Revisions – two columns */}

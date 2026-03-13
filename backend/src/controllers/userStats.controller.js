@@ -1,6 +1,95 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const UserQuestionProgress = require('../models/UserQuestionProgress');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
+
+/**
+ * Helper function to compute detailed stats for a given user.
+ * Returns totalSolved, totalMastered, difficultyBreakdown, and platformBreakdown.
+ */
+const computeDetailedStats = async (userId) => {
+  const objectId = new mongoose.Types.ObjectId(userId);
+
+  const pipeline = [
+    { $match: { userId: objectId } },
+    {
+      $lookup: {
+        from: 'questions',
+        localField: 'questionId',
+        foreignField: '_id',
+        as: 'question'
+      }
+    },
+    { $unwind: '$question' },
+    {
+      $facet: {
+        totals: [
+          {
+            $group: {
+              _id: null,
+              totalSolved: { $sum: { $cond: [{ $in: ['$status', ['Solved', 'Mastered']] }, 1, 0] } },
+              totalMastered: { $sum: { $cond: [{ $eq: ['$status', 'Mastered'] }, 1, 0] } }
+            }
+          }
+        ],
+        difficultyBreakdown: [
+          {
+            $match: { $or: [{ status: 'Solved' }, { status: 'Mastered' }] }
+          },
+          {
+            $group: {
+              _id: '$question.difficulty',
+              solved: { $sum: 1 },
+              mastered: { $sum: { $cond: [{ $eq: ['$status', 'Mastered'] }, 1, 0] } }
+            }
+          }
+        ],
+        platformBreakdown: [
+          {
+            $match: { $or: [{ status: 'Solved' }, { status: 'Mastered' }] }
+          },
+          {
+            $group: {
+              _id: '$question.platform',
+              count: { $sum: 1 }
+            }
+          }
+        ]
+      }
+    }
+  ];
+
+  const results = await UserQuestionProgress.aggregate(pipeline);
+  const data = results[0];
+
+  const totals = data.totals[0] || { totalSolved: 0, totalMastered: 0 };
+
+  const difficultyBreakdown = {
+    Easy: { solved: 0, mastered: 0 },
+    Medium: { solved: 0, mastered: 0 },
+    Hard: { solved: 0, mastered: 0 }
+  };
+  data.difficultyBreakdown.forEach(item => {
+    const diff = item._id;
+    if (difficultyBreakdown[diff]) {
+      difficultyBreakdown[diff].solved = item.solved;
+      difficultyBreakdown[diff].mastered = item.mastered;
+    }
+  });
+
+  const platformBreakdown = {};
+  data.platformBreakdown.forEach(item => {
+    platformBreakdown[item._id] = item.count;
+  });
+
+  return {
+    totalSolved: totals.totalSolved,
+    totalMastered: totals.totalMastered,
+    difficultyBreakdown,
+    platformBreakdown
+  };
+};
 
 /**
  * Get detailed statistics for the current user (including breakdowns)
@@ -9,69 +98,16 @@ const getUserDetailedStats = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    // Aggregate progress by difficulty and platform
-    const progress = await UserQuestionProgress.aggregate([
-      { $match: { userId } },
-      {
-        $lookup: {
-          from: 'questions',
-          localField: 'questionId',
-          foreignField: '_id',
-          as: 'question'
-        }
-      },
-      { $unwind: '$question' },
-      {
-        $group: {
-          _id: null,
-          totalSolved: { $sum: { $cond: [{ $in: ['$status', ['Solved', 'Mastered']] }, 1, 0] } },
-          totalMastered: { $sum: { $cond: [{ $eq: ['$status', 'Mastered'] }, 1, 0] } },
-          byDifficulty: {
-            $push: {
-              difficulty: '$question.difficulty',
-              status: '$status'
-            }
-          },
-          byPlatform: {
-            $push: {
-              platform: '$question.platform',
-              status: '$status'
-            }
-          }
-        }
-      }
-    ]);
+    const computed = await computeDetailedStats(userId);
 
-    const stats = progress[0] || { totalSolved: 0, totalMastered: 0, byDifficulty: [], byPlatform: [] };
-
-    // Build breakdown objects
-    const difficultyBreakdown = { Easy: { solved: 0, mastered: 0 }, Medium: { solved: 0, mastered: 0 }, Hard: { solved: 0, mastered: 0 } };
-    stats.byDifficulty.forEach(item => {
-      if (item.status === 'Solved' || item.status === 'Mastered') {
-        difficultyBreakdown[item.difficulty].solved++;
-        if (item.status === 'Mastered') difficultyBreakdown[item.difficulty].mastered++;
-      }
-    });
-
-    const platformBreakdown = {};
-    stats.byPlatform.forEach(item => {
-      if (item.status === 'Solved' || item.status === 'Mastered') {
-        platformBreakdown[item.platform] = (platformBreakdown[item.platform] || 0) + 1;
-      }
-    });
-
-    // Get user streak and other info
     const user = await User.findById(userId).select('streak stats preferences');
     const detailedStats = {
-      totalSolved: stats.totalSolved,
-      totalMastered: stats.totalMastered,
+      ...computed,
       masteryRate: user.stats.masteryRate,
       streak: user.streak,
       activeDays: user.stats.activeDays,
       totalTimeSpent: user.stats.totalTimeSpent,
       totalRevisions: user.stats.totalRevisions,
-      difficultyBreakdown,
-      platformBreakdown,
       preferences: user.preferences
     };
 
@@ -82,26 +118,44 @@ const getUserDetailedStats = async (req, res, next) => {
 };
 
 /**
- * Get public stats for another user (with more fields but exclude sensitive ones)
+ * Get public stats for another user (rich details, minimal fields)
  */
 const getPublicUserStats = async (req, res, next) => {
   try {
     const { userId } = req.params;
+
     const user = await User.findById(userId)
       .select('-email -providerId -preferences -authProvider -__v')
       .lean();
     if (!user) throw new AppError('User not found', 404);
     if (user.privacy !== 'public') throw new AppError('User stats are private', 403);
 
-    // Compute isOnline
-    user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 5 * 60 * 1000;
+    // Compute detailed stats for this user
+    const computed = await computeDetailedStats(userId);
 
-    // Round masteryRate
-    if (user.stats && user.stats.masteryRate) {
-      user.stats.masteryRate = Math.round(user.stats.masteryRate * 100) / 100;
+    // Build public stats object – identical to own stats but without preferences
+    const publicStats = {
+      totalSolved: computed.totalSolved,
+      totalMastered: computed.totalMastered,
+      masteryRate: user.stats.masteryRate,
+      streak: user.streak,
+      activeDays: user.stats.activeDays,
+      totalTimeSpent: user.stats.totalTimeSpent,
+      totalRevisions: user.stats.totalRevisions,
+      difficultyBreakdown: computed.difficultyBreakdown,
+      platformBreakdown: computed.platformBreakdown
+    };
+
+    // Round masteryRate to two decimals
+    if (publicStats.masteryRate) {
+      publicStats.masteryRate = Math.round(publicStats.masteryRate * 100) / 100;
     }
 
-    res.json(formatResponse('Public user stats retrieved', { user }));
+    // Return only stats and user ID
+    res.json(formatResponse('Public user stats retrieved', {
+      stats: publicStats,
+      userId: user._id
+    }));
   } catch (error) {
     next(error);
   }

@@ -10,7 +10,7 @@ const getCurrentUser = async (req, res, next) => {
   try {
     const user = req.user.toObject();
     delete user.__v;
-    // Online if last activity within 5 minutes
+    // Online if last activity within 1 minutes
     user.isOnline = (Date.now() - new Date(user.lastOnline).getTime()) < 1 * 60 * 1000;
     
     // Round masteryRate to 2 decimal places

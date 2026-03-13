@@ -1,0 +1,393 @@
+.container {
+  width: 100%;
+  margin: var(--spacing-lg) 0;
+}
+
+.header {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px dashed var(--border);
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Base block styles – border only, no shadow */
+.block {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.block:hover {
+  border-color: var(--accent-moss);
+  transform: translateY(-2px);
+}
+
+.blockLabel {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  transition: color 0.2s ease;
+}
+
+/* Mastery block */
+.masteryBlock {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.masteryValue {
+  font-family: var(--font-heading);
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--accent-moss);
+}
+
+/* Solved block */
+.solvedBlock {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+.solvedValue {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.difficultyRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1);
+  gap: var(--spacing-sm);
+  justify-content: center;
+  margin-top: var(--spacing-sm);
+}
+
+.difficultyPill {
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  padding: 4px 12px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Place the third pill (Hard) centered below */
+.difficultyPill:nth-child(3) {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+/* Hover effects for difficulty pills */
+.difficultyPill:hover {
+  border-color: currentColor;
+}
+
+.difficultyPill:hover .difficultyLabel {
+  color: currentColor;
+}
+
+.difficultyNumber {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.difficultyLabel {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  transition: color 0.2s ease;
+}
+
+/* Difficulty-specific colors on hover */
+.difficultyPill:nth-child(1):hover .difficultyLabel {
+  color: #2e7d32;
+}
+.difficultyPill:nth-child(2):hover .difficultyLabel {
+  color: #ed6c02;
+}
+.difficultyPill:nth-child(3):hover .difficultyLabel {
+  color: #d32f2f;
+}
+
+/* Streak block */
+.streakBlock {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  flex-direction: row;
+}
+
+.streakItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.2s ease;
+}
+
+.streakItem:hover {
+  transform: scale(1.02);
+}
+
+.streakIcon {
+  color: var(--accent-moss);
+  font-size: 1.2rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.streakItem:hover .streakIcon {
+  color: #f97316;
+  transform: scale(1.1);
+}
+
+.streakValue {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.streakItem .blockLabel {
+  margin-left: 2px;
+}
+
+/* Effort block */
+.effortBlock {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  flex-direction: row;
+}
+
+.effortItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.2s ease;
+}
+
+.effortItem:hover {
+  transform: scale(1.02);
+}
+
+.effortIcon {
+  color: var(--accent-moss);
+  font-size: 1.2rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.effortItem:hover .effortIcon {
+  color: #0284c7;
+  transform: scale(1.1);
+}
+
+.effortValue {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.effortItem .blockLabel {
+  margin-left: 2px;
+}
+
+/* Platforms block */
+.platformsBlock {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  flex-direction: row;
+}
+
+.platformItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  transition: transform 0.2s ease;
+}
+
+.platformItem:hover {
+  transform: scale(1.02);
+}
+
+.platformName {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.platformItem:hover .platformName {
+  color: var(--accent-moss);
+}
+
+.platformCount {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+/* Goals block */
+.goalsBlock {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  flex-direction: row;
+}
+
+.goalsBlock:hover {
+  border-color: var(--accent-moss);
+  transform: translateY(-2px);
+}
+
+.goalItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goalIcon {
+  color: var(--accent-moss);
+  font-size: 1.2rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.goalsBlock:hover .goalIcon {
+  color: var(--accent-moss);
+  transform: scale(1.1);
+}
+
+.goalValue {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.goalLabel {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-left: 2px;
+}
+
+.goalSeparator {
+  color: var(--divider);
+  font-size: 1.2rem;
+}
+
+/* Error state */
+.error {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--spacing-lg);
+}
+
+/* Responsive: tablet and desktop */
+@media (min-width: 768px) {
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .masteryBlock {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .solvedBlock {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .streakBlock {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .effortBlock {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .platformsBlock {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  .goalsBlock {
+    grid-column: 1 / -1;
+    grid-row: 5;
+  }
+}
+
+@media (max-width: 767px) {
+  .masteryValue {
+    font-size: 2.5rem;
+  }
+  .solvedValue {
+    font-size: 2rem;
+  }
+  .streakValue,
+  .effortValue,
+  .goalValue {
+    font-size: 1.3rem;
+  }
+  .platformCount {
+    font-size: 1rem;
+  }
+  .difficultyPill {
+    padding: 2px 8px;
+    font-size: 0.8rem;
+  }
+  .difficultyRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .difficultyPill:nth-child(3) {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+}

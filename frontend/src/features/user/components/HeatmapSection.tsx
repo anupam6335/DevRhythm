@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { FiChevronDown } from 'react-icons/fi';
@@ -157,7 +155,7 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
 
         {/* Right side: daily garden + year dropdown */}
         <div className={styles.right}>
-          <span className={styles.title}>daily garden</span>
+          <span className={styles.title}>Daily Garden</span>
           <div className={styles.yearSelectWrapper}>
             <select
               value={selectedYear}
