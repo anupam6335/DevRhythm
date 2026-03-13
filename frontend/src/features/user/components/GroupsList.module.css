@@ -1,0 +1,265 @@
+/* GroupsList.module.css */
+
+.container {
+  width: 100%;
+  margin: var(--spacing-xl) 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px dashed var(--border);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+/* Grid layout */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+/* Card */
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.card {
+  background: var(--bg-surface);
+  border-radius: 12px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.card:hover {
+  border-color: var(--accent-moss);
+  transform: translateY(-2px);
+}
+
+/* Card header */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.groupName {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.privacyBadge {
+  flex-shrink: 0;
+}
+
+/* Description - fixed height via line clamp, but will push content if short */
+.description {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex-shrink: 0; /* prevents description from shrinking when space is tight */
+  min-height: calc(1.5em * 2); /* ensures consistent height for two lines */
+}
+
+/* Members row - will be pushed to bottom if description is short */
+.membersRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: auto; /* pushes to bottom when extra space exists */
+  flex-shrink: 0;
+}
+
+.avatarGroup {
+  /* no extra styling */
+}
+
+.extraCount {
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.memberCount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.memberIcon {
+  font-size: 1rem;
+  color: var(--accent-moss);
+}
+
+/* Activity (own profile) */
+.activity {
+  margin-top: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.goalPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(var(--accent-moss-rgb), 0.15);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.goalIcon {
+  font-size: 0.9rem;
+}
+
+.goalText {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer - always at bottom */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--spacing-xs);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  border-top: 1px dashed var(--divider);
+  padding-top: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.footerIcon {
+  font-size: 0.9rem;
+  color: var(--accent-moss);
+}
+
+.footerText {
+  font-family: var(--font-body);
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-bottom: var(--spacing-sm);
+}
+
+.findGroupsLink {
+  display: inline-block;
+  margin-top: var(--spacing-md);
+  color: var(--accent-moss);
+  text-decoration: none;
+  font-size: 0.9rem;
+  border: 1px solid var(--accent-moss);
+  padding: 6px 16px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.findGroupsLink:hover {
+  background-color: var(--accent-moss);
+  color: var(--bg-surface);
+}
+
+/* Error state */
+.error {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--spacing-lg);
+}
+
+/* Skeleton card */
+.skeletonCard {
+  height: 180px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 939px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 1.3rem;
+  }
+  .card {
+    padding: var(--spacing-sm);
+  }
+  .groupName {
+    font-size: 1.1rem;
+  }
+  .description {
+    font-size: 0.85rem;
+  }
+  .goalPill {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+  }
+}

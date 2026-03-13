@@ -37,7 +37,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
       </section>
 
       {/* Followers / Following – two columns on desktop */}
-      <div className={styles.twoColumns}>
+      <div className={styles.section}>
        <FollowSection user={user} isOwnProfile={isOwnProfile} />
       </div>
 
@@ -55,7 +55,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Study Groups + Notifications – two columns */}
       <div className={styles.twoColumns}>
-        <GroupsList />
+        <GroupsList userId={user._id} isOwnProfile={isOwnProfile} limit={5} />
         <NotificationsList />
       </div>
     </div>

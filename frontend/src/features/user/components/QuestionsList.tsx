@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FiClock, FiRefreshCw } from 'react-icons/fi';
+import { FiBookOpen, FiClock, FiRefreshCw } from 'react-icons/fi';
 import clsx from 'clsx';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -137,7 +137,7 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h2 className={styles.title}>the path of solved</h2>
+          <h2 className={styles.title}>The path of solved</h2>
           <span className={styles.viewAll}>loading…</span>
         </div>
         <div className={styles.timeline}>
@@ -153,11 +153,11 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h2 className={styles.title}>the path of solved</h2>
+          <h2 className={styles.title}>The path of solved</h2>
         </div>
         <NoRecordFound
           message="No ascents yet. Ready to plant your flag?"
-          icon={<span className={styles.emptyIcon}>🗺️</span>}
+          icon={<FiBookOpen className={styles.emptyIcon} />}
         />
       </div>
     );
