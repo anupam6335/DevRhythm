@@ -26,7 +26,7 @@ export const ROUTES = {
 
   USERS: {
     // Dynamic: /users/:username
-    DETAIL: (username: string) => `/users/${username}`,
+    DETAIL: (username: string) => `/user/${username}`,
     FOLLOWING: (username: string) => `/users/${username}/following`,
     FOLLOWERS: (username: string) => `/users/${username}/followers`,
     SHARES: (username: string) => `/users/${username}/shares`,

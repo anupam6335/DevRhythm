@@ -1,6 +1,6 @@
 import { QueryClient, DefaultOptions } from '@tanstack/react-query';
 
-const staleTime = 5 * 60 * 1000; // 5 minutes
+const staleTime = 1 * 60 * 1000; // 1 minutes
 const gcTime = 10 * 60 * 1000; // 10 minutes (formerly cacheTime)
 
 const defaultOptions: DefaultOptions = {

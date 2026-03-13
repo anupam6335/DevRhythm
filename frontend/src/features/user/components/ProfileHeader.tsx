@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import { FiSettings, FiCalendar, FiStar, FiUsers, FiTarget, FiAward } from 'react-icons/fi';
 import { FaFire, FaTrophy, FaLeaf, FaRegGem, FaStar } from 'react-icons/fa';

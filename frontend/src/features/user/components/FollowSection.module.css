@@ -1,0 +1,200 @@
+/* FollowSection.module.css */
+
+.container {
+  width: 100%;
+  margin: var(--spacing-lg) 0;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding: 0 var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px dashed var(--border);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+/* ===== Content area ===== */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-md);
+}
+
+/* Two‑column grid for followers & following */
+.twoColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+/* Individual block – bordered container with hover effect */
+.block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.block:hover {
+  border-color: var(--accent-moss);
+  transform: translateY(-2px);
+}
+
+.blockHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+}
+
+.blockLabel {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.blockNumber {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* Avatar row */
+.avatarRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+}
+
+/* Empty message for blocks with zero count */
+.emptyMessage {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: var(--spacing-xs);
+}
+
+/* No mutuals message (when both followers/following exist but no mutuals) */
+.noMutuals {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.8;
+  margin-top: var(--spacing-md);
+}
+
+/* ===== Empty State ===== */
+.empty {
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-md);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-sm);
+}
+
+.findPeopleLink {
+  color: var(--accent-moss);
+  text-decoration: none;
+  font-size: 0.95rem;
+  border: 1px solid var(--accent-moss);
+  padding: 6px 16px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  margin-top: var(--spacing-sm);
+}
+
+.findPeopleLink:hover {
+  background-color: var(--accent-moss);
+  color: var(--bg-surface);
+}
+
+/* ===== Error State ===== */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-muted);
+  padding: var(--spacing-xl);
+  background: var(--error-soft);
+  border-radius: var(--radius);
+}
+
+/* ===== Tablet (768px) ===== */
+@media (max-width: 768px) {
+  .twoColumns {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  .blockNumber {
+    font-size: 2rem;
+  }
+}
+
+/* ===== Mobile (≤480px) ===== */
+@media (max-width: 480px) {
+  .header {
+    margin-bottom: var(--spacing-lg);
+  }
+  .title {
+    font-size: 1.3rem;
+  }
+  .blockNumber {
+    font-size: 1.8rem;
+  }
+  .blockLabel {
+    font-size: 0.9rem;
+  }
+}
+
+/* ===== Skeleton Loading ===== */
+.avatarGroupSkeleton {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+}

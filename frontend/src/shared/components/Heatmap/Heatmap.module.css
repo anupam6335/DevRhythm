@@ -7,7 +7,7 @@
 /* Horizontal row of month blocks */
 .monthsRow {
   display: flex;
-  gap: 16px; /* gap between months */
+  gap: 7px; /* gap between months */
   min-width: fit-content;
 }
 
