@@ -1,5 +1,5 @@
 import apiClient, { buildQueryString, ApiClientResponse } from '@/shared/lib/apiClient';
-import type { User, PublicProgressItem } from '@/shared/types';
+import type { User, PublicProgressItem, HeatmapData } from '@/shared/types';
 
 export const userService = {
   async getCurrentUser(): Promise<User> {
@@ -82,5 +82,15 @@ export const userService = {
     const query = buildQueryString(params);
     const response = await apiClient.get<{ progress: PublicProgressItem[] }>(`/users/${userId}/progress${query}`);
     return response.data.progress;
+  },
+
+  /**
+   * Get public heatmap data for a user for a specific year.
+   * @param userId - The user's ID
+   * @param year - The year (e.g., 2025)
+   */
+  async getUserHeatmap(userId: string, year: number): Promise<HeatmapData> {
+    const response = await apiClient.get<HeatmapData>(`/users/${userId}/heatmap/${year}`);
+    return response.data;
   }
 };
