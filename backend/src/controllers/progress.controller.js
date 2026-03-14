@@ -84,6 +84,7 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (keyInsights !== undefined) updateData.keyInsights = keyInsights;
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
     if (confidenceLevel) updateData.confidenceLevel = confidenceLevel;
+    if (req.body.personalDifficulty !== undefined) updateData.personalDifficulty = req.body.personalDifficulty;
 
     // If status is being set to Solved and it wasn't Solved before, set solvedAt
     if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {
@@ -120,7 +121,8 @@ const createOrUpdateProgress = async (req, res, next) => {
         keyInsights,
         savedCode: savedCode ? { ...savedCode, lastUpdated: new Date() } : undefined,
         confidenceLevel: confidenceLevel || 1,
-        totalTimeSpent: timeSpent || 0
+        totalTimeSpent: timeSpent || 0,
+        personalDifficulty: req.body.personalDifficulty,
       });
     }
 
@@ -420,6 +422,54 @@ const getRecentProgress = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+/**
+ * Get questions sorted by the user's personal difficulty rating
+ */
+const getQuestionsByPersonalDifficulty = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { page, limit, skip } = getPaginationParams(req);
+    const { sortOrder, personalDifficulty: filterDifficulty } = req.query;
+
+    const query = { userId };
+    if (filterDifficulty) {
+      query.personalDifficulty = filterDifficulty;
+    }
+
+    const sort = { personalDifficulty: sortOrder === 'asc' ? 1 : -1 };
+
+    const [progressRecords, total] = await Promise.all([
+      UserQuestionProgress.find(query)
+        .populate({
+          path: 'questionId',
+          select: '_id title problemLink platform difficulty tags pattern',
+        })
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      UserQuestionProgress.countDocuments(query),
+    ]);
+
+    // Format response: include question details and personal difficulty
+    const questions = progressRecords.map(record => ({
+      question: record.questionId,
+      personalDifficulty: record.personalDifficulty,
+      status: record.status,
+      confidenceLevel: record.confidenceLevel,
+      // include any other relevant progress fields
+    }));
+
+    res.json(formatResponse(
+      'Questions sorted by personal difficulty retrieved',
+      { questions },
+      { pagination: paginate(total, page, limit) }
+    ));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProgress,
   getQuestionProgress,
@@ -432,5 +482,6 @@ module.exports = {
   recordRevision,
   deleteProgress,
   getProgressStats,
-  getRecentProgress
+  getRecentProgress,
+  getQuestionsByPersonalDifficulty
 };

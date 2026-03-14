@@ -34,6 +34,12 @@ const createQuestion = async (req, res, next) => {
   try {
     const existing = await Question.findOne({ platform: req.body.platform, platformQuestionId: req.body.platformQuestionId });
     if (existing) throw new AppError('Question with same platform and ID already exists', 409);
+
+    // Normalize pattern to array if it's a string
+    if (req.body.pattern && !Array.isArray(req.body.pattern)) {
+      req.body.pattern = [req.body.pattern];
+    }
+
     const question = await Question.create(req.body);
     
     await invalidateQuestionCache(question._id, question.platform, question.platformQuestionId);
@@ -44,6 +50,11 @@ const createQuestion = async (req, res, next) => {
 
 const updateQuestion = async (req, res, next) => {
   try {
+    // Normalize pattern to array if it's provided as a string
+    if (req.body.pattern && !Array.isArray(req.body.pattern)) {
+      req.body.pattern = [req.body.pattern];
+    }
+
     const question = await Question.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).select('-__v');
     if (!question) throw new AppError('Question not found', 404);
     
@@ -128,7 +139,7 @@ const getSimilarQuestions = async (req, res, next) => {
 
 const getPatterns = async (req, res, next) => {
   try {
-    const patterns = await Question.distinct('pattern', { pattern: { $ne: '' }, isActive: true });
+    const patterns = await Question.distinct('pattern', { pattern: { $ne: [] }, isActive: true });
     res.json(formatResponse('Patterns retrieved successfully', { patterns }));
   } catch (error) { next(error); }
 };
@@ -151,7 +162,7 @@ const getStatistics = async (req, res, next) => {
       { $match: { isActive: true } },
       { $group: { _id: '$platform', count: { $sum: 1 } } },
     ]);
-    const totalPatterns = await Question.distinct('pattern', { pattern: { $ne: '' }, isActive: true });
+    const totalPatterns = await Question.distinct('pattern', { pattern: { $ne: [] }, isActive: true });
     const totalTags = await Question.distinct('tags', { isActive: true });
     res.json(formatResponse('Statistics retrieved successfully', {
       statistics: {

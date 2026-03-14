@@ -30,10 +30,10 @@ const QuestionSchema = new mongoose.Schema({
     type: String,
     trim: true,
   }],
-  pattern: {
+  pattern: [{
     type: String,
     trim: true,
-  },
+  }],
   solutionLinks: [{
     type: String,
     trim: true,
@@ -59,5 +59,12 @@ QuestionSchema.index({ pattern: 1 });
 QuestionSchema.index({ tags: 1 });
 QuestionSchema.index({ title: "text", pattern: "text" });
 QuestionSchema.index({ platform: 1, difficulty: 1, pattern: 1 });
+
+QuestionSchema.pre('save', function(next) {
+  if (this.pattern && !Array.isArray(this.pattern)) {
+    this.pattern = [this.pattern];
+  }
+  next();
+});
 
 module.exports = mongoose.model("Question", QuestionSchema);

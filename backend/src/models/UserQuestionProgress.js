@@ -11,6 +11,11 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     ref: "Question",
     required: true,
   },
+  personalDifficulty: {
+    type: String,
+    enum: ['Easy', 'Medium', 'Hard'],
+    required: false,
+  },
   status: {
     type: String,
     enum: ["Not Started", "Attempted", "Solved", "Mastered"],
@@ -60,6 +65,7 @@ UserQuestionProgressSchema.index({ userId: 1, "attempts.count": -1 });
 UserQuestionProgressSchema.index({ questionId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, confidenceLevel: -1 });
 UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
+UserQuestionProgressSchema.index({ userId: 1, personalDifficulty: 1 });
 
 UserQuestionProgressSchema.post('save', async function(doc) {
   try {

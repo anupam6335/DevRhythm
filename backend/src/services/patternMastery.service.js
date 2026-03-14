@@ -3,8 +3,15 @@ const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
 const { getStartOfDay, getDaysBetween } = require('../utils/helpers/date');
 
+/**
+ * Calculate statistics for a specific pattern of a user.
+ * @param {ObjectId} userId
+ * @param {string} patternName
+ * @returns {Object} pattern stats
+ */
 const calculatePatternStats = async (userId, patternName) => {
   try {
+    // Find all questions that have this pattern (pattern array contains patternName)
     const patternQuestions = await Question.find({ pattern: patternName }).distinct('_id');
     const progressRecords = await UserQuestionProgress.find({
       userId,
@@ -14,7 +21,11 @@ const calculatePatternStats = async (userId, patternName) => {
     const solved = progressRecords.filter(p => p.status === 'Solved' || p.status === 'Mastered');
     const mastered = progressRecords.filter(p => p.status === 'Mastered');
     
-    const difficultyBreakdown = { easy: { solved: 0, mastered: 0, totalTime: 0 }, medium: { solved: 0, mastered: 0, totalTime: 0 }, hard: { solved: 0, mastered: 0, totalTime: 0 } };
+    const difficultyBreakdown = {
+      easy: { solved: 0, mastered: 0, totalTime: 0 },
+      medium: { solved: 0, mastered: 0, totalTime: 0 },
+      hard: { solved: 0, mastered: 0, totalTime: 0 }
+    };
     const platformDistribution = { LeetCode: 0, HackerRank: 0, CodeForces: 0, Other: 0 };
     let totalTimeSpent = 0;
     let totalAttempts = 0;
@@ -95,6 +106,9 @@ const calculatePatternStats = async (userId, patternName) => {
   }
 };
 
+/**
+ * Calculate confidence level based on mastery and success rates.
+ */
 const calculateConfidenceLevel = (masteryRate, successRate, recentSuccessRate) => {
   if (masteryRate >= 80 && successRate >= 90) return 5;
   if (masteryRate >= 60 && successRate >= 80) return 4;
@@ -103,71 +117,97 @@ const calculateConfidenceLevel = (masteryRate, successRate, recentSuccessRate) =
   return 1;
 };
 
+/**
+ * Update pattern mastery for all patterns associated with a question.
+ * Called after a progress record is created/updated/deleted.
+ * @param {ObjectId} userId
+ * @param {ObjectId} questionProgressId
+ * @returns {Array} updated pattern mastery documents or null
+ */
 const updatePatternMasteryFromProgress = async (userId, questionProgressId) => {
   try {
     const progress = await UserQuestionProgress.findById(questionProgressId)
       .populate('questionId', 'pattern difficulty platform title problemLink');
     
-    if (!progress || !progress.questionId?.pattern) return null;
-    
-    const patternName = progress.questionId.pattern;
-    const stats = await calculatePatternStats(userId, patternName);
-    if (!stats) return null;
-    
-    const recentQuestions = await UserQuestionProgress.find({
-      userId,
-      questionId: { $in: await Question.find({ pattern: patternName }).distinct('_id') },
-      $or: [{ status: 'Solved' }, { status: 'Mastered' }]
-    })
-      .populate('questionId', 'title problemLink platform difficulty')
-      .sort({ 'attempts.solvedAt': -1 })
-      .limit(5)
-      .lean();
-    
-    const recentQuestionsFormatted = recentQuestions.map(rq => ({
-      questionProgressId: rq._id,
-      questionId: rq.questionId._id,
-      title: rq.questionId.title,
-      problemLink: rq.questionId.problemLink,
-      platform: rq.questionId.platform,
-      difficulty: rq.questionId.difficulty,
-      solvedAt: rq.attempts?.solvedAt || rq.updatedAt,
-      status: rq.status,
-      timeSpent: rq.totalTimeSpent || 0
-    }));
-    
-    const lastPracticed = recentQuestionsFormatted[0]?.solvedAt || new Date();
-    
-    const updateData = {
-      ...stats,
-      lastPracticed,
-      lastUpdated: new Date(),
-      recentQuestions: recentQuestionsFormatted
-    };
-    
-    const patternMastery = await PatternMastery.findOneAndUpdate(
-      { userId, patternName },
-      updateData,
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-    
-    return patternMastery;
+    if (!progress || !progress.questionId) return null;
+
+    const patterns = progress.questionId.pattern;
+    if (!patterns || patterns.length === 0) return null;
+
+    const updatedPatterns = [];
+
+    // Update each pattern associated with this question
+    for (const patternName of patterns) {
+      const stats = await calculatePatternStats(userId, patternName);
+      if (!stats) continue;
+
+      // Get recent questions for this pattern (up to 5)
+      const patternQuestions = await Question.find({ pattern: patternName }).distinct('_id');
+      const recentQuestions = await UserQuestionProgress.find({
+        userId,
+        questionId: { $in: patternQuestions },
+        $or: [{ status: 'Solved' }, { status: 'Mastered' }]
+      })
+        .populate('questionId', 'title problemLink platform difficulty')
+        .sort({ 'attempts.solvedAt': -1 })
+        .limit(5)
+        .lean();
+
+      const recentQuestionsFormatted = recentQuestions.map(rq => ({
+        questionProgressId: rq._id,
+        questionId: rq.questionId._id,
+        title: rq.questionId.title,
+        problemLink: rq.questionId.problemLink,
+        platform: rq.questionId.platform,
+        difficulty: rq.questionId.difficulty,
+        solvedAt: rq.attempts?.solvedAt || rq.updatedAt,
+        status: rq.status,
+        timeSpent: rq.totalTimeSpent || 0
+      }));
+
+      const lastPracticed = recentQuestionsFormatted[0]?.solvedAt || new Date();
+
+      const updateData = {
+        ...stats,
+        lastPracticed,
+        lastUpdated: new Date(),
+        recentQuestions: recentQuestionsFormatted
+      };
+
+      const patternMastery = await PatternMastery.findOneAndUpdate(
+        { userId, patternName },
+        updateData,
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+
+      updatedPatterns.push(patternMastery);
+    }
+
+    return updatedPatterns;
   } catch (error) {
     console.error('Pattern mastery update error:', error);
     return null;
   }
 };
 
+/**
+ * Get pattern recommendations for a user.
+ * @param {ObjectId} userId
+ * @param {number} limit
+ * @returns {Array} recommendations
+ */
 const getPatternRecommendations = async (userId, limit = 5) => {
   try {
     const patterns = await PatternMastery.find({ userId }).lean();
-    const allPatterns = await Question.distinct('pattern', { pattern: { $ne: '' } });
+    // Get all distinct patterns from questions
+    const allPatterns = await Question.distinct('pattern', { pattern: { $ne: [] } });
     
     const userPatterns = patterns.map(p => p.patternName);
     const missingPatterns = allPatterns.filter(p => !userPatterns.includes(p));
     
     const recommendations = [];
     
+    // Add weakest patterns from user's existing patterns
     patterns.sort((a, b) => a.confidenceLevel - b.confidenceLevel || a.masteryRate - b.masteryRate)
       .slice(0, limit)
       .forEach(pattern => {
@@ -181,6 +221,7 @@ const getPatternRecommendations = async (userId, limit = 5) => {
         });
       });
     
+    // Fill remaining slots with new patterns
     if (recommendations.length < limit && missingPatterns.length > 0) {
       missingPatterns.slice(0, limit - recommendations.length).forEach(pattern => {
         recommendations.push({
