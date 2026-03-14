@@ -20,5 +20,6 @@ router.put('/confidence/:questionId', auth, rateLimiters.createMemoryLimiter(15 
 router.post('/attempt/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.recordAttempt), progressController.recordAttempt);
 router.post('/revision/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.recordRevision), progressController.recordRevision);
 router.delete('/question/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.deleteProgress, 'params'), progressController.deleteProgress);
+router.get('/by-personal-difficulty', auth, rateLimiters.userLimiter, validate(progressValidator.getByPersonalDifficulty, 'query'), progressController.getQuestionsByPersonalDifficulty);
 
 module.exports = router;

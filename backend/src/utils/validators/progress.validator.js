@@ -157,7 +157,8 @@ const createOrUpdateProgress = Joi.object({
     code: Joi.string().required()
   }),
   confidenceLevel: Joi.number().integer().min(1).max(5),
-  timeSpent: Joi.number().integer().min(0).max(480)
+  timeSpent: Joi.number().integer().min(0).max(480),
+  personalDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard').optional()
 });
 
 const updateStatus = Joi.object({
@@ -239,6 +240,14 @@ const getOverdue = Joi.object({
   limit: Joi.number().integer().min(1).max(50).default(20)
 });
 
+const getByPersonalDifficulty = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  sortOrder: Joi.string().valid('asc', 'desc').default('asc'),
+  personalDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard').optional()
+});
+
+
 module.exports = {
   getGoals,
   getGoalById,
@@ -269,5 +278,6 @@ module.exports = {
   createRevision,
   completeRevision,
   rescheduleRevision,
-  getOverdue
+  getOverdue,
+  getByPersonalDifficulty
 };
