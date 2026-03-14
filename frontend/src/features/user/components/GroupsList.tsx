@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -115,9 +113,7 @@ const GroupsList: React.FC<GroupsListProps> = ({
           href={isOwnProfile ? '/groups' : `/users/${userId}/groups`}
           className={styles.viewAll}
         >
-          <Button variant="ghost" size="sm">
-            View All →
-          </Button>
+          View All →
         </Link>
       </div>
 

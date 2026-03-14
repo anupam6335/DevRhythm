@@ -173,7 +173,7 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
           href={isOwnProfile ? '/progress' : `/users/${userId}/progress`}
           className={styles.viewAll}
         >
-          <Button variant='ghost' size="sm">View All →</Button>
+          View All →
           
         </Link>
       </div>

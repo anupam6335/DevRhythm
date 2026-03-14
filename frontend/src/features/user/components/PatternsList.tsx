@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -10,7 +8,6 @@ import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NoRecordFound from '@/shared/components/NoRecordFound';
 import { ROUTES } from '@/shared/config/routes';
-import { truncate } from '@/shared/lib/stringUtils';
 import type { PatternMastery } from '@/shared/types';
 
 import styles from './PatternsList.module.css';
@@ -108,7 +105,7 @@ const PatternCard: React.FC<{ pattern: PatternMastery; href: string }> = ({ patt
                 <span className={styles.connector}>╰─</span>
                 <DifficultyDot difficulty={q.difficulty} />
                 <span className={styles.recentTitle} title={q.title}>
-                  {truncate(q.title, 30)}
+                   {q.title}
                 </span>
               </div>
             ))

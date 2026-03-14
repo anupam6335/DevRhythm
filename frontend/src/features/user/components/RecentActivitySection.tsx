@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -119,8 +117,8 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
       <div className={clsx(styles.container, styles.empty, className)}>
         <div className={styles.header}>
           <h2 className={styles.title}>Recent Activity</h2>
-          <Link href="/activity" className={styles.viewAll}>
-            <Button variant="ghost" size="sm">Vew All →</Button>
+          <Link href="/activity" className={styles.viewall}>
+            View All →
           </Link>
         </div>
         <NoRecordFound
@@ -135,8 +133,8 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
     <div className={clsx(styles.container, className)}>
       <div className={styles.header}>
         <h2 className={styles.title}>Recent Activity</h2>
-        <Link href="/activity" className={styles.viewAll}>
-          <Button variant="ghost" size="sm">View All →</Button>
+        <Link href="/activity" className={styles.viewall}>
+          View All →
         </Link>
       </div>
 

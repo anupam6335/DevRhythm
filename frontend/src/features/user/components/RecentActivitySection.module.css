@@ -23,7 +23,7 @@
   margin: 0;
 }
 
-.viewAll {
+.viewall {
   font-size: 1.1rem;
   color: var(--text-secondary);
   text-decoration: none;
@@ -31,7 +31,7 @@
   transition: color 0.2s ease;
 }
 
-.viewAll:hover {
+.viewall:hover {
   color: var(--accent-moss);
 }
 

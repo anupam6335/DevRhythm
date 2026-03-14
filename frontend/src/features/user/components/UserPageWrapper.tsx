@@ -37,7 +37,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Followers / Following – two columns on desktop */}
       <div className={styles.section}>
-        <FollowSection user={user} isOwnProfile={isOwnProfile} />
+        <PatternsList userId={user._id} isOwnProfile={isOwnProfile} limit={4} />
       </div>
 
 
@@ -49,7 +49,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Patterns + Revisions – two columns */}
       <div className={styles.twoColumns}>
-        <PatternsList userId={user._id} isOwnProfile={isOwnProfile} limit={4} />
+        <FollowSection user={user} isOwnProfile={isOwnProfile} />
         <RevisionsLeftCard />
       </div>
 
