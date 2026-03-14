@@ -22,7 +22,7 @@ const refreshSchema = Joi.object({
 router.get('/',
   auth,
   rateLimiters.progressSnapshotLimiter,
-  cache(60, 'progress-snapshots:list'),
+  cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'progress-snapshots:list' }),
   validate(getSnapshotsSchema, 'query'),
   progressSnapshotController.getSnapshots
 );
@@ -30,7 +30,7 @@ router.get('/',
 router.get('/latest/:period',
   auth,
   rateLimiters.progressSnapshotLimiter,
-  cache(60, 'progress-snapshots:latest'),
+  cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'progress-snapshots:latest' }),
   validate(Joi.object({ period: Joi.string().valid('daily', 'weekly', 'monthly').required() }), 'params'),
   progressSnapshotController.getLatestSnapshot
 );

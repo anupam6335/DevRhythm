@@ -8,6 +8,7 @@ const HeatmapData = require('../../models/HeatmapData');
 const Notification = require('../../models/Notification');
 const { invalidateUserCache, invalidateCache } = require('../../middleware/cache');
 const { getStartOfDay, parseDate } = require('../../utils/helpers/date');
+const { maybeEnqueueStatsUpdate } = require('../../utils/helpers/stats'); 
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
@@ -127,8 +128,9 @@ const handleQuestionSolved = async (job) => {
       dailyGoal.completedCount += 1;
       await dailyGoal.save();
       if (dailyGoal.completedCount >= dailyGoal.targetCount) {
-        const { goalCompletedQueue } = require('../queue.service');
-        await goalCompletedQueue.add({
+        const { jobQueue } = require('../queue.service');
+        await jobQueue.add({
+          type: 'goal.completed',
           userId,
           goalId: dailyGoal._id,
           completedAt: new Date(),
@@ -189,6 +191,9 @@ const handleQuestionSolved = async (job) => {
       });
       await invalidateCache(`notifications:${userId}:*`);
     }
+
+    // --- 8. Enqueue user-stats update (with cooldown) ---
+    await maybeEnqueueStatsUpdate(userId);
 
     console.log(`[question.solved] Completed successfully for user ${userId}`);
   } catch (error) {

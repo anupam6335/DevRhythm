@@ -20,7 +20,7 @@ const leaderboardQuery = Joi.object({
 router.get('/:type',
   auth,
   rateLimiters.leaderboardLimiter,
-  cache(300, 'leaderboard'),
+  cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'leaderboard' }),
   validate(leaderboardParams, 'params'),
   validate(leaderboardQuery, 'query'),
   leaderboardController.getLeaderboard
@@ -29,7 +29,7 @@ router.get('/:type',
 router.get('/:type/my-rank',
   auth,
   rateLimiters.leaderboardLimiter,
-  cache(60, 'leaderboard:my-rank'),
+  cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'leaderboard:my-rank' }),
   validate(leaderboardParams, 'params'),
   validate(Joi.object({ date: Joi.date().iso() }), 'query'),
   leaderboardController.getUserRank

@@ -66,7 +66,7 @@ const getQuestionProgress = async (req, res, next) => {
 
 const createOrUpdateProgress = async (req, res, next) => {
   try {
-    const { status, notes, keyInsights, savedCode, confidenceLevel, timeSpent } = req.body;
+    const { status, notes, keyInsights, savedCode, confidenceLevel, timeSpent, userDifficulty, userTags, userPatterns } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
@@ -84,6 +84,9 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (keyInsights !== undefined) updateData.keyInsights = keyInsights;
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
     if (confidenceLevel) updateData.confidenceLevel = confidenceLevel;
+    if (userDifficulty !== undefined) updateData.userDifficulty = userDifficulty;
+    if (userTags !== undefined) updateData.userTags = userTags;
+    if (userPatterns !== undefined) updateData.userPatterns = userPatterns;
 
     // If status is being set to Solved and it wasn't Solved before, set solvedAt
     if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {
@@ -120,7 +123,10 @@ const createOrUpdateProgress = async (req, res, next) => {
         keyInsights,
         savedCode: savedCode ? { ...savedCode, lastUpdated: new Date() } : undefined,
         confidenceLevel: confidenceLevel || 1,
-        totalTimeSpent: timeSpent || 0
+        totalTimeSpent: timeSpent || 0,
+        userDifficulty: userDifficulty || null,
+        userTags: userTags || [],
+        userPatterns: userPatterns || []
       });
     }
 
@@ -154,8 +160,9 @@ const createOrUpdateProgress = async (req, res, next) => {
       }
     }
 
-    await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via the post-save/post-update hook,
+    // so we no longer need to call updateProgressPatternMastery here.
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     const statusCode = newProgress.createdAt === newProgress.updatedAt ? 201 : 200;
     res.status(statusCode).json(formatResponse(
@@ -215,7 +222,8 @@ const updateStatus = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Status updated successfully', { progress }));
   } catch (error) {
@@ -241,7 +249,8 @@ const updateCode = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Code updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -264,7 +273,8 @@ const updateNotes = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Notes updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -287,7 +297,8 @@ const updateConfidence = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Confidence level updated successfully', { progress }));
   } catch (error) { next(error); }
@@ -295,7 +306,7 @@ const updateConfidence = async (req, res, next) => {
 
 const recordAttempt = async (req, res, next) => {
   try {
-    const { timeSpent, successful } = req.body;
+    const { timeSpent, successful, notes } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
@@ -304,11 +315,18 @@ const recordAttempt = async (req, res, next) => {
       $set: { 
         'attempts.lastAttemptAt': new Date(),
         updatedAt: new Date()
+      },
+      $push: {
+        attemptHistory: {
+          timestamp: new Date(),
+          outcome: successful ? 'success' : 'failure',
+          timeSpent,
+          notes: notes || undefined
+        }
       }
     };
 
     if (successful) {
-      // Successful attempt → mark as solved
       update.$set.status = 'Solved';
       update.$set['attempts.solvedAt'] = new Date();
     } else {
@@ -350,7 +368,8 @@ const recordAttempt = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
   } catch (error) {
@@ -383,7 +402,8 @@ const recordRevision = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
+    // Pattern mastery will be recalculated via post-update hook
+    // await updateProgressPatternMastery(userId, questionId);  // REMOVED
 
     res.json(formatResponse('Revision recorded successfully', { progress }));
   } catch (error) { next(error); }
@@ -399,7 +419,8 @@ const deleteProgress = async (req, res, next) => {
     if (!progress) throw new AppError('Progress record not found', 404);
 
     await invalidateProgressCache(req.user._id);
-    await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id);
+    // Pattern mastery will be recalculated via post-delete hook
+    // await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id); // REMOVED
 
     res.json(formatResponse('Progress deleted successfully'));
   } catch (error) { next(error); }

@@ -16,7 +16,7 @@ const filterLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 100);
 router.get('/', 
   auth, 
   heatmapLimiter,
-  cache(15 * 60, 'heatmap:current'),
+  cache(15 * 60, { privacy: 'private', maxAge: 15 * 60, keyPrefix: 'heatmap:current' }),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     includeCache: Joi.boolean().default(true)
@@ -27,7 +27,7 @@ router.get('/',
 router.get('/stats', 
   auth, 
   statsLimiter,
-  cache(10 * 60, 'heatmap:stats'),
+  cache(10 * 60, { privacy: 'private', maxAge: 10 * 60, keyPrefix: 'heatmap:stats' }),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional()
   }), 'query'),
@@ -37,7 +37,7 @@ router.get('/stats',
 router.get('/filter', 
   auth, 
   filterLimiter,
-  cache(15 * 60, 'heatmap:filter'),
+  cache(15 * 60, { privacy: 'private', maxAge: 15 * 60, keyPrefix: 'heatmap:filter' }),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     viewType: Joi.string().valid(
@@ -53,7 +53,7 @@ router.get('/filter',
 router.get('/:year', 
   auth, 
   heatmapLimiter,
-  cache(15 * 60, 'heatmap:year'),
+  cache(15 * 60, { privacy: 'private', maxAge: 15 * 60, keyPrefix: 'heatmap:year' }),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).required()
   }), 'params'),

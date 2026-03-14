@@ -187,7 +187,7 @@ const calculateUpcomingStats = async (userId, startDate, endDate) => {
 };
 
 const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null) => {
-  const schedule = customSchedule || [1, 3, 7, 14, 30].map(days => {
+  const schedule = customSchedule || constants.REVISION_SCHEDULE.map(days => {
     const date = new Date(baseDate);
     date.setDate(date.getDate() + days);
     date.setHours(0, 0, 0, 0);

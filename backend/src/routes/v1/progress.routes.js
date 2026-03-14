@@ -7,11 +7,10 @@ const { progressValidator } = require('../../utils/validators');
 const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
 
-
-router.get('/', auth, cache(10, 'progress:list'), validate(progressValidator.getProgress, 'query'), progressController.getProgress);
-router.get('/stats', auth, cache(10, 'progress:stats'), progressController.getProgressStats);
-router.get('/recent', auth, cache(10, 'progress:recent'), validate(progressValidator.getRecentProgress, 'query'), progressController.getRecentProgress);
-router.get('/question/:questionId', auth, cache(10, 'progress:question'), validate(progressValidator.getQuestionProgress, 'params'), progressController.getQuestionProgress);
+router.get('/', auth, cache(10, { privacy: 'private', maxAge: 10, keyPrefix: 'progress:list' }), validate(progressValidator.getProgress, 'query'), progressController.getProgress);
+router.get('/stats', auth, cache(10, { privacy: 'private', maxAge: 10, keyPrefix: 'progress:stats' }), progressController.getProgressStats);
+router.get('/recent', auth, cache(10, { privacy: 'private', maxAge: 10, keyPrefix: 'progress:recent' }), validate(progressValidator.getRecentProgress, 'query'), progressController.getRecentProgress);
+router.get('/question/:questionId', auth, cache(10, { privacy: 'private', maxAge: 10, keyPrefix: 'progress:question' }), validate(progressValidator.getQuestionProgress, 'params'), progressController.getQuestionProgress);
 router.post('/question/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.createOrUpdateProgress), progressController.createOrUpdateProgress);
 router.put('/status/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.updateStatus), progressController.updateStatus);
 router.put('/code/:questionId', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 60), validate(progressValidator.updateCode), progressController.updateCode);

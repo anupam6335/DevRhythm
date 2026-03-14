@@ -157,7 +157,10 @@ const createOrUpdateProgress = Joi.object({
     code: Joi.string().required()
   }),
   confidenceLevel: Joi.number().integer().min(1).max(5),
-  timeSpent: Joi.number().integer().min(0).max(480)
+  timeSpent: Joi.number().integer().min(0).max(480),
+  userDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard'),
+  userTags: Joi.array().items(Joi.string().trim().max(50)).max(20),
+  userPatterns: Joi.array().items(Joi.string().trim().max(100)).max(10) 
 });
 
 const updateStatus = Joi.object({
@@ -180,7 +183,8 @@ const updateConfidence = Joi.object({
 
 const recordAttempt = Joi.object({
   timeSpent: Joi.number().integer().min(0).max(480).default(0),
-  successful: Joi.boolean().default(false)
+  successful: Joi.boolean().default(false),
+  notes: Joi.string().allow('').max(1000)
 });
 
 const recordRevision = Joi.object({

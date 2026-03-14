@@ -17,7 +17,7 @@ router.get('/', auth, validate(Joi.object({
   search: Joi.string().trim().min(1).max(100),
   sortBy: Joi.string().valid('createdAt', 'lastActivityAt', 'memberCount').default('lastActivityAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc')
-}), 'query'), cache(60, 'study-groups:list'), studyGroupController.getGroups);
+}), 'query'), cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'study-groups:list' }), studyGroupController.getGroups);
 
 router.post('/', auth, validate(Joi.object({
   name: Joi.string().trim().required().min(3).max(100),
@@ -25,11 +25,11 @@ router.post('/', auth, validate(Joi.object({
   privacy: Joi.string().valid('public', 'private', 'invite-only').default('invite-only')
 })), studyGroupController.createGroup);
 
-router.get('/my', auth, validate(Joi.object(paginationSchema), 'query'), cache(30, 'study-groups:user:membership'), studyGroupController.getMyGroups);
+router.get('/my', auth, validate(Joi.object(paginationSchema), 'query'), cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'study-groups:user:membership' }), studyGroupController.getMyGroups);
 
 router.get('/:groupId', auth, validate(Joi.object({
   groupId: Joi.string().hex().length(24).required()
-}), 'params'), cache(30, 'study-group'), studyGroupController.getGroup);
+}), 'params'), cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'study-group' }), studyGroupController.getGroup);
 
 router.put('/:groupId', auth, validate(Joi.object({
   groupId: Joi.string().hex().length(24).required()
@@ -103,10 +103,10 @@ router.get('/:groupId/activity', auth, validate(Joi.object({
   groupId: Joi.string().hex().length(24).required()
 }), 'params'), validate(Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20)
-}), 'query'), cache(30, 'study-group:activity'), studyGroupController.getGroupActivity);
+}), 'query'), cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'study-group:activity' }), studyGroupController.getGroupActivity);
 
 router.get('/:groupId/stats', auth, validate(Joi.object({
   groupId: Joi.string().hex().length(24).required()
-}), 'params'), cache(60, 'study-group:stats'), studyGroupController.getGroupStats);
+}), 'params'), cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'study-group:stats' }), studyGroupController.getGroupStats);
 
 module.exports = router;

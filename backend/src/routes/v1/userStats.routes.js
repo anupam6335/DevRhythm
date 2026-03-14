@@ -10,14 +10,14 @@ const rateLimiters = require('../../middleware/rateLimiter');
 router.get('/me',
   auth,
   rateLimiters.userLimiter,
-  cache(60, 'user-stats:me'),
+  cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'user-stats:me' }),
   userStatsController.getUserDetailedStats
 );
 
 router.get('/public/:userId',
   auth,
   rateLimiters.userLimiter,
-  cache(300, 'user-stats:public'),
+  cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'user-stats:public' }),
   validate(Joi.object({ userId: Joi.string().hex().length(24).required() }), 'params'),
   userStatsController.getPublicUserStats
 );

@@ -1,9 +1,5 @@
 const HeatmapData = require('../models/HeatmapData');
 const User = require('../models/User');
-const UserQuestionProgress = require('../models/UserQuestionProgress');
-const RevisionSchedule = require('../models/RevisionSchedule');
-const Goal = require('../models/Goal');
-const StudyGroup = require('../models/StudyGroup');
 const heatmapService = require('../services/heatmap.service');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
@@ -12,28 +8,92 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
+const { jobQueue } = require('../services/queue.service');
+const { v4: uuidv4 } = require('uuid');
 
+// Helper: check if a heatmap generation job is pending for a user/year
+const isHeatmapJobPending = async (userId, year) => {
+  const exists = await redisClient.exists(`devrhythm:heatmap:pending:${userId}:${year}`);
+  return exists === 1;
+};
+
+// Helper: enqueue a heatmap generation job and store pending flag
+const enqueueHeatmapGeneration = async (userId, year, forceFullRefresh = false) => {
+  const jobId = `heatmap_${userId}_${year}_${Date.now()}_${uuidv4().slice(0, 8)}`;
+  // Set pending flag with 5-minute TTL (job should complete within that time)
+  await redisClient.setEx(`devrhythm:heatmap:pending:${userId}:${year}`, 300, jobId);
+  await jobQueue.add({
+    type: 'heatmap.generate',
+    userId,
+    year,
+    forceFullRefresh,
+  });
+  return jobId;
+};
+
+/**
+ * Get heatmap for current year (or specified year)
+ */
 const getHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const includeCache = req.query.includeCache !== 'false';
-    
+
     let heatmap = await HeatmapData.findOne({ 
       userId: req.user._id, 
       year 
     }).lean();
-    
+
+    // If heatmap doesn't exist, handle async generation
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
-    }
-    
-    if (!heatmap) {
-      throw new AppError('Heatmap data not found', 404, { 
-        code: 'HEATMAP_NOT_FOUND', 
-        details: 'No heatmap data exists for the specified year' 
+      // Check if generation is already pending
+      const pending = await isHeatmapJobPending(req.user._id, year);
+      if (pending) {
+        return res.status(202).json({
+          success: true,
+          statusCode: 202,
+          message: 'Heatmap generation is in progress. Please try again shortly.',
+          data: {
+            year,
+            status: 'generating',
+            // Return minimal placeholder data
+            dailyData: [],
+            performance: {},
+            consistency: {},
+            statsPanel: {}
+          },
+          meta: {
+            year,
+            jobId: pending
+          },
+          error: null
+        });
+      }
+
+      // No heatmap and no pending job → start generation
+      const jobId = await enqueueHeatmapGeneration(req.user._id, year);
+      return res.status(202).json({
+        success: true,
+        statusCode: 202,
+        message: 'Heatmap generation started. Check back later.',
+        data: {
+          year,
+          status: 'generating',
+          dailyData: [],
+          performance: {},
+          consistency: {},
+          statsPanel: {}
+        },
+        meta: {
+          year,
+          jobId,
+          estimatedCompletion: new Date(Date.now() + 2 * 60 * 1000) // rough estimate
+        },
+        error: null
       });
     }
-    
+
+    // Heatmap exists – return it
     const response = {
       year: heatmap.year,
       weekCount: heatmap.weekCount,
@@ -44,11 +104,10 @@ const getHeatmap = async (req, res, next) => {
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
     };
-    
     if (includeCache && heatmap.cachedRenderData) {
       response.cachedRenderData = heatmap.cachedRenderData;
     }
-    
+
     res.json(formatResponse('Heatmap data retrieved successfully', response, {
       year,
       lastUpdated: heatmap.lastUpdated
@@ -58,32 +117,69 @@ const getHeatmap = async (req, res, next) => {
   }
 };
 
+/**
+ * Get heatmap for a specific year (path parameter)
+ */
 const getHeatmapByYear = async (req, res, next) => {
   try {
     const year = parseInt(req.params.year);
     const includeCache = req.query.includeCache !== 'false';
-    
+
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
     }
-    
+
     let heatmap = await HeatmapData.findOne({ 
       userId: req.user._id, 
       year 
     }).lean();
-    
+
+    // If heatmap doesn't exist, handle async generation
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
-    }
-    
-    if (!heatmap) {
-      throw new AppError('Heatmap data not found for year ' + year, 404, { 
-        code: 'HEATMAP_NOT_FOUND',
-        details: 'No heatmap data exists for the specified year',
-        suggestedAction: 'Refresh heatmap data'
+      const pending = await isHeatmapJobPending(req.user._id, year);
+      if (pending) {
+        return res.status(202).json({
+          success: true,
+          statusCode: 202,
+          message: 'Heatmap generation is in progress. Please try again shortly.',
+          data: {
+            year,
+            status: 'generating',
+            dailyData: [],
+            performance: {},
+            consistency: {},
+            statsPanel: {}
+          },
+          meta: {
+            year,
+            jobId: pending
+          },
+          error: null
+        });
+      }
+
+      const jobId = await enqueueHeatmapGeneration(req.user._id, year);
+      return res.status(202).json({
+        success: true,
+        statusCode: 202,
+        message: 'Heatmap generation started. Check back later.',
+        data: {
+          year,
+          status: 'generating',
+          dailyData: [],
+          performance: {},
+          consistency: {},
+          statsPanel: {}
+        },
+        meta: {
+          year,
+          jobId,
+          estimatedCompletion: new Date(Date.now() + 2 * 60 * 1000)
+        },
+        error: null
       });
     }
-    
+
     const response = {
       year: heatmap.year,
       weekCount: heatmap.weekCount,
@@ -94,11 +190,10 @@ const getHeatmapByYear = async (req, res, next) => {
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
     };
-    
     if (includeCache && heatmap.cachedRenderData) {
       response.cachedRenderData = heatmap.cachedRenderData;
     }
-    
+
     res.json(formatResponse('Heatmap data retrieved successfully', response, {
       year,
       lastUpdated: heatmap.lastUpdated
@@ -108,28 +203,29 @@ const getHeatmapByYear = async (req, res, next) => {
   }
 };
 
+/**
+ * Refresh/regenerate heatmap (trigger background job)
+ */
 const refreshHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const forceFullRefresh = req.body.forceFullRefresh === true;
-    
+
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
     }
-    
-    const jobId = `heatmap_refresh_${req.user._id}_${year}_${Date.now()}`;
-    const estimatedCompletion = new Date(Date.now() + 5 * 60 * 1000);
-    
+
+    // Invalidate caches
     await invalidateCache(`heatmap:${req.user._id}:${year}:*`);
     await invalidateCache(`heatmap:stats:${req.user._id}:${year}`);
     await invalidateCache(`heatmap:filter:${req.user._id}:${year}:*`);
-    
-    heatmapService.regenerateHeatmapData(req.user._id, year, forceFullRefresh)
-      .catch(err => console.error('Heatmap regeneration failed:', err));
-    
+
+    // Enqueue job
+    const jobId = await enqueueHeatmapGeneration(req.user._id, year, forceFullRefresh);
+
     res.status(202).json(formatResponse('Heatmap recalculation started', {
       jobId,
-      estimatedCompletion
+      estimatedCompletion: new Date(Date.now() + 5 * 60 * 1000)
     }, {
       year,
       refreshType: forceFullRefresh ? 'full' : 'incremental'
@@ -139,28 +235,23 @@ const refreshHeatmap = async (req, res, next) => {
   }
 };
 
+/**
+ * Get heatmap statistics (no generation needed – uses existing data)
+ */
 const getHeatmapStats = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
-    
+
     const heatmap = await HeatmapData.findOne({ 
       userId: req.user._id, 
       year 
     }).lean();
-    
+
     if (!heatmap || !heatmap.statsPanel) {
-      const generated = await heatmapService.generateHeatmapData(req.user._id, year);
-      if (!generated) {
-        throw new AppError('Heatmap data not found', 404);
-      }
-      
-      res.json(formatResponse('Heatmap statistics retrieved', generated.statsPanel, {
-        year,
-        calculatedAt: new Date()
-      }));
-      return;
+      // If no stats, we could trigger background generation, but for stats we'll just return 404
+      throw new AppError('Heatmap data not found', 404);
     }
-    
+
     res.json(formatResponse('Heatmap statistics retrieved', heatmap.statsPanel, {
       year,
       calculatedAt: heatmap.lastUpdated
@@ -170,35 +261,39 @@ const getHeatmapStats = async (req, res, next) => {
   }
 };
 
+/**
+ * Get filtered heatmap (uses existing data or calculates on the fly – may be heavy, but limited scope)
+ */
 const getFilteredHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const viewType = req.query.viewType || 'all';
     const weekStart = parseInt(req.query.weekStart) || 1;
     const weekEnd = parseInt(req.query.weekEnd) || 53;
-    
+
     const validViewTypes = [
       'all', 'new_problems', 'revisions', 'study_group', 
       'leetcode', 'hackerrank', 'codeforces', 'easy', 'medium', 'hard'
     ];
-    
+
     if (!validViewTypes.includes(viewType)) {
       throw new AppError('Invalid view type', 400);
     }
-    
+
     const heatmap = await HeatmapData.findOne({ 
       userId: req.user._id, 
       year 
     }).lean();
-    
+
     if (!heatmap) {
+      // Could also trigger generation, but for simplicity, return 404
       throw new AppError('Heatmap data not found', 404);
     }
-    
+
     let filteredData = [];
     let totalActivities = 0;
     let maxInDay = 0;
-    
+
     if (viewType === 'all') {
       filteredData = heatmap.dailyData;
     } else if (heatmap.filterViews && heatmap.filterViews[viewType]) {
@@ -208,17 +303,18 @@ const getFilteredHeatmap = async (req, res, next) => {
         intensityLevel: heatmapService.calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
       }));
     } else {
+      // On‑the‑fly calculation – may be slow, but acceptable for occasional use
       filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType);
     }
-    
+
     filteredData.forEach(day => {
       totalActivities += day.totalActivities;
       if (day.totalActivities > maxInDay) maxInDay = day.totalActivities;
     });
-    
+
     const consistencyScore = heatmap.consistency?.consistencyScore || 0;
     const averagePerDay = filteredData.length > 0 ? totalActivities / filteredData.length : 0;
-    
+
     res.json(formatResponse('Filtered heatmap data retrieved', {
       viewType,
       dailyData: filteredData,
@@ -238,24 +334,27 @@ const getFilteredHeatmap = async (req, res, next) => {
   }
 };
 
+/**
+ * Export heatmap data (generates export as JSON/CSV)
+ */
 const exportHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const format = req.body.format || 'json';
     const includeDetails = req.body.includeDetails === true;
-    
+
     const heatmap = await HeatmapData.findOne({ 
       userId: req.user._id, 
       year 
     }).lean();
-    
+
     if (!heatmap) {
       throw new AppError('Heatmap data not found for export', 404);
     }
-    
+
     const exportId = `exp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    
+
     let exportData;
     if (format === 'csv') {
       exportData = heatmapService.convertToCSV(heatmap, includeDetails);
@@ -273,12 +372,12 @@ const exportHeatmap = async (req, res, next) => {
         consistency: heatmap.consistency
       };
     }
-    
+
     const size = Buffer.byteLength(JSON.stringify(exportData), 'utf8');
     const sizeKB = (size / 1024).toFixed(1);
-    
+
     const downloadUrl = `${config.backendUrl}/api/v1/heatmap/export/${exportId}?format=${format}`;
-    
+
     await redisClient.setEx(`export:${exportId}`, 24 * 60 * 60, JSON.stringify({
       userId: req.user._id.toString(),
       userDisplayName: req.user.displayName,
@@ -288,7 +387,7 @@ const exportHeatmap = async (req, res, next) => {
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString()
     }));
-    
+
     res.json(formatResponse('Heatmap export generated', {
       exportId,
       downloadUrl,
@@ -304,30 +403,33 @@ const exportHeatmap = async (req, res, next) => {
   }
 };
 
+/**
+ * Download exported heatmap data
+ */
 const downloadExport = async (req, res, next) => {
   try {
     const { exportId } = req.params;
     const format = req.query.format || 'json';
-    
+
     const exportKey = `export:${exportId}`;
     const exportData = await redisClient.get(exportKey);
-    
+
     if (!exportData) {
       throw new AppError('Export not found or expired', 404);
     }
-    
+
     const parsedExport = JSON.parse(exportData);
-    
+
     if (parsedExport.userId !== req.user._id.toString()) {
       throw new AppError('Unauthorized to access this export', 403);
     }
-    
+
     const safeDisplayName = (parsedExport.userDisplayName || req.user.displayName || 'User')
       .replace(/[^a-zA-Z0-9]/g, '_')
       .substring(0, 50);
-    
+
     const filename = `DevRhythm_${safeDisplayName}_${parsedExport.year}.${format}`;
-    
+
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -342,6 +444,9 @@ const downloadExport = async (req, res, next) => {
   }
 };
 
+/**
+ * Get public heatmap for another user (read‑only, minimal data)
+ */
 const getPublicUserHeatmap = async (req, res, next) => {
   try {
     const { userId, year } = req.params;
@@ -386,7 +491,6 @@ const getPublicUserHeatmap = async (req, res, next) => {
     next(error);
   }
 };
-
 
 module.exports = {
   getHeatmap,

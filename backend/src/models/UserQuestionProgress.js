@@ -26,6 +26,27 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     solvedAt: Date,
     masteredAt: Date,
   },
+  attemptHistory: [{
+    timestamp: {
+      type: Date,
+      default: Date.now,
+    },
+    outcome: {
+      type: String,
+      enum: ['success', 'failure'],
+      required: true,
+    },
+    timeSpent: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+  }],
   notes: String,
   keyInsights: String,
   savedCode: {
@@ -48,6 +69,20 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     max: 5,
     default: 1,
   },
+  userDifficulty: {
+    type: String,
+    enum: ["Easy", "Medium", "Hard"],
+    default: null,
+  },
+  userTags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+  }],
+  userPatterns: [{
+    type: String,
+    trim: true,
+  }],
 }, {
   timestamps: true,
 });
@@ -60,41 +95,41 @@ UserQuestionProgressSchema.index({ userId: 1, "attempts.count": -1 });
 UserQuestionProgressSchema.index({ questionId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, confidenceLevel: -1 });
 UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
+UserQuestionProgressSchema.index({ userId: 1, userTags: 1 });
 
+// Helper to enqueue a pattern‑mastery recalculation job
+const enqueuePatternMasteryRecalc = (userId) => {
+  try {
+    const { jobQueue } = require('../services/queue.service');
+    if (jobQueue) {
+      jobQueue.add({
+        type: 'pattern-mastery.recalc',
+        userId,
+      }).catch(err => console.error('Failed to enqueue pattern mastery recalc:', err));
+    } else {
+      console.warn('Job queue not available, pattern mastery not updated');
+    }
+  } catch (err) {
+    console.error('Error enqueuing pattern mastery recalc:', err);
+  }
+};
+
+// Post-save hook – trigger recalculation
 UserQuestionProgressSchema.post('save', async function(doc) {
-  try {
-    const patternMasteryService = require('../services/patternMastery.service');
-    setTimeout(async () => {
-      await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
-    }, 100);
-  } catch (error) {
-    console.error('Pattern mastery post-save sync error:', error);
-  }
+  enqueuePatternMasteryRecalc(doc.userId);
 });
 
+// Post-update hook – trigger recalculation
 UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
-  try {
-    if (doc) {
-      const patternMasteryService = require('../services/patternMastery.service');
-      setTimeout(async () => {
-        await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
-      }, 100);
-    }
-  } catch (error) {
-    console.error('Pattern mastery post-update sync error:', error);
+  if (doc) {
+    enqueuePatternMasteryRecalc(doc.userId);
   }
 });
 
+// Post-delete hook – trigger recalculation
 UserQuestionProgressSchema.post('findOneAndDelete', async function(doc) {
-  try {
-    if (doc) {
-      const patternMasteryService = require('../services/patternMastery.service');
-      setTimeout(async () => {
-        await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
-      }, 100);
-    }
-  } catch (error) {
-    console.error('Pattern mastery post-delete sync error:', error);
+  if (doc) {
+    enqueuePatternMasteryRecalc(doc.userId);
   }
 });
 

@@ -6,10 +6,10 @@ const validate = require('../../middleware/validator');
 const { cache } = require('../../middleware/cache');
 const { progressValidator } = require('../../utils/validators');
 
-router.get('/', auth, cache(30, 'revisions:list'), validate(progressValidator.getRevisions, 'query'), revisionController.getRevisions);
-router.get('/today', auth, cache(60, 'revisions:today'), validate(progressValidator.getToday, 'query'), revisionController.getTodayRevisions);
-router.get('/upcoming', auth, cache(60, 'revisions:upcoming'), validate(progressValidator.getUpcoming, 'query'), revisionController.getUpcomingRevisions);
-router.get('/question/:questionId', auth, cache(30, 'revisions:question'), validate(progressValidator.getQuestionRevision, 'params'), revisionController.getQuestionRevision);
+router.get('/', auth, cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'revisions:list' }), validate(progressValidator.getRevisions, 'query'), revisionController.getRevisions);
+router.get('/today', auth, cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'revisions:today' }), validate(progressValidator.getToday, 'query'), revisionController.getTodayRevisions);
+router.get('/upcoming', auth, cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'revisions:upcoming' }), validate(progressValidator.getUpcoming, 'query'), revisionController.getUpcomingRevisions);
+router.get('/question/:questionId', auth, cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'revisions:question' }), validate(progressValidator.getQuestionRevision, 'params'), revisionController.getQuestionRevision);
 router.post('/question/:questionId', auth, validate(progressValidator.createRevision, 'body'), revisionController.createRevision);
 router.post('/:revisionId/complete', auth, validate(progressValidator.completeRevision, 'body'), revisionController.completeRevision);
 router.post('/question/:questionId/complete', auth, validate(progressValidator.completeRevision, 'body'), revisionController.completeQuestionRevision);
@@ -17,7 +17,7 @@ router.put('/:revisionId/reschedule', auth, validate(progressValidator.reschedul
 router.delete('/:revisionId', auth, revisionController.deleteRevision);
 router.delete('/question/:questionId', auth, revisionController.deleteQuestionRevision);
 
-router.get('/stats', auth, cache(60, 'revisions:stats'), revisionController.getRevisionStats);
-router.get('/overdue', auth, cache(30, 'revisions:overdue'), validate(progressValidator.getOverdue, 'query'), revisionController.getOverdueRevisions);
+router.get('/stats', auth, cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'revisions:stats' }), revisionController.getRevisionStats);
+router.get('/overdue', auth, cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'revisions:overdue' }), validate(progressValidator.getOverdue, 'query'), revisionController.getOverdueRevisions);
 
 module.exports = router;

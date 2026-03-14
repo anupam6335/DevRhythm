@@ -4,11 +4,12 @@ const PatternMastery = require('../../models/PatternMastery');
 const ActivityLog = require('../../models/ActivityLog');
 const Notification = require('../../models/Notification');
 const { invalidateUserCache, invalidateCache } = require('../../middleware/cache');
-const { parseDate } = require('../../utils/helpers/date');  
+const { parseDate } = require('../../utils/helpers/date');
+const { maybeEnqueueStatsUpdate } = require('../../utils/helpers/stats'); 
 
 const handleQuestionMastered = async (job) => {
   const { userId, questionId, progressId, masteredAt } = job.data;
-  const masteredDate = parseDate(masteredAt);                
+  const masteredDate = parseDate(masteredAt);
 
   try {
     const question = await Question.findById(questionId);
@@ -21,7 +22,6 @@ const handleQuestionMastered = async (job) => {
     if (question.pattern) {
       let pattern = await PatternMastery.findOne({ userId, patternName: question.pattern });
       if (!pattern) {
-        // Create new pattern mastery record (should not happen if solved first, but handle gracefully)
         pattern = new PatternMastery({ userId, patternName: question.pattern });
       }
 
@@ -51,7 +51,7 @@ const handleQuestionMastered = async (job) => {
           problemLink: question.problemLink,
           platform: question.platform,
           difficulty: question.difficulty,
-          solvedAt: masteredDate,          
+          solvedAt: masteredDate,
           status: 'Mastered',
           timeSpent: 0,
         });
@@ -63,7 +63,6 @@ const handleQuestionMastered = async (job) => {
     }
 
     // 2. Update user stats (overall mastery rate)
-    // Recalculate overall mastery rate as average of all pattern mastery rates
     const allPatterns = await PatternMastery.find({ userId });
     let totalMastered = 0;
     let totalMasteryRate = 0;
@@ -88,7 +87,7 @@ const handleQuestionMastered = async (job) => {
         platform: question.platform,
         pattern: question.pattern,
       },
-      createdAt: masteredDate,            
+      createdAt: masteredDate,
     });
 
     // 4. Notification for mastery milestone
@@ -106,6 +105,9 @@ const handleQuestionMastered = async (job) => {
       });
       await invalidateCache(`notifications:${userId}:*`);
     }
+
+    // 5. Enqueue user-stats update (with cooldown)
+    await maybeEnqueueStatsUpdate(userId);
 
     console.log(`Question mastered event processed for user ${userId}`);
   } catch (error) {

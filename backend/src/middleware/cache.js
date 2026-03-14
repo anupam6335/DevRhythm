@@ -1,41 +1,95 @@
 const { client: redisClient } = require('../config/redis');
+const crypto = require('crypto');
 
-// Helper to get keys by pattern using KEYS command (use SCAN for production with many keys)
+// Helper to generate ETag from response data
+const generateETag = (data) => {
+  const hash = crypto.createHash('sha1');
+  hash.update(JSON.stringify(data));
+  return `"${hash.digest('hex')}"`; // ETags are quoted strings per spec
+};
+
+// Helper to get keys by pattern using KEYS (use SCAN in production)
 const getKeys = async (pattern) => {
   if (!redisClient) return [];
   try {
-    const result = await redisClient.sendCommand(['KEYS', pattern]);
-    // sendCommand returns an array of strings
-    return result;
+    return await redisClient.sendCommand(['KEYS', pattern]);
   } catch (err) {
     console.warn('Error getting keys:', err);
     return [];
   }
 };
 
-const cache = (duration = 60, keyPrefix = '') => {
+/**
+ * Cache middleware with client-side caching headers.
+ * @param {number} duration - TTL in seconds (also used for max-age)
+ * @param {Object|string} options - If string, used as key prefix; else options object
+ * @param {string} options.keyPrefix - Custom key prefix (default: '')
+ * @param {string} options.privacy - 'public' or 'private' (default: 'private')
+ * @param {number} options.maxAge - Override max-age (defaults to duration)
+ */
+const cache = (duration = 60, options = {}) => {
+  // Handle legacy usage: second argument was keyPrefix as string
+  if (typeof options === 'string') {
+    options = { keyPrefix: options };
+  }
+
+  const {
+    keyPrefix = '',
+    privacy = 'private',   // default to private for authenticated data
+    maxAge = duration,
+  } = options;
+
   return async (req, res, next) => {
-    if (!redisClient) return next();
+    // Only cache GET requests
     if (req.method !== 'GET') return next();
+    if (!redisClient) return next();
 
-    let cacheKey = '';
+    // Build cache key (include user ID if authenticated, otherwise public)
+    let cacheKey;
+    if (req.user && req.user._id) {
+      cacheKey = `devrhythm:cache:${keyPrefix}:user:${req.user._id}:${req.originalUrl}`;
+    } else {
+      cacheKey = `devrhythm:cache:${keyPrefix}:${req.originalUrl}`;
+    }
+
     try {
-      if (req.user && req.user._id) {
-        cacheKey = `devrhythm:cache:${keyPrefix}:user:${req.user._id}:${req.originalUrl}`;
-      } else {
-        cacheKey = `devrhythm:cache:${keyPrefix}:${req.originalUrl}`;
-      }
-
+      // Try to get cached entry
       const cached = await redisClient.get(cacheKey);
       if (cached) {
-        return res.json(JSON.parse(cached));
+        const { data, etag } = JSON.parse(cached);
+
+        // Set cache control headers
+        res.setHeader('Cache-Control', `${privacy}, max-age=${maxAge}`);
+        res.setHeader('ETag', etag);
+
+        // Handle conditional request
+        const ifNoneMatch = req.headers['if-none-match'];
+        if (ifNoneMatch === etag) {
+          return res.status(304).end(); // Not Modified
+        }
+
+        // Return cached data
+        return res.json(data);
       }
 
+      // No cache: capture response to store
       const originalJson = res.json;
-      res.json = function(data) {
-        redisClient.setEx(cacheKey, duration, JSON.stringify(data));
+      res.json = function (data) {
+        // Compute ETag
+        const etag = generateETag(data);
+
+        // Set headers
+        res.setHeader('Cache-Control', `${privacy}, max-age=${maxAge}`);
+        res.setHeader('ETag', etag);
+
+        // Store in Redis
+        const toCache = JSON.stringify({ data, etag });
+        redisClient.setEx(cacheKey, duration, toCache).catch(console.warn);
+
+        // Send response
         originalJson.call(this, data);
       };
+
       next();
     } catch (error) {
       console.warn('Cache middleware error:', error.message);
@@ -85,5 +139,5 @@ module.exports = {
   invalidateCache,
   invalidateUserCache,
   invalidateQuestionCache,
-  invalidateProgressCache
+  invalidateProgressCache,
 };

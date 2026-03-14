@@ -26,5 +26,11 @@ module.exports = {
   DEFAULT_DAILY_GOAL: 3,
   DEFAULT_WEEKLY_GOAL: 15,
   MAX_DAILY_GOAL: 50,
-  MAX_WEEKLY_GOAL: 100
+  MAX_WEEKLY_GOAL: 100,
+  CONFIDENCE_THRESHOLDS: {
+    LEVEL_5: { mastery: 80, success: 90 },
+    LEVEL_4: { mastery: 60, success: 80 },
+    LEVEL_3: { mastery: 40, success: 70 },
+    LEVEL_2: { mastery: 20, success: 60 }
+  }
 };

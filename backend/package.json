@@ -1,6 +1,6 @@
 {
   "name": "devrhythm-backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Production backend for DevRhythm",
   "main": "src/server.js",
   "scripts": {

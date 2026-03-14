@@ -3,7 +3,8 @@ const UserQuestionProgress = require('../../models/UserQuestionProgress');
 const HeatmapData = require('../../models/HeatmapData');
 const { invalidateCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
-const { parseDate } = require('../../utils/helpers/date'); // import helper
+const { parseDate } = require('../../utils/helpers/date');
+const { maybeEnqueueStatsUpdate } = require('../../utils/helpers/stats'); 
 
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
@@ -67,6 +68,9 @@ const handleRevisionCompleted = async (job) => {
       await heatmap.save();
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
+
+    // --- Enqueue user-stats update (with cooldown) ---
+    await maybeEnqueueStatsUpdate(userId);
 
     console.log(`Revision completed event processed for user ${userId}`);
   } catch (error) {

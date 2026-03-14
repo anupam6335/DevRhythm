@@ -17,18 +17,18 @@ router.get('/me/stats', auth, userController.getUserStats);
 router.put('/me/last-online', auth, userController.updateLastOnline);
 router.delete('/me', auth, userController.deleteCurrentUser);
 
-router.get('/search', auth, rateLimiters.userLimiter, validate(userValidator.searchUsers, 'query'), cache(300, 'user:search'), userController.searchUsers);
-router.get('/top/streaks', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, 'user:top:streaks'), userController.getTopStreaks);
-router.get('/top/solved', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, 'user:top:solved'), userController.getTopSolved);
+router.get('/search', auth, rateLimiters.userLimiter, validate(userValidator.searchUsers, 'query'), cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'user:search' }), userController.searchUsers);
+router.get('/top/streaks', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, { privacy: 'public', maxAge: 300, keyPrefix: 'user:top:streaks' }), userController.getTopStreaks);
+router.get('/top/solved', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, { privacy: 'public', maxAge: 300, keyPrefix: 'user:top:solved' }), userController.getTopSolved);
 
-router.get('/:userId/following', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, 'user:public:following'), followController.getPublicFollowing);
-router.get('/:userId/followers', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, 'user:public:followers'), followController.getPublicFollowers);
+router.get('/:userId/following', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'user:public:following' }), followController.getPublicFollowing);
+router.get('/:userId/followers', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'user:public:followers' }), followController.getPublicFollowers);
 
-router.get('/:userId/progress', validate(userValidator.getUserPublicProgress, 'params'), cache(30, 'user:public:progress'), userController.getUserPublicProgress);
+router.get('/:userId/progress', validate(userValidator.getUserPublicProgress, 'params'), cache(30, { privacy: 'public', maxAge: 30, keyPrefix: 'user:public:progress' }), userController.getUserPublicProgress);
 
 router.get('/:userId/heatmap/:year',
   rateLimiters.publicLimiter,
-  cache(300, 'user:heatmap:public'),
+  cache(300, { privacy: 'public', maxAge: 300, keyPrefix: 'user:heatmap:public' }),
   validate(Joi.object({
     userId: Joi.string().hex().length(24).required(),
     year: Joi.number().integer().min(2000).max(2100).required()
@@ -48,7 +48,7 @@ router.get('/:userId/groups',
   studyGroupController.getUserPublicGroups
 );
 
-router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
-router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);
+router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, { privacy: 'public', maxAge: 600, keyPrefix: 'user:public' }), userController.getUserByUsername);
+router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, { privacy: 'public', maxAge: 300, keyPrefix: 'username:availability' }), userController.checkUsernameAvailability);
 
 module.exports = router;

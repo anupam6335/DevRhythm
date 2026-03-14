@@ -24,7 +24,7 @@ const markMultipleSchema = Joi.object({
 router.get('/',
   auth,
   rateLimiters.notificationReadLimiter,
-  cache(30, 'notifications:list'),
+  cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'notifications:list' }),
   validate(getNotificationsSchema, 'query'),
   notificationController.getNotifications
 );
@@ -32,7 +32,7 @@ router.get('/',
 router.get('/unread-count',
   auth,
   rateLimiters.notificationReadLimiter,
-  cache(30, 'notifications:unread'),
+  cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'notifications:unread' }),
   notificationController.getUnreadCount
 );
 

@@ -6,8 +6,9 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
 const { jobQueue } = require('../services/queue.service');
+const constants = require('../config/constants');
 
-const calculateSpacedRepetitionSchedule = (baseDate, schedule = [1, 3, 7, 14, 30]) => {
+const calculateSpacedRepetitionSchedule = (baseDate, schedule = constants.REVISION_SCHEDULE) => {
   return schedule.map(days => {
     const date = new Date(baseDate);
     date.setDate(date.getDate() + days);

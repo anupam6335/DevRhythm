@@ -7,11 +7,11 @@ const { cache } = require("../../middleware/cache");
 const rateLimiters = require("../../middleware/rateLimiter");
 const progressValidator = require("../../utils/validators/progress.validator");
 
-router.get("/", auth, rateLimiters.userLimiter, cache(30, "goals:list"), validate(progressValidator.getGoals, "query"), goalController.getGoals);
-router.get("/current", auth, rateLimiters.userLimiter, cache(60, "goals:current"), validate(progressValidator.getToday, "query"), goalController.getCurrentGoals);
-router.get("/stats", auth, rateLimiters.userLimiter, cache(60, "goals:stats"), validate(progressValidator.getStats, "query"), goalController.getGoalStats);
-router.get("/history", auth, rateLimiters.userLimiter, cache(300, "goals:history"), validate(progressValidator.getHistory, "query"), goalController.getGoalHistory);
-router.get("/:id", auth, rateLimiters.userLimiter, cache(30, "goal"), validate(progressValidator.getGoalById, "params"), goalController.getGoalById);
+router.get("/", auth, rateLimiters.userLimiter, cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'goals:list' }), validate(progressValidator.getGoals, "query"), goalController.getGoals);
+router.get("/current", auth, rateLimiters.userLimiter, cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'goals:current' }), validate(progressValidator.getToday, "query"), goalController.getCurrentGoals);
+router.get("/stats", auth, rateLimiters.userLimiter, cache(60, { privacy: 'private', maxAge: 60, keyPrefix: 'goals:stats' }), validate(progressValidator.getStats, "query"), goalController.getGoalStats);
+router.get("/history", auth, rateLimiters.userLimiter, cache(300, { privacy: 'private', maxAge: 300, keyPrefix: 'goals:history' }), validate(progressValidator.getHistory, "query"), goalController.getGoalHistory);
+router.get("/:id", auth, rateLimiters.userLimiter, cache(30, { privacy: 'private', maxAge: 30, keyPrefix: 'goal' }), validate(progressValidator.getGoalById, "params"), goalController.getGoalById);
 router.post("/", auth, rateLimiters.userLimiter, validate(progressValidator.createGoal, "body"), goalController.createGoal);
 router.put("/:id", auth, rateLimiters.userLimiter, validate(progressValidator.updateGoal, "body"), goalController.updateGoal);
 router.post("/:id/increment", auth, rateLimiters.userLimiter, validate(progressValidator.incrementGoal, "body"), goalController.incrementGoal);

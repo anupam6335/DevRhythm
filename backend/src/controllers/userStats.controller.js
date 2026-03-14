@@ -1,161 +1,125 @@
-const mongoose = require('mongoose');
+const UserStats = require('../models/UserStats');
 const User = require('../models/User');
-const UserQuestionProgress = require('../models/UserQuestionProgress');
+const { jobQueue } = require('../services/queue.service');
+const { client: redisClient } = require('../config/redis');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 
-/**
- * Helper function to compute detailed stats for a given user.
- * Returns totalSolved, totalMastered, difficultyBreakdown, and platformBreakdown.
- */
-const computeDetailedStats = async (userId) => {
-  const objectId = new mongoose.Types.ObjectId(userId);
+// Helper to check if stats need refresh
+const isStatsStale = (lastUpdated) => {
+  const oneHour = 60 * 60 * 1000;
+  return !lastUpdated || (Date.now() - new Date(lastUpdated).getTime()) > oneHour;
+};
 
-  const pipeline = [
-    { $match: { userId: objectId } },
-    {
-      $lookup: {
-        from: 'questions',
-        localField: 'questionId',
-        foreignField: '_id',
-        as: 'question'
-      }
-    },
-    { $unwind: '$question' },
-    {
-      $facet: {
-        totals: [
-          {
-            $group: {
-              _id: null,
-              totalSolved: { $sum: { $cond: [{ $in: ['$status', ['Solved', 'Mastered']] }, 1, 0] } },
-              totalMastered: { $sum: { $cond: [{ $eq: ['$status', 'Mastered'] }, 1, 0] } }
-            }
-          }
-        ],
-        difficultyBreakdown: [
-          {
-            $match: { $or: [{ status: 'Solved' }, { status: 'Mastered' }] }
-          },
-          {
-            $group: {
-              _id: '$question.difficulty',
-              solved: { $sum: 1 },
-              mastered: { $sum: { $cond: [{ $eq: ['$status', 'Mastered'] }, 1, 0] } }
-            }
-          }
-        ],
-        platformBreakdown: [
-          {
-            $match: { $or: [{ status: 'Solved' }, { status: 'Mastered' }] }
-          },
-          {
-            $group: {
-              _id: '$question.platform',
-              count: { $sum: 1 }
-            }
-          }
-        ]
-      }
-    }
-  ];
-
-  const results = await UserQuestionProgress.aggregate(pipeline);
-  const data = results[0];
-
-  const totals = data.totals[0] || { totalSolved: 0, totalMastered: 0 };
-
-  const difficultyBreakdown = {
-    Easy: { solved: 0, mastered: 0 },
-    Medium: { solved: 0, mastered: 0 },
-    Hard: { solved: 0, mastered: 0 }
-  };
-  data.difficultyBreakdown.forEach(item => {
-    const diff = item._id;
-    if (difficultyBreakdown[diff]) {
-      difficultyBreakdown[diff].solved = item.solved;
-      difficultyBreakdown[diff].mastered = item.mastered;
-    }
+// Helper to enqueue a stats update
+const enqueueStatsUpdate = async (userId) => {
+  const jobId = `stats_${userId}_${Date.now()}`;
+  await jobQueue.add({
+    type: 'user-stats.update',
+    userId
   });
-
-  const platformBreakdown = {};
-  data.platformBreakdown.forEach(item => {
-    platformBreakdown[item._id] = item.count;
-  });
-
-  return {
-    totalSolved: totals.totalSolved,
-    totalMastered: totals.totalMastered,
-    difficultyBreakdown,
-    platformBreakdown
-  };
+  return jobId;
 };
 
 /**
- * Get detailed statistics for the current user (including breakdowns)
+ * Get detailed statistics for the current user
  */
 const getUserDetailedStats = async (req, res, next) => {
   try {
     const userId = req.user._id;
+    let stats = await UserStats.findOne({ userId }).lean();
 
-    const computed = await computeDetailedStats(userId);
+    if (!stats || isStatsStale(stats.lastUpdated)) {
+      // Enqueue an update in background
+      const jobId = await enqueueStatsUpdate(userId);
+      // If stats exist, return them with a warning
+      if (stats) {
+        res.set('X-Stats-Stale', 'true');
+        res.set('X-Stats-Job-Id', jobId);
+        return res.json(formatResponse('Detailed user statistics retrieved (stale)', { stats }));
+      } else {
+        // No stats yet – return 202 with job ID
+        return res.status(202).json({
+          success: true,
+          statusCode: 202,
+          message: 'Statistics are being generated. Please try again shortly.',
+          data: null,
+          meta: { jobId }
+        });
+      }
+    }
 
-    const user = await User.findById(userId).select('streak stats preferences');
-    const detailedStats = {
-      ...computed,
-      masteryRate: user.stats.masteryRate,
+    // Merge with user data for streak and preferences if needed
+    const user = await User.findById(userId).select('streak preferences');
+    const response = {
+      ...stats,
       streak: user.streak,
-      activeDays: user.stats.activeDays,
-      totalTimeSpent: user.stats.totalTimeSpent,
-      totalRevisions: user.stats.totalRevisions,
       preferences: user.preferences
     };
 
-    res.json(formatResponse('Detailed user statistics retrieved', { stats: detailedStats }));
+    res.json(formatResponse('Detailed user statistics retrieved', { stats: response }));
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Get public stats for another user (rich details, minimal fields)
+ * Get public stats for another user
  */
 const getPublicUserStats = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
     const user = await User.findById(userId)
-      .select('-email -providerId -preferences -authProvider -__v')
+      .select('username displayName avatarUrl privacy streak stats')
       .lean();
     if (!user) throw new AppError('User not found', 404);
     if (user.privacy !== 'public') throw new AppError('User stats are private', 403);
 
-    // Compute detailed stats for this user
-    const computed = await computeDetailedStats(userId);
+    let stats = await UserStats.findOne({ userId }).lean();
 
-    // Build public stats object – identical to own stats but without preferences
-    const publicStats = {
-      totalSolved: computed.totalSolved,
-      totalMastered: computed.totalMastered,
-      masteryRate: user.stats.masteryRate,
-      streak: user.streak,
-      activeDays: user.stats.activeDays,
-      totalTimeSpent: user.stats.totalTimeSpent,
-      totalRevisions: user.stats.totalRevisions,
-      difficultyBreakdown: computed.difficultyBreakdown,
-      platformBreakdown: computed.platformBreakdown
-    };
-
-    // Round masteryRate to two decimals
-    if (publicStats.masteryRate) {
-      publicStats.masteryRate = Math.round(publicStats.masteryRate * 100) / 100;
+    if (!stats || isStatsStale(stats.lastUpdated)) {
+      const jobId = await enqueueStatsUpdate(userId);
+      if (stats) {
+        res.set('X-Stats-Stale', 'true');
+        res.set('X-Stats-Job-Id', jobId);
+        // Return public stats (strip preferences)
+        const publicStats = {
+          totalSolved: stats.totalSolved,
+          totalMastered: stats.totalMastered,
+          masteryRate: stats.masteryRate,
+          streak: user.streak,
+          activeDays: user.stats.activeDays,
+          totalTimeSpent: stats.totalTimeSpent,
+          totalRevisions: stats.totalRevisions,
+          difficultyBreakdown: stats.byDifficulty,
+          platformBreakdown: stats.byPlatform
+        };
+        return res.json(formatResponse('Public user stats retrieved (stale)', { stats: publicStats, userId }));
+      } else {
+        return res.status(202).json({
+          success: true,
+          statusCode: 202,
+          message: 'Public statistics are being generated. Please try again shortly.',
+          data: null,
+          meta: { jobId }
+        });
+      }
     }
 
-    // Return only stats and user ID
-    res.json(formatResponse('Public user stats retrieved', {
-      stats: publicStats,
-      userId: user._id
-    }));
+    const publicStats = {
+      totalSolved: stats.totalSolved,
+      totalMastered: stats.totalMastered,
+      masteryRate: stats.masteryRate,
+      streak: user.streak,
+      activeDays: user.stats.activeDays,
+      totalTimeSpent: stats.totalTimeSpent,
+      totalRevisions: stats.totalRevisions,
+      difficultyBreakdown: stats.byDifficulty,
+      platformBreakdown: stats.byPlatform
+    };
+
+    res.json(formatResponse('Public user stats retrieved', { stats: publicStats, userId }));
   } catch (error) {
     next(error);
   }

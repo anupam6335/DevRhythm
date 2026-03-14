@@ -9,6 +9,9 @@ const { handleGroupGoalProgress } = require('./groupGoalProgress.handler');
 const { handleGroupGoalCompleted } = require('./groupGoalCompleted.handler');
 const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handler');
 const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
+const { handlePatternMasteryRecalc } = require('./patternMasteryRecalc.handler');
+const { handleHeatmapGenerate } = require('./heatmapGenerate.handler');
+const { handleUserStatsUpdate } = require('./userStatsUpdate.handler');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -47,6 +50,15 @@ const processJob = async (job) => {
       break;
     case 'group.challenge_completed':
       await handleGroupChallengeCompleted(job);
+      break;
+    case 'pattern-mastery.recalc': 
+      await handlePatternMasteryRecalc(job);
+      break;
+    case 'heatmap.generate':
+      await handleHeatmapGenerate(job);
+      break;
+    case 'user-stats.update':
+      await handleUserStatsUpdate(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);
