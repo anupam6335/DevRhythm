@@ -15,7 +15,8 @@
 
   .threeColumns {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    /* First column exactly 55% of total width, second exactly 45%, minus half the gap each */
+    grid-template-columns: calc(55% - var(--spacing-lg) / 2) calc(45% - var(--spacing-lg) / 2);
     gap: var(--spacing-lg);
   }
 
