@@ -1,6 +1,5 @@
 .container {
   width: 100%;
-  margin: var(--spacing-lg) 0;
 }
 
 .header {

@@ -115,7 +115,7 @@ const GroupsList: React.FC<GroupsListProps> = ({
           href={isOwnProfile ? '/groups' : `/users/${userId}/groups`}
           className={styles.viewAll}
         >
-          <Button variant="ghost" size="md">
+          <Button variant="ghost" size="sm">
             View All →
           </Button>
         </Link>

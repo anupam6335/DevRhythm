@@ -1,4 +1,3 @@
-
 import React from 'react';
 import clsx from 'clsx';
 import HeatmapSection from './HeatmapSection';
@@ -9,8 +8,8 @@ import PatternsList from './PatternsList';
 import RevisionsLeftCard from './RevisionsLeftCard';
 import GroupsList from './GroupsList';
 import NotificationsList from './NotificationsList';
-
 import ProfileHeader from './ProfileHeader';
+import RecentActivitySection from './RecentActivitySection';
 import type { User } from '@/shared/types';
 
 import styles from './UserPageWrapper.module.css';
@@ -38,12 +37,13 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Followers / Following – two columns on desktop */}
       <div className={styles.section}>
-       <FollowSection user={user} isOwnProfile={isOwnProfile} />
+        <FollowSection user={user} isOwnProfile={isOwnProfile} />
       </div>
 
-      {/* Milestones + Stats – two columns */}
-      <div className={styles.twoColumns}>
+
+      <div className={styles.threeColumns}> 
         <QuestionsList userId={user._id} isOwnProfile={isOwnProfile} limit={6} />
+        <RecentActivitySection userId={user._id} isOwnProfile={isOwnProfile} limit={5} />
         <StatsPanel user={user} isOwnProfile={isOwnProfile} />
       </div>
 

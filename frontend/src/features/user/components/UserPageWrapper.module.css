@@ -12,6 +12,31 @@
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-lg);
   }
+
+  .threeColumns {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+  }
+
+  /* First child (QuestionsList) spans both rows */
+  .threeColumns > :first-child {
+    grid-row: span 2;
+  }
+}
+
+/* On mobile, all columns stack */
+@media (max-width: 767px) {
+  .twoColumns,
+  .threeColumns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+
+  .threeColumns > :first-child {
+    grid-row: auto; /* reset */
+  }
 }
 
 .section {
