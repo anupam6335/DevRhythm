@@ -1,0 +1,267 @@
+/* PatternsList.module.css */
+
+.container {
+  width: 100%;
+  margin: var(--spacing-lg) 0;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px dashed var(--border);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+/* ===== Desktop rows (alternating 60/40 widths) ===== */
+.desktopRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.row {
+  display: flex;
+  gap: var(--spacing-md);
+  width: 100%;
+}
+
+/* Large cards (60%) */
+.largeLeft,
+.largeRight {
+  width: 60%;
+}
+
+/* Small cards (40%) */
+.smallLeft,
+.smallRight {
+  width: 40%;
+}
+
+/* ===== Fallback grid (mobile / tablet / <4 items) ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+/* ===== Card link and card itself ===== */
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  height: 100%;
+}
+
+.card {
+  background: var(--bg-surface);
+  border-radius: 12px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--accent-moss);
+  transform: translateY(-2px);
+}
+
+/* ===== Name Row (pattern name + ring) ===== */
+.nameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}
+
+.patternName {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+/* ===== Mastery ring with hover animation ===== */
+@keyframes fillRing {
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--fill-to);
+  }
+}
+
+.ring {
+  flex-shrink: 0;
+}
+
+.ringProgress {
+  stroke-dashoffset: var(--fill-to);
+  transition: none; /* no transition – we use keyframe animation on hover */
+}
+
+.card:hover .ringProgress {
+  animation: fillRing 1s ease-out forwards;
+}
+
+/* ===== Stats line ===== */
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.statSeparator {
+  color: var(--divider);
+}
+
+/* ===== Recent questions ===== */
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+  font-size: 0.85rem;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connector {
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-family: monospace;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.difficultyDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.recentTitle {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noRecent {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* ===== Empty / error / loading states ===== */
+.empty {
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-bottom: var(--spacing-sm);
+}
+
+.findPatternsLink {
+  display: inline-block;
+  margin-top: var(--spacing-md);
+  color: var(--accent-moss);
+  text-decoration: none;
+  font-size: 0.9rem;
+  border: 1px solid var(--accent-moss);
+  padding: 6px 16px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.findPatternsLink:hover {
+  background-color: var(--accent-moss);
+  color: var(--bg-surface);
+}
+
+.error {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--spacing-lg);
+}
+
+.skeletonCard {
+  height: 140px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 939px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  /* On tablet/mobile, override desktop row widths to full width */
+  .largeLeft,
+  .largeRight,
+  .smallLeft,
+  .smallRight {
+    width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 1.3rem;
+  }
+  .patternName {
+    font-size: 1rem;
+  }
+  .stats {
+    font-size: 0.8rem;
+  }
+}

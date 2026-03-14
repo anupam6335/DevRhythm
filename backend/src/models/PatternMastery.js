@@ -7,6 +7,22 @@ const PatternMasterySchema = new mongoose.Schema({
     required: true,
     index: true
   },
+   title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
+  tags: [String],
+  visibility: {
+    type: String,
+    enum: ['public', 'private'],
+    default: 'public',
+  },
   patternName: {
     type: String,
     required: true,

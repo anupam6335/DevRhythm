@@ -60,5 +60,17 @@ export const patternMasteryService = {
     const query = buildQueryString(params);
     const response = await apiClient.get<{ progress: any[] }>(`/pattern-mastery/progress${query}`);
     return response.data.progress;
+  },
+
+  /**
+   * Get pattern mastery for a specific user (public).
+   * GET /users/:userId/pattern-mastery
+   */
+  async getUserPatternMastery(userId: string, params?: { page?: number; limit?: number }) {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<PatternMasteryListResponse>(
+      `/users/${userId}/pattern-mastery${query}`
+    );
+    return response.data;
   }
 };

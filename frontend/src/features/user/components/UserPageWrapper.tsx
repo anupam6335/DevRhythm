@@ -49,7 +49,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 
       {/* Patterns + Revisions – two columns */}
       <div className={styles.twoColumns}>
-        <PatternsList />
+        <PatternsList userId={user._id} isOwnProfile={isOwnProfile} limit={4} />
         <RevisionsLeftCard />
       </div>
 
