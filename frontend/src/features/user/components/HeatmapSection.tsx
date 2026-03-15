@@ -80,7 +80,7 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
         return heatmapService.getHeatmapByYear(selectedYear, true);
       } else {
         // For public profile, use public endpoint (simple version)
-        return heatmapService.getPublicUserHeatmap(user._id, selectedYear, { simple: true });
+        return heatmapService.getPublicUserHeatmap(user._id, selectedYear);
       }
     },
     // Use initialData only for current year and public profile

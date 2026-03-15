@@ -55,7 +55,7 @@ export const heatmapService = {
    * Get public heatmap data for a user (no authentication required)
   */
   async getPublicUserHeatmap(userId: string, year: number, params?: { simple?: boolean }): Promise<HeatmapData> {
-    const query = buildQueryString(params);
+    const query = buildQueryString(params || {});
     const response = await apiClient.get<HeatmapData>(`/users/${userId}/heatmap/${year}${query}`);
     return response.data;
   }

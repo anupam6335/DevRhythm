@@ -68,7 +68,7 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
       patternsResult,
       statsResult,
     ] = await Promise.allSettled([
-      heatmapService.getPublicUserHeatmap(userId, currentYear, { simple: true }),
+      heatmapService.getPublicUserHeatmap(userId, currentYear),
       userService.getUserPublicProgress(userId, { limit: 6 }),
       studyGroupService.getUserPublicGroups(userId, { limit: 5 }),
       patternMasteryService.getUserPatternMastery(userId, { limit: 4 }),
