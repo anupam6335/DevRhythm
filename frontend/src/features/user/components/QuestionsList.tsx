@@ -1,3 +1,4 @@
+"use client"
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FiBookOpen, FiClock, FiRefreshCw } from 'react-icons/fi';

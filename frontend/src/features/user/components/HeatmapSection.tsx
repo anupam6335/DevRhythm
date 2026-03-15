@@ -1,3 +1,4 @@
+"use client"
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { FiChevronDown } from 'react-icons/fi';

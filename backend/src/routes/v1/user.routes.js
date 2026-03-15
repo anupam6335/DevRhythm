@@ -49,7 +49,7 @@ router.get('/:userId/groups',
   studyGroupController.getUserPublicGroups
 );
 
-router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
+router.get('/:username', validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
 router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);
 router.get('/:userId/pattern-mastery', optionalAuth, getUserPatternMastery);
 
