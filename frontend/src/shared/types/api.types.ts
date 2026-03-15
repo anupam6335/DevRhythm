@@ -678,3 +678,28 @@ export interface ExportHeatmapRequest {
   format?: 'json' | 'csv';
   includeDetails?: boolean;
 }
+
+/** User notification */
+export interface Notification extends Timestamp {
+  _id: ID;
+  userId: ID;
+  type:
+    | 'revision_reminder_daily'
+    | 'revision_reminder_urgent'
+    | 'goal_completion'
+    | 'streak_reminder'
+    | 'new_follower'
+    | 'weekly_report'
+    | 'question_solved'
+    | 'question_mastered'
+    | 'revision_completed';
+  title: string;
+  message: string;
+  data: Record<string, any>; // flexible, based on type
+  channel: 'in-app' | 'email' | 'both';
+  status: 'pending' | 'sent' | 'failed';
+  scheduledAt: ISODateString;
+  sentAt?: ISODateString;
+  readAt?: ISODateString;
+  expiresAt?: ISODateString;
+}

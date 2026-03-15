@@ -122,3 +122,11 @@ export const followKeys = {
   mutual: (userId: string, targetId: string) => [...followKeys.all, 'mutual', userId, targetId] as const,
   stats: () => [...followKeys.all, 'stats'] as const,
 };
+
+export const notificationKeys = {
+  all: ['notifications'] as const,
+  lists: () => [...notificationKeys.all, 'list'] as const,
+  list: (filters: Record<string, any>) => [...notificationKeys.lists(), filters] as const,
+  unreadCount: () => [...notificationKeys.all, 'unreadCount'] as const,
+  detail: (id: string) => [...notificationKeys.all, 'detail', id] as const,
+};

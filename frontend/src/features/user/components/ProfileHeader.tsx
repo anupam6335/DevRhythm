@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FiSettings, FiCalendar, FiStar, FiUsers, FiTarget, FiAward } from 'react-icons/fi';
 import { FaFire, FaTrophy, FaLeaf, FaRegGem, FaStar } from 'react-icons/fa';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import clsx from 'clsx';
 import { format } from 'date-fns';
@@ -13,6 +13,8 @@ import Modal from '@/shared/components/Modal';
 import Checkbox from '@/shared/components/Checkbox';
 import ThemeToggle from '@/shared/components/ThemeToggle';
 import { toast } from '@/shared/components/Toast';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { followService } from '@/features/follow/services/followService';
 import { userService } from '@/features/user/services/userService';
 import { userKeys } from '@/shared/lib/react-query';
 import { formatNumber } from '@/shared/lib/stringUtils';
@@ -50,6 +52,49 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+
+  // Follow status – only fetch if not own profile and logged in
+  const { data: followStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ['follow', 'status', currentUser?._id, user._id],
+    queryFn: () => followService.getFollowStatus(user._id),
+    enabled: !isOwnProfile && !!currentUser,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Follow / unfollow mutations
+  const followMutation = useMutation({
+    mutationFn: () => followService.followUser(user._id),
+    onSuccess: () => {
+      // Invalidate follow status and any follow lists
+      queryClient.invalidateQueries({ queryKey: ['follow', 'status', currentUser?._id, user._id] });
+      queryClient.invalidateQueries({ queryKey: ['follow'] });
+      toast.success(`You are now following ${user.displayName || user.username}`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to follow user');
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: () => followService.unfollowUser(user._id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow', 'status', currentUser?._id, user._id] });
+      queryClient.invalidateQueries({ queryKey: ['follow'] });
+      toast.success(`You have unfollowed ${user.displayName || user.username}`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to unfollow user');
+    },
+  });
+
+  const handleFollowToggle = () => {
+    if (followStatus?.isFollowing) {
+      unfollowMutation.mutate();
+    } else {
+      followMutation.mutate();
+    }
+  };
 
   // Determine online status from backend field
   const isOnline = user?.isOnline ?? false;
@@ -57,7 +102,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   const badges = computeBadges(user);
   const memberSince = format(new Date(user?.accountCreated), 'MMM yyyy');
 
-  // Settings modal form
+  // Settings modal form (only for own profile)
   const { control, handleSubmit, formState: { isSubmitting } } = useForm({
     defaultValues: {
       displayName: user?.displayName,
@@ -137,11 +182,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className={styles.ripple} aria-hidden="true" />
         </div>
 
-        {/* Name and gear */}
+        {/* Name and action button(s) */}
         <div className={styles.nameSection}>
           <div className={styles.nameRow}>
             <h1 className={styles.displayName}>{user?.displayName}</h1>
-            {isOwnProfile && (
+            {isOwnProfile ? (
               <button
                 className={styles.settingsButton}
                 onClick={() => setModalOpen(true)}
@@ -149,6 +194,18 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               >
                 <FiSettings />
               </button>
+            ) : (
+              currentUser && (
+                <Button
+                  variant={followStatus?.isFollowing ? 'outline' : 'primary'}
+                  size="sm"
+                  onClick={handleFollowToggle}
+                  isLoading={followMutation.isPending || unfollowMutation.isPending}
+                  disabled={statusLoading}
+                >
+                  {followStatus?.isFollowing ? 'Unfollow' : 'Follow'}
+                </Button>
+              )
             )}
           </div>
           <p className={styles.username}>@{user?.username}</p>
@@ -205,131 +262,133 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         )}
       </div>
 
-      {/* Settings Modal */}
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Preferences"
-        size="md"
-        closeOnBackdropClick
-        closeOnEsc
-        showCloseButton
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className={styles.modalForm}>
-          {/* Display Name Field */}
-          <div className={styles.formGroup}>
-            <label htmlFor="displayName">Display Name</label>
-            <input
-              id="displayName"
-              type="text"
-              {...control.register('displayName')}
-            />
-          </div>
+      {/* Settings Modal (only for own profile) */}
+      {isOwnProfile && (
+        <Modal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title="Preferences"
+          size="md"
+          closeOnBackdropClick
+          closeOnEsc
+          showCloseButton
+        >
+          <form onSubmit={handleSubmit(onSubmit)} className={styles.modalForm}>
+            {/* Display Name Field */}
+            <div className={styles.formGroup}>
+              <label htmlFor="displayName">Display Name</label>
+              <input
+                id="displayName"
+                type="text"
+                {...control.register('displayName')}
+              />
+            </div>
 
-          <div className={styles.formGroup}>
-            <label htmlFor="dailyGoal">Daily Goal</label>
-            <input
-              id="dailyGoal"
-              type="number"
-              min={1}
-              max={50}
-              {...control.register('dailyGoal', { valueAsNumber: true })}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="weeklyGoal">Weekly Goal</label>
-            <input
-              id="weeklyGoal"
-              type="number"
-              min={5}
-              max={100}
-              {...control.register('weeklyGoal', { valueAsNumber: true })}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="timezone">Timezone</label>
-            <select {...control.register('timezone')}>
-              <option value="UTC">UTC</option>
-              <option value="UTC+5:30">Asia/Kolkata (UTC+5:30)</option>
-              <option value="UTC-5">America/New York (UTC-5)</option>
-            </select>
-          </div>
-          <fieldset className={styles.notifications}>
-            <legend>Notifications</legend>
-            <Controller
-              name="notifications.revisionReminders"
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  label="Revision Reminders"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-            <Controller
-              name="notifications.goalTracking"
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  label="Goal Tracking"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-            <Controller
-              name="notifications.socialInteractions"
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  label="Social Interactions"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-            <Controller
-              name="notifications.weeklyReports"
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  label="Weekly Reports"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-          </fieldset>
-          <Divider />
-          <div className={styles.themeSection}>
-            <span>Theme</span>
-            <ThemeToggle variant="both" />
-          </div>
-        </form>
+            <div className={styles.formGroup}>
+              <label htmlFor="dailyGoal">Daily Goal</label>
+              <input
+                id="dailyGoal"
+                type="number"
+                min={1}
+                max={50}
+                {...control.register('dailyGoal', { valueAsNumber: true })}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="weeklyGoal">Weekly Goal</label>
+              <input
+                id="weeklyGoal"
+                type="number"
+                min={5}
+                max={100}
+                {...control.register('weeklyGoal', { valueAsNumber: true })}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="timezone">Timezone</label>
+              <select {...control.register('timezone')}>
+                <option value="UTC">UTC</option>
+                <option value="UTC+5:30">Asia/Kolkata (UTC+5:30)</option>
+                <option value="UTC-5">America/New York (UTC-5)</option>
+              </select>
+            </div>
+            <fieldset className={styles.notifications}>
+              <legend>Notifications</legend>
+              <Controller
+                name="notifications.revisionReminders"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    label="Revision Reminders"
+                    checked={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
+              />
+              <Controller
+                name="notifications.goalTracking"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    label="Goal Tracking"
+                    checked={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
+              />
+              <Controller
+                name="notifications.socialInteractions"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    label="Social Interactions"
+                    checked={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
+              />
+              <Controller
+                name="notifications.weeklyReports"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    label="Weekly Reports"
+                    checked={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
+              />
+            </fieldset>
+            <Divider />
+            <div className={styles.themeSection}>
+              <span>Theme</span>
+              <ThemeToggle variant="both" />
+            </div>
+          </form>
 
-        {/* Modal footer with action buttons */}
-        <div className={styles.modalActions}>
-          <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            isLoading={isSubmitting}
-            onClick={handleSubmit(onSubmit)}
-          >
-            Save
-          </Button>
-        </div>
-      </Modal>
+          {/* Modal footer with action buttons */}
+          <div className={styles.modalActions}>
+            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              isLoading={isSubmitting}
+              onClick={handleSubmit(onSubmit)}
+            >
+              Save
+            </Button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 };
