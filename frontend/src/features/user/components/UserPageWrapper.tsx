@@ -48,13 +48,17 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
       </div>
 
       {/* Patterns + Revisions – two columns */}
-      <div className={styles.section}>
-        <NotificationsList />
-      </div>
+      {
+        isOwnProfile &&
+        <div className={styles.section}>
+          <NotificationsList isOwnProfile={isOwnProfile} limit={5} />
+        </div> 
+      }
+      
 
       {/* Study Groups + Notifications – two columns */}
       <div className={styles.twoColumns}>
-         <FollowSection user={user} isOwnProfile={isOwnProfile} />
+        <FollowSection user={user} isOwnProfile={isOwnProfile} />
         <GroupsList userId={user._id} isOwnProfile={isOwnProfile} limit={5} />
       </div>
     </div>
