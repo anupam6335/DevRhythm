@@ -1,21 +1,24 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import clsx from 'clsx';
 
+// Critical components – imported normally
 import ProfileHeader from './ProfileHeader';
 import HeatmapSection from './HeatmapSection';
 import PatternsList from './PatternsList';
 import QuestionsList from './QuestionsList';
-import RecentActivitySection from './RecentActivitySection';
 import StatsPanel from './StatsPanel';
-import FollowSection from './FollowSection';
-import GroupsList from './GroupsList';
-import NotificationsList from './NotificationsList';
+
+// Non‑critical components – lazy loaded with ssr: false
+const RecentActivitySection = dynamic(() => import('./RecentActivitySection'), { ssr: false });
+const FollowSection = dynamic(() => import('./FollowSection'), { ssr: false });
+const GroupsList = dynamic(() => import('./GroupsList'), { ssr: false });
+const NotificationsList = dynamic(() => import('./NotificationsList'), { ssr: false });
 
 import type { User } from '@/shared/types';
 import type { HeatmapData, PublicProgressItem, PatternMastery } from '@/shared/types';
-import type { PublicStudyGroup } from '@/features/studyGroup/types/studyGroup.types';
 import type { UserStats } from '@/features/user/types/userStats.types';
 import type { GroupListResponse } from '@/features/studyGroup/types/studyGroup.types';
 
@@ -25,6 +28,7 @@ export interface UserPageWrapperProps {
   user: User;
   isOwnProfile?: boolean;
   className?: string;
+  // Optional initial data for public profiles (server‑fetched)
   initialHeatmap?: HeatmapData | null;
   initialProgress?: PublicProgressItem[];
   initialGroups?: GroupListResponse | null;
@@ -44,10 +48,10 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
 }) => {
   return (
     <div className={clsx(styles.wrapper, className)}>
-      {/* Header */}
+      {/* Header – critical */}
       <ProfileHeader user={user} isOwnProfile={isOwnProfile} />
 
-      {/* Heatmap */}
+      {/* Heatmap – critical */}
       <section className={styles.section}>
         <HeatmapSection
           user={user}
@@ -56,7 +60,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
         />
       </section>
 
-      {/* Patterns */}
+      {/* Patterns – critical */}
       <div className={styles.section}>
         <PatternsList
           userId={user._id}
@@ -66,7 +70,7 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
         />
       </div>
 
-      {/* Three columns: Questions, Activity, Stats */}
+      {/* Three columns: Questions, Activity, Stats – Questions and Stats are critical, Activity is lazy */}
       <div className={styles.threeColumns}>
         <QuestionsList
           userId={user._id}
@@ -86,14 +90,14 @@ export const UserPageWrapper: React.FC<UserPageWrapperProps> = ({
         />
       </div>
 
-      {/* Own profile only: Notifications */}
+      {/* Own profile only: Notifications – lazy */}
       {isOwnProfile && (
         <div className={styles.section}>
           <NotificationsList isOwnProfile={isOwnProfile} limit={5} />
         </div>
       )}
 
-      {/* Two columns: Followers & Groups */}
+      {/* Two columns: Followers & Groups – both lazy */}
       <div className={styles.twoColumns}>
         <FollowSection user={user} isOwnProfile={isOwnProfile} />
         <GroupsList
