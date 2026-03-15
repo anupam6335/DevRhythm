@@ -13,7 +13,7 @@ const handleGoalCompleted = async (job) => {
       title: 'Goal Achieved!',
       message: `Congratulations! You've completed your ${goalType} goal (${completedCount}/${targetCount})!`,
       data: { goalId, goalType, targetCount, completedCount },
-      channel: 'both',
+      channel: 'in-app',
       status: 'pending',
       scheduledAt: new Date(),
     });

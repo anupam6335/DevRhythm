@@ -57,5 +57,15 @@ module.exports = {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
     trustProxy: parseInt(process.env.RATE_LIMIT_TRUST_PROXY) || 1
-  }
+  },
+
+  email: {
+    provider: process.env.EMAIL_PROVIDER || 'mailjet',
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply@devrhythm.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'DevRhythm',
+    mailjet: {
+      apiKey: process.env.MAILJET_API_KEY,
+      secretKey: process.env.MAILJET_SECRET_KEY,
+    },
+  },
 };

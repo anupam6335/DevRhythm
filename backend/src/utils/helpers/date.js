@@ -60,13 +60,20 @@ const parseDate = (input) => {
   if (!input) return new Date();
   if (input instanceof Date) return input;
   if (typeof input === 'number') {
-    // If timestamp is in seconds (less than 10^11, i.e., before year 5138), convert to milliseconds
     if (input < 10000000000) {
       return new Date(input * 1000);
     }
     return new Date(input);
   }
   if (typeof input === 'string') {
+    // Try parsing as number if it's a numeric string
+    const num = Number(input);
+    if (!isNaN(num)) {
+      if (num < 10000000000) {
+        return new Date(num * 1000);
+      }
+      return new Date(num);
+    }
     const date = new Date(input);
     if (!isNaN(date.getTime())) return date;
   }

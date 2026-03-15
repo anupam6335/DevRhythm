@@ -1,14 +1,16 @@
 const User = require('../../models/User');
+const Question = require('../../models/Question');
 const UserQuestionProgress = require('../../models/UserQuestionProgress');
 const HeatmapData = require('../../models/HeatmapData');
+const Notification = require('../../models/Notification');
 const { invalidateCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
-const { parseDate } = require('../../utils/helpers/date'); // import helper
+const { parseDate } = require('../../utils/helpers/date');
 
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
 
-  // Parse the date robustly
+  // Parse the date robustly – handles numeric strings, timestamps, etc.
   const revisionDate = parseDate(completedAt);
 
   try {
@@ -67,6 +69,29 @@ const handleRevisionCompleted = async (job) => {
       await heatmap.save();
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
+
+    // --- Fetch question title for notification ---
+    const question = await Question.findById(questionId).select('title');
+    const questionTitle = question ? question.title : 'a question';
+
+    // --- Create in-app notification for this completed revision ---
+    await Notification.create({
+      userId,
+      type: 'revision_completed',
+      title: 'Revision Completed',
+      message: `You completed a revision for "${questionTitle}"`,
+      data: {
+        questionId,
+        revisionId,
+        revisionIndex,
+        status,
+      },
+      channel: 'in-app',
+      status: 'sent',
+      scheduledAt: new Date(),
+    });
+
+    await invalidateCache(`notifications:*:user:${userId}:*`);
 
     console.log(`Revision completed event processed for user ${userId}`);
   } catch (error) {

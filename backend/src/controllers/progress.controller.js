@@ -70,11 +70,14 @@ const createOrUpdateProgress = async (req, res, next) => {
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
+    console.log(`[createOrUpdateProgress] Called for user ${userId}, question ${questionId}, status=${status}`); // LOG
+
     const question = await Question.findById(questionId);
     if (!question) throw new AppError('Question not found', 404);
 
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
     const oldStatus = progress ? progress.status : null;
+    console.log(`[createOrUpdateProgress] oldStatus=${oldStatus}`); // LOG
 
     const updateData = {
       updatedAt: new Date()
@@ -129,10 +132,11 @@ const createOrUpdateProgress = async (req, res, next) => {
     // Emit events after the progress is saved
     if (newProgress) {
       if (status === 'Solved' && oldStatus !== 'Solved') {
+        console.log(`[createOrUpdateProgress] Condition met: adding question.solved job`); // LOG
         if (!jobQueue) {
           console.error('jobQueue is not available, cannot add job');
         } else {
-          await jobQueue.add({
+          const job = await jobQueue.add({
             type: 'question.solved',
             userId,
             questionId,
@@ -140,19 +144,24 @@ const createOrUpdateProgress = async (req, res, next) => {
             timeSpent: timeSpent || 0,
             solvedAt: new Date(),
           });
+          console.log(`[createOrUpdateProgress] Job added successfully, jobId=${job.id}`); // LOG
         }
       } else if (status === 'Mastered' && oldStatus !== 'Mastered') {
+        console.log(`[createOrUpdateProgress] Condition met: adding question.mastered job`); // LOG
         if (!jobQueue) {
           console.error('jobQueue is not available, cannot add job');
         } else {
-          await jobQueue.add({
+          const job = await jobQueue.add({
             type: 'question.mastered',
             userId,
             questionId,
             progressId: newProgress._id,
             masteredAt: new Date(),
           });
+          console.log(`[createOrUpdateProgress] Job added successfully, jobId=${job.id}`); // LOG
         }
+      } else {
+        console.log(`[createOrUpdateProgress] No job added. status=${status}, oldStatus=${oldStatus}`); // LOG
       }
     }
 
@@ -165,6 +174,7 @@ const createOrUpdateProgress = async (req, res, next) => {
       { progress: newProgress }
     ));
   } catch (error) {
+    console.error('[createOrUpdateProgress] Error:', error); // LOG
     next(error);
   }
 };

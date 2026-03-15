@@ -128,6 +128,10 @@ const UserSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  lastDigestSentAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true

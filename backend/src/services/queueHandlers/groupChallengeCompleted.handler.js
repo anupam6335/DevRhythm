@@ -14,7 +14,7 @@ const handleGroupChallengeCompleted = async (job) => {
       title: "Group Challenge Completed!",
       message: `You completed the group challenge: "${challengeName}"`,
       data: { groupId, challengeId, target },
-      channel: "both",
+      channel: 'in-app',
       status: "pending",
       scheduledAt: new Date(),
     });
