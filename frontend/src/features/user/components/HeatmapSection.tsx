@@ -1,13 +1,15 @@
-"use client"
+'use client';
+
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { FiChevronDown } from 'react-icons/fi';
 
-import { usePublicHeatmap } from '../hooks/usePublicHeatmap';
+import { heatmapService } from '@/features/heatmap/services/heatmapService';
 import Heatmap from '@/shared/components/Heatmap';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import Tooltip from '@/shared/components/Tooltip';
-import type { User } from '@/shared/types';
+import type { User, HeatmapData } from '@/shared/types';
 
 import styles from './HeatmapSection.module.css';
 
@@ -15,11 +17,11 @@ export interface HeatmapSectionProps {
   user: User;
   isOwnProfile?: boolean;
   className?: string;
+  initialData?: HeatmapData | null;
 }
 
 // Legend item component with tooltip explaining the activity range
 const LegendItem: React.FC<{ color: string; label: string; level: number }> = ({ color, label, level }) => {
-  // Tooltip content based on intensity level
   const tooltipContent = useMemo(() => {
     switch (level) {
       case 1:
@@ -47,17 +49,18 @@ const LegendItem: React.FC<{ color: string; label: string; level: number }> = ({
 
 const HeatmapSection: React.FC<HeatmapSectionProps> = ({
   user,
-  isOwnProfile,
+  isOwnProfile = false,
   className,
+  initialData,
 }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
   // Get account creation year
   const accountYear = useMemo(() => {
-    if (!user?.accountCreated) return currentYear - 1; // fallback
+    if (!user?.accountCreated) return currentYear - 1;
     return new Date(user.accountCreated).getFullYear();
-  }, [user?.accountCreated]);
+  }, [user?.accountCreated, currentYear]);
 
   // Generate year options from account year to currentYear + 1
   const yearOptions = useMemo(() => {
@@ -69,9 +72,23 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
   }, [accountYear, currentYear]);
 
   // Fetch heatmap data
-  const { data, isLoading, error } = usePublicHeatmap(user._id, selectedYear);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['user', user._id, 'heatmap', selectedYear, { isOwnProfile }],
+    queryFn: () => {
+      if (isOwnProfile) {
+        // For own profile, use authenticated endpoint (full data)
+        return heatmapService.getHeatmapByYear(selectedYear, true);
+      } else {
+        // For public profile, use public endpoint (simple version)
+        return heatmapService.getPublicUserHeatmap(user._id, selectedYear, { simple: true });
+      }
+    },
+    // Use initialData only for current year and public profile
+    initialData: !isOwnProfile && selectedYear === currentYear ? initialData ?? undefined : undefined,
+    staleTime: 5 * 60 * 1000,
+    enabled: true,
+  });
 
-  // Handle year change
   const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedYear(parseInt(event.target.value, 10));
   };
@@ -81,7 +98,6 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
     '#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39',
   ];
 
-  // Legend items for levels 1–4
   const legendItems = [
     { level: 1, label: 'low', color: colorScale[1] },
     { level: 2, label: 'medium', color: colorScale[2] },
@@ -90,7 +106,7 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
   ];
 
   // Loading state – show a skeleton
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className={clsx(styles.container, className)}>
         <div className={styles.header}>
@@ -106,14 +122,13 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
             <SkeletonLoader variant="text" width={150} height={32} />
           </div>
         </div>
-        {/* Custom skeleton for the heatmap area */}
         <SkeletonLoader variant="custom" height={200} />
       </div>
     );
   }
 
   // Error state – show a friendly message
-  if (error || !data) {
+  if (error) {
     return (
       <div className={clsx(styles.container, className)}>
         <div className={styles.error}>
@@ -130,11 +145,50 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
     );
   }
 
+  // No data or empty daily data – show empty state
+  if (!data || !data.dailyData || data.dailyData.length === 0) {
+    return (
+      <div className={clsx(styles.container, styles.empty, className)}>
+        <div className={styles.header}>
+          <div className={styles.left}>
+            <div className={styles.consistency}>
+              <span className={styles.consistencyValue}>0%</span>
+              <span className={styles.consistencyLabel}>consistency</span>
+            </div>
+            {/* Optionally show legend skeleton or nothing */}
+          </div>
+          <div className={styles.right}>
+            <span className={styles.title}>Daily Garden</span>
+            <div className={styles.yearSelectWrapper}>
+              <select
+                value={selectedYear}
+                onChange={handleYearChange}
+                className={styles.yearSelect}
+                aria-label="Select year"
+              >
+                {yearOptions.map(year => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <FiChevronDown className={styles.selectIcon} aria-hidden="true" />
+            </div>
+          </div>
+        </div>
+        <div className={styles.emptyHeatmap}>
+          <p>No activity data for {selectedYear} yet.</p>
+          {isOwnProfile && (
+            <p>Start solving problems to grow your garden!</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={clsx(styles.container, className)}>
-      {/* Two‑column header */}
       <div className={styles.header}>
-        {/* Left side: consistency + legend */}
         <div className={styles.left}>
           <div className={styles.consistency}>
             <span className={styles.consistencyValue}>
@@ -154,7 +208,6 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
           </div>
         </div>
 
-        {/* Right side: daily garden + year dropdown */}
         <div className={styles.right}>
           <span className={styles.title}>Daily Garden</span>
           <div className={styles.yearSelectWrapper}>
@@ -175,7 +228,6 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
         </div>
       </div>
 
-      {/* The heatmap itself */}
       <Heatmap data={data} showNextYearPreview={false} />
     </div>
   );

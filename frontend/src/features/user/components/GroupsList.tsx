@@ -1,4 +1,5 @@
-"use client"
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -11,15 +12,17 @@ import Button from '@/shared/components/Button';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import Tooltip from '@/shared/components/Tooltip';
 import NoRecordFound from '@/shared/components/NoRecordFound';
+import { useUserGroups } from '@/features/studyGroup/hooks/useUserGroups';
+import type { GroupListResponse, PublicStudyGroup } from '@/features/studyGroup/types/studyGroup.types';
 
 import styles from './GroupsList.module.css';
-import { useUserGroups } from '@/features/studyGroup/hooks/useUserGroups';
 
 export interface GroupsListProps {
   userId?: string;
   isOwnProfile?: boolean;
   limit?: number;
   className?: string;
+  initialGroups?: GroupListResponse | null; // server‑fetched data
 }
 
 // Helper to get privacy icon and Badge variant
@@ -43,8 +46,9 @@ const GroupsList: React.FC<GroupsListProps> = ({
   isOwnProfile = false,
   limit = 5,
   className,
+  initialGroups,
 }) => {
-  const { data, isLoading, error } = useUserGroups(userId, isOwnProfile, limit);
+  const { data, isLoading, error } = useUserGroups(userId, isOwnProfile, limit, initialGroups ?? undefined);
 
   // Loading state
   if (isLoading) {

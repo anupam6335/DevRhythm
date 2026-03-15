@@ -1,4 +1,5 @@
-"use client"
+'use client';
+
 import React from 'react';
 import clsx from 'clsx';
 import { FaFire } from 'react-icons/fa';
@@ -9,12 +10,14 @@ import { useMediaQuery } from '@/shared/hooks';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import Tooltip from '@/shared/components/Tooltip';
 import type { User } from '@/shared/types';
+import type { UserStats } from '@/features/user/types/userStats.types';
 import styles from './StatsPanel.module.css';
 
 export interface StatsPanelProps {
   user: User;
   isOwnProfile?: boolean;
   className?: string;
+  initialStats?: UserStats | null; 
 }
 
 // Helper to format minutes to hours with one decimal
@@ -28,10 +31,16 @@ const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
-const StatsPanel: React.FC<StatsPanelProps> = ({ user, isOwnProfile = false, className }) => {
+const StatsPanel: React.FC<StatsPanelProps> = ({
+  user,
+  isOwnProfile = false,
+  className,
+  initialStats,
+}) => {
   const userId = user?._id;
-  const { data: stats, isLoading, error } = useUserStats(userId, isOwnProfile);
+  const { data: stats, isLoading, error } = useUserStats(userId, isOwnProfile, initialStats);
   const isMobile = useMediaQuery('(max-width: 767px)');
+
   if (!user) return null;
 
   if (isLoading) {

@@ -1,12 +1,18 @@
-
 import type { Metadata } from 'next';
 import { userService } from '@/features/user/services/userService';
+import { heatmapService } from '@/features/heatmap/services/heatmapService';
+import { studyGroupService } from '@/features/studyGroup/services/studyGroupService';
+import { patternMasteryService } from '@/features/patternMastery/services/patternMasteryService';
+import { userStatsService } from '@/features/user/services/userStatsService';
 import { UserPageWrapper } from '@/features/user/components';
 import { SITE_NAME, SITE_URL } from '@/shared/config/seo';
 import NotFoundPage from '@/shared/components/NotFoundPage';
+import type { GroupListResponse } from '@/features/studyGroup/types/studyGroup.types';
+import type { PatternMasteryListResponse } from '@/features/patternMastery/types/patternMastery.types';
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
+
   try {
     const user = await userService.getUserByUsername(username);
     const title = `${user.displayName} (@${user.username}) · ${SITE_NAME}`;
@@ -46,11 +52,50 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
 
 export default async function PublicUserPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
+
   try {
+    // 1. Fetch user first (needed for userId)
     const user = await userService.getUserByUsername(username);
-    return <UserPageWrapper user={user} isOwnProfile={false} />;
+    const userId = user._id;
+    const currentYear = new Date().getFullYear();
+
+    // 2. Fetch all other public data in parallel
+    const [
+      heatmapResult,
+      progressResult,
+      groupsResult,
+      patternsResult,
+      statsResult,
+    ] = await Promise.allSettled([
+      heatmapService.getPublicUserHeatmap(userId, currentYear, { simple: true }),
+      userService.getUserPublicProgress(userId, { limit: 6 }),
+      studyGroupService.getUserPublicGroups(userId, { limit: 5 }),
+      patternMasteryService.getUserPatternMastery(userId, { limit: 4 }),
+      userStatsService.getPublicUserStats(userId),
+    ]);
+
+    // 3. Extract data with proper typing and fallbacks
+    const initialHeatmap = heatmapResult.status === 'fulfilled' ? heatmapResult.value : null;
+    const initialProgress = progressResult.status === 'fulfilled' ? progressResult.value : [];
+    const initialGroups = groupsResult.status === 'fulfilled' ? groupsResult.value as GroupListResponse : null;
+    const initialPatterns = patternsResult.status === 'fulfilled' ? (patternsResult.value as PatternMasteryListResponse).patterns : [];
+    const initialDetailedStats = statsResult.status === 'fulfilled' ? statsResult.value : null;
+
+    // 4. Pass everything to the client wrapper
+    return (
+      <UserPageWrapper
+        user={user}
+        isOwnProfile={false}
+        initialHeatmap={initialHeatmap}
+        initialProgress={initialProgress}
+        initialGroups={initialGroups}
+        initialPatterns={initialPatterns}
+        initialDetailedStats={initialDetailedStats}
+      />
+    );
   } catch (error) {
     console.error(`Failed to fetch user ${username}:`, error);
+    // User not found or private – show custom 404 page
     return (
       <NotFoundPage
         title="User Not Found"

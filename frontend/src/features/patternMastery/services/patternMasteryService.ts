@@ -66,11 +66,9 @@ export const patternMasteryService = {
    * Get pattern mastery for a specific user (public).
    * GET /users/:userId/pattern-mastery
    */
-  async getUserPatternMastery(userId: string, params?: { page?: number; limit?: number }) {
+  async getUserPatternMastery(userId: string, params?: { page?: number; limit?: number }): Promise<PatternMasteryListResponse> {
     const query = buildQueryString(params);
-    const response = await apiClient.get<PatternMasteryListResponse>(
-      `/users/${userId}/pattern-mastery${query}`
-    );
+    const response = await apiClient.get<PatternMasteryListResponse>(`/users/${userId}/pattern-mastery${query}`);
     return response.data;
   }
 };
