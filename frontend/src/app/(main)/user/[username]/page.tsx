@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { userService } from '@/features/user/services/userService';
 import { heatmapService } from '@/features/heatmap/services/heatmapService';
 import { studyGroupService } from '@/features/studyGroup/services/studyGroupService';
@@ -81,21 +82,43 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
     const initialPatterns = patternsResult.status === 'fulfilled' ? (patternsResult.value as PatternMasteryListResponse).patterns : [];
     const initialDetailedStats = statsResult.status === 'fulfilled' ? statsResult.value : null;
 
-    // 4. Pass everything to the client wrapper
+    // 4. Generate structured data (JSON-LD)
+    const structuredData = {
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: user.displayName,
+      alternateName: `@${user.username}`,
+      description: `Solved ${user.stats.totalSolved} coding problems with a ${user.streak.current} day streak and ${user.stats.masteryRate}% mastery rate.`,
+      image: user.avatarUrl || undefined,
+      url: `${SITE_URL}/user/${username}`,
+      sameAs: [], 
+      mainEntityOfPage: {
+        '@type': 'ProfilePage',
+        '@id': `${SITE_URL}/user/${username}`,
+      },
+    };
+
     return (
-      <UserPageWrapper
-        user={user}
-        isOwnProfile={false}
-        initialHeatmap={initialHeatmap}
-        initialProgress={initialProgress}
-        initialGroups={initialGroups}
-        initialPatterns={initialPatterns}
-        initialDetailedStats={initialDetailedStats}
-      />
+      <>
+        {/* Structured data */}
+        <Script
+          id="schema-person"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        <UserPageWrapper
+          user={user}
+          isOwnProfile={false}
+          initialHeatmap={initialHeatmap}
+          initialProgress={initialProgress}
+          initialGroups={initialGroups}
+          initialPatterns={initialPatterns}
+          initialDetailedStats={initialDetailedStats}
+        />
+      </>
     );
   } catch (error) {
-    console.error(`Failed to fetch user ${username}:`, error);
-    // User not found or private – show custom 404 page
     return (
       <NotFoundPage
         title="User Not Found"
