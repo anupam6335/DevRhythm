@@ -121,13 +121,6 @@
 }
 
 
-.horizontal .animateReveal {
-  transform: translateX(calc(-1 * var(--image-size)));
-}
-
-.vertical .animateReveal {
-  transform: translateY(calc(-1 * var(--image-size)));
-}
 
 
 /* Focus ring */
