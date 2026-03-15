@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const PatternMastery = require('../models/PatternMastery');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
@@ -234,6 +235,57 @@ const syncPatternMastery = async (userId, questionProgress) => {
     console.error('Pattern mastery sync error:', error);
   }
 };
+/**
+ * GET /api/v1/users/:userId/pattern-mastery
+ * Public – returns pattern mastery data for a specific user (paginated)
+ */
+const getUserPatternMastery = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const sort = req.query.sort || '-confidenceLevel'; // default sort by confidence
+    const skip = (page - 1) * limit;
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new AppError('Invalid user ID', 400);
+    }
+
+    // Optional: check if the target user's profile is public
+    // (You can implement a privacy setting on the User model)
+    // const targetUser = await User.findById(userId).select('privacy');
+    // if (!targetUser) throw new AppError('User not found', 404);
+    // const isOwner = req.user && req.user._id.toString() === userId;
+    // if (!isOwner && targetUser.privacy === 'private') {
+    //   throw new AppError('This user\'s patterns are private', 403);
+    // }
+
+    // Build query
+    const query = { userId };
+
+    // If you have a visibility field on PatternMastery, filter here
+    // if (!isOwner) query.visibility = 'public';
+
+    // Execute
+    const [patterns, total] = await Promise.all([
+      PatternMastery.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PatternMastery.countDocuments(query)
+    ]);
+
+    res.json(formatResponse(
+      'User pattern mastery retrieved',
+      { patterns },
+      { pagination: paginate(total, page, limit) }
+    ));
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getPatternMasteryList,
@@ -243,5 +295,6 @@ module.exports = {
   getWeakestPatterns,
   getStrongestPatterns,
   getPatternProgress,
-  syncPatternMastery
+  syncPatternMastery,
+  getUserPatternMastery
 };

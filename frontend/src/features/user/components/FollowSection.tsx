@@ -76,10 +76,8 @@ const FollowSection: React.FC<FollowSectionProps> = ({
       <div className={clsx(styles.container, styles.empty, className)}>
         <div className={styles.header}>
           <h2 className={styles.title}>Connections</h2>
-          <Link href={`/users/${user.username}/connections`} passHref className={styles.viewall}>
-            <Button variant="ghost" size="sm">
-              View Connections →
-            </Button>
+          <Link href={`/users/${user.username}/connections`} className={styles.viewall}>
+            View Connections →
           </Link>
         </div>
         <div className={styles.emptyState}>
@@ -100,10 +98,8 @@ const FollowSection: React.FC<FollowSectionProps> = ({
       {/* Header */}
       <div className={styles.header}>
         <h2 className={styles.title}>Connections</h2>
-        <Link href={`/users/${user.username}/connections`} passHref className={styles.viewall}>
-          <Button variant="ghost" size="sm">
-            View Connections →
-          </Button>
+        <Link href={`/users/${user.username}/connections`} className={styles.viewall}>
+          View Connections →
         </Link>
       </div>
 

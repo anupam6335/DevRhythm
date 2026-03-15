@@ -4,7 +4,8 @@ const userController = require('../../controllers/user.controller');
 const followController = require('../../controllers/follow.controller');
 const heatmapController = require('../../controllers/heatmap.controller');   
 const studyGroupController = require('../../controllers/studyGroup.controller');
-const { auth } = require('../../middleware/auth');
+const { getUserPatternMastery } = require('../../controllers/patternMastery.controller');
+const { auth, optionalAuth } = require('../../middleware/auth');
 const validate = require('../../middleware/validator');
 const userValidator = require('../../utils/validators/user.validator');
 const rateLimiters = require('../../middleware/rateLimiter');
@@ -50,5 +51,6 @@ router.get('/:userId/groups',
 
 router.get('/:username', auth, validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
 router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);
+router.get('/:userId/pattern-mastery', optionalAuth, getUserPatternMastery);
 
 module.exports = router;
