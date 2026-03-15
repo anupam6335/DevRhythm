@@ -1,40 +1,27 @@
-'use client';
-
-import { use } from 'react';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/features/auth/server/getCurrentUser';
 import { UserPageWrapper } from '@/features/user/components';
-import SkeletonLoader from '@/shared/components/SkeletonLoader';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/shared/config/seo';
 
-export default function OwnUserPage({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = use(params);
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
+// Optional metadata (since it's a private page, you might skip or use generic)
+export const metadata: Metadata = {
+  title: `My Profile · ${SITE_NAME}`,
+  robots: 'noindex, nofollow', // Private page – do not index
+};
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isLoading, router]);
+export default async function OwnUserPage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  const user = await getCurrentUser();
 
-  useEffect(() => {
-    // After user is loaded, check if the URL username matches
-    if (!isLoading && user && user.username !== username) {
-      router.replace(`/user/${user.username}`);
-    }
-  }, [isLoading, user, username, router]);
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <SkeletonLoader variant="user-card" count={3} />
-      </div>
-    );
+  // Not authenticated → redirect to login
+  if (!user) {
+    redirect('/login');
   }
 
-  if (!user) {
-    return null; // will redirect
+  // Username mismatch → redirect to correct own profile URL
+  if (user.username !== username) {
+    redirect(`/user/u/${user.username}`);
   }
 
   return <UserPageWrapper user={user} isOwnProfile={true} />;

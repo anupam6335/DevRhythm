@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -82,6 +84,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const isActive = (href: string) => pathname === href;
+
+  // Build login URL with returnTo parameter (only if not already on login)
+  const loginHref = pathname && !pathname.startsWith('/login')
+    ? `/login?returnTo=${encodeURIComponent(pathname)}`
+    : '/login';
 
   // Desktop navigation
   if (!isMobile) {
@@ -219,7 +226,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
-              <Link href={ROUTES.LOGIN} className={styles.loginLink}>
+              <Link href={loginHref} className={styles.loginLink}>
                 Login
               </Link>
             )}
@@ -267,7 +274,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               ) : (
                 <Link
-                  href={ROUTES.LOGIN}
+                  href={loginHref}
                   className={styles.drawerLoginLink}
                   onClick={() => setIsDrawerOpen(false)}
                 >
@@ -386,9 +393,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </Link>
 
           <Link
-            href={user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN}
+            href={user ? ROUTES.USER_PROFILE.OWN(user.username) : loginHref}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.USER_PROFILE.OWN(user?.username || '')) && styles.active)}
             aria-label={user ? 'Profile' : 'Login'}
+            onClick={() => setIsDrawerOpen(false)}
           >
             {user ? (
               <Avatar src={user.avatarUrl} name={user.displayName || user.username} size="xs" />

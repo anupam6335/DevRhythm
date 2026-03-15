@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from '@/features/auth/hooks/useSession';
 import { OAuthButtons } from '@/features/auth/components/OAuthButtons';
 import { RotatingQuote } from '@/features/auth/components/RotatingQuote';
@@ -10,12 +10,26 @@ import styles from './LoginPageWrapper.module.css';
 export default function LoginPageWrapper() {
   const { login, isLoading, isAuthenticated } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard');
+    // Priority: query param > existing localStorage (but avoid overwriting valid returnTo)
+    const returnToFromQuery = searchParams.get('returnTo');
+    if (returnToFromQuery && returnToFromQuery !== '/login' && returnToFromQuery !== '/') {
+      localStorage.setItem('returnTo', returnToFromQuery);
     }
-  }, [isAuthenticated, router]);
+
+    if (isAuthenticated) {
+      const returnTo = localStorage.getItem('returnTo');
+      if (returnTo && returnTo !== '/login' && returnTo !== '/') {
+        localStorage.removeItem('returnTo');
+        router.push(returnTo);
+      } else {
+        localStorage.removeItem('returnTo');
+        router.push('/dashboard');
+      }
+    }
+  }, [isAuthenticated, router, searchParams]);
 
   const handleGoogleLogin = () => login('google');
   const handleGitHubLogin = () => login('github');
@@ -48,7 +62,6 @@ export default function LoginPageWrapper() {
         </div>
       </div>
 
-      {/* Capillary waves – now generated with a loop (DRY) */}
       <div className={styles.capillaryBackground} aria-hidden="true">
         {Array.from({ length: 10 }, (_, i) => (
           <div key={i} className={styles.capillaryRing} />

@@ -27,15 +27,35 @@ export const useSession = () => {
   });
 
   const login = (provider: 'google' | 'github') => {
-    // Store the intended return path
-    const returnTo = localStorage.getItem('returnTo') || '/dashboard';
-    localStorage.setItem('returnTo', returnTo);
+    // Store the intended return path, but avoid storing /login or /
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname + window.location.search + window.location.hash;
+      const existingReturnTo = localStorage.getItem('returnTo');
+      
+      // Only set a new returnTo if:
+      // 1. There's no existing valid returnTo, or
+      // 2. The existing one is /login or /, and current path is not /login
+      if (!existingReturnTo || existingReturnTo === '/login' || existingReturnTo === '/') {
+        if (!currentPath.startsWith('/login') && currentPath !== '/') {
+          localStorage.setItem('returnTo', currentPath);
+        }
+      }
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     const redirectUri = `${window.location.origin}/auth/callback`;
     window.location.href = `${baseUrl}/auth/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}`;
   };
 
   const logout = async () => {
+    // Store current path before redirecting to login (except if it's login itself)
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname + window.location.search + window.location.hash;
+      if (!currentPath.startsWith('/login')) {
+        localStorage.setItem('returnTo', currentPath);
+      }
+    }
+
     try {
       await apiClient.post('/auth/logout');
     } catch (err) {
