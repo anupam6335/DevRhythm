@@ -11,8 +11,6 @@ const { getStartOfDay, parseDate } = require('../../utils/helpers/date');
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
-
-  // Convert solvedAt to Date object
   const solvedDate = parseDate(solvedAt);
   if (isNaN(solvedDate.getTime())) {
     throw new Error(`Invalid solvedAt date: ${solvedAt}`);
@@ -31,21 +29,25 @@ const handleQuestionSolved = async (job) => {
     user.stats.totalSolved += 1;
     user.stats.totalTimeSpent += timeSpent;
 
-    // Simple mastery rate: percentage of total questions solved (temporary)
     const totalQuestions = await Question.countDocuments();
-    user.stats.masteryRate = totalQuestions > 0 ? (user.stats.totalSolved / totalQuestions) * 100 : 0;
+    let rawMasteryRate = totalQuestions > 0 ? (user.stats.totalSolved / totalQuestions) * 100 : 0;
+    if (rawMasteryRate > 100) {
+      console.warn(
+        `[question.solved] Mastery rate capped for user ${userId}: ` +
+        `raw ${rawMasteryRate} > 100 (totalSolved=${user.stats.totalSolved}, totalQuestions=${totalQuestions})`
+      );
+      rawMasteryRate = 100;
+    }
+    user.stats.masteryRate = rawMasteryRate;
 
-    // Update active days and streak
     const today = new Date();
     const todayStr = today.toDateString();
     const lastActive = user.streak.lastActiveDate ? new Date(user.streak.lastActiveDate).toDateString() : null;
     if (!lastActive) {
-      // First activity
       user.streak.current = 1;
       user.streak.longest = 1;
       user.stats.activeDays = 1;
     } else if (lastActive !== todayStr) {
-      // Check if yesterday
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       if (lastActive === yesterday.toDateString()) {
@@ -62,36 +64,50 @@ const handleQuestionSolved = async (job) => {
     await invalidateUserCache(userId);
     console.log(`[question.solved] User stats updated for ${userId}`);
 
-    // --- 2. Update PatternMastery ---
-    if (question.pattern) {
-      let pattern = await PatternMastery.findOne({ userId, patternName: question.pattern });
-      if (!pattern) {
-        pattern = new PatternMastery({ userId, patternName: question.pattern });
+    // --- 2. Update PatternMastery for each pattern ---
+    if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
+      for (const patternName of question.pattern) {
+        let pattern = await PatternMastery.findOne({ userId, patternName });
+        if (!pattern) {
+          pattern = new PatternMastery({
+            userId,
+            patternName,
+            title: patternName,
+            description: `Problems using the ${patternName} pattern`,
+          });
+        } else {
+          // Ensure existing documents have required fields
+          if (!pattern.title) pattern.title = patternName;
+          if (!pattern.description) pattern.description = `Problems using the ${patternName} pattern`;
+        }
+
+        pattern.solvedCount += 1;
+        pattern.totalAttempts += 1;
+        pattern.successfulAttempts += 1;
+        pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
+        const totalPatternQuestions = await Question.countDocuments({ pattern: patternName });
+        pattern.masteryRate = totalPatternQuestions > 0 ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100) : 0;
+        pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
+        pattern.lastPracticed = solvedDate;
+        pattern.lastUpdated = new Date();
+
+        pattern.recentQuestions.unshift({
+          questionProgressId: progressId,
+          questionId,
+          title: question.title,
+          problemLink: question.problemLink,
+          platform: question.platform,
+          difficulty: question.difficulty,
+          solvedAt: solvedDate,
+          status: 'Solved',
+          timeSpent,
+        });
+        if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
+
+        await pattern.save();
       }
-      pattern.solvedCount += 1;
-      pattern.totalAttempts += 1;
-      pattern.successfulAttempts += 1;
-      pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
-      const totalPatternQuestions = await Question.countDocuments({ pattern: question.pattern });
-      pattern.masteryRate = totalPatternQuestions > 0 ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100) : 0;
-      pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
-      pattern.lastPracticed = solvedDate;
-      pattern.lastUpdated = new Date();
-      pattern.recentQuestions.unshift({
-        questionProgressId: progressId,
-        questionId,
-        title: question.title,
-        problemLink: question.problemLink,
-        platform: question.platform,
-        difficulty: question.difficulty,
-        solvedAt: solvedDate,
-        status: 'Solved',
-        timeSpent,
-      });
-      if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
-      await pattern.save();
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
-      console.log(`[question.solved] Pattern mastery updated for ${question.pattern}`);
+      console.log(`[question.solved] Pattern mastery updated for patterns: ${question.pattern.join(', ')}`);
     }
 
     // --- 3. Update RevisionSchedule ---
@@ -145,7 +161,7 @@ const handleQuestionSolved = async (job) => {
       userId,
       action: 'question_solved',
       targetId: questionId,
-      targetType: 'Question',
+      targetModel: 'Question',
       metadata: {
         title: question.title,
         difficulty: question.difficulty,
@@ -153,7 +169,7 @@ const handleQuestionSolved = async (job) => {
         pattern: question.pattern,
         timeSpent,
       },
-      createdAt: solvedDate,
+      timestamp: solvedDate,
     });
 
     // --- 6. Update HeatmapData ---
@@ -173,7 +189,25 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
-    // --- 7. Milestone Notification ---
+    // --- 7. In-app notification for this solved question ---
+    await Notification.create({
+      userId,
+      type: 'question_solved',
+      title: 'Problem Solved!',
+      message: `You solved "${question.title}"`,
+      data: {
+        questionId,
+        title: question.title,
+        difficulty: question.difficulty,
+        platform: question.platform,
+        timeSpent,
+      },
+      channel: 'in-app',
+      status: 'sent',
+      scheduledAt: new Date(),
+    });
+
+    // --- 8. Milestone Notification ---
     const solvedCount = user.stats.totalSolved;
     const milestones = [1, 10, 25, 50, 100, 250, 500, 1000];
     if (milestones.includes(solvedCount)) {
@@ -183,17 +217,17 @@ const handleQuestionSolved = async (job) => {
         title: 'Milestone Achieved!',
         message: `Congratulations! You've solved ${solvedCount} problems.`,
         data: { milestone: solvedCount },
-        channel: 'both',
-        status: 'pending',
+        channel: 'in-app',
+        status: 'sent',
         scheduledAt: new Date(),
       });
-      await invalidateCache(`notifications:${userId}:*`);
     }
 
+    await invalidateCache(`notifications:*:user:${userId}:*`);
     console.log(`[question.solved] Completed successfully for user ${userId}`);
   } catch (error) {
     console.error(`[question.solved] Error processing for user ${userId}:`, error);
-    throw error; // Bull will retry the job
+    throw error;
   }
 };
 

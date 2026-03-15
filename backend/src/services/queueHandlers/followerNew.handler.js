@@ -20,7 +20,7 @@ const handleFollowerNew = async (job) => {
         title: 'New Follower',
         message: `${follower.displayName || follower.username} started following you`,
         data: { followerId, followerName: follower.username },
-        channel: 'both',
+        channel: 'in-app',
         status: 'pending',
         scheduledAt: new Date(),
       });

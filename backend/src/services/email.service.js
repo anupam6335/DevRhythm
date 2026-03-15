@@ -1,54 +1,68 @@
-const nodemailer = require('nodemailer');
 const config = require('../config');
+const EmailProviderFactory = require('./email/providers/provider.factory');
 
-// Gmail transporter (replaceable)
-let transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD, // App password for Gmail
-  },
-});
+let provider = null;
 
-// Generic send function
+const getProvider = () => {
+  if (!provider) {
+    provider = EmailProviderFactory.createProvider();
+  }
+  return provider;
+};
+
+/**
+ * Send a single email (used by batch sender)
+ */
 const sendEmail = async ({ to, subject, html, text }) => {
+  const from = {
+    email: config.email.fromAddress,
+    name: config.email.fromName,
+  };
+  return getProvider().sendEmail({ to, subject, html, text, from });
+};
+
+/**
+ * Send a consolidated email containing multiple notifications for a user
+ * @param {string} userId - user ID
+ * @param {Array} notifications - array of notification objects (from DB)
+ */
+const sendBatchEmail = async (userId, notifications) => {
+  if (!notifications || notifications.length === 0) return;
+
+  // Fetch user email (assuming we have userId)
+  const User = require('../models/User');
+  const user = await User.findById(userId).select('email displayName preferences');
+  if (!user || !user.email) return;
+
+  // Respect user's email preferences (already filtered in query)
+
+  // Build email content
+  const subject = `Your DevRhythm Digest (${new Date().toLocaleDateString()})`;
+
+  let html = `<h2>Hello ${user.displayName || user.username},</h2>`;
+  html += '<p>Here are your recent notifications:</p><ul>';
+
+  notifications.forEach(notif => {
+    html += `<li><strong>${notif.title}</strong>: ${notif.message}</li>`;
+  });
+
+  html += '</ul><p>Check your dashboard for details.</p>';
+
+  const text = notifications.map(n => `${n.title}: ${n.message}`).join('\n');
+
   try {
-    const mailOptions = {
-      from: process.env.GMAIL_USER,
-      to,
-      subject,
-      html,
-      text,
-    };
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
-    return info;
+    await sendEmail({ to: user.email, subject, html, text });
+    console.log(`Batch email sent to user ${userId} with ${notifications.length} notifications`);
   } catch (error) {
-    console.error('Email send error:', error);
+    console.error(`Batch email failed for user ${userId}:`, error);
     throw error;
   }
 };
 
-// Notification-specific email builder
+// Keep sendNotificationEmail for backward compatibility but mark as deprecated
 const sendNotificationEmail = async (userId, notification) => {
-  const user = await User.findById(userId).select('email displayName preferences');
-  if (!user || !user.preferences?.notifications?.email) return;
-
-  let subject, html;
-  switch (notification.type) {
-    case 'revision_reminder_daily':
-      subject = 'Daily Revision Reminder';
-      html = `<p>You have pending revisions for today. Check your dashboard.</p>`;
-      break;
-    case 'goal_completion':
-      subject = 'Goal Achieved!';
-      html = `<p>${notification.message}</p>`;
-      break;
-    // ... other types
-    default:
-      return;
-  }
-  await sendEmail({ to: user.email, subject, html });
+  console.warn('sendNotificationEmail is deprecated; use batching instead');
+  await sendBatchEmail(userId, [notification]);
 };
 
-module.exports = { sendEmail, sendNotificationEmail };
+module.exports = { sendEmail, sendBatchEmail, sendNotificationEmail };
