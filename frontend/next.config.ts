@@ -1,23 +1,21 @@
 import type { NextConfig } from 'next';
+import withBundleAnalyzer from '@next/bundle-analyzer';
+
+const bundleAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for optimized Vercel deployment
   output: 'standalone',
-
-  // Configure allowed image domains for external avatars
   images: {
     domains: [
-      'lh3.googleusercontent.com',   // Google avatars
-      'avatars.githubusercontent.com', // GitHub avatars
-      'res.cloudinary.com',           // Cloudinary (if used)
+      'lh3.googleusercontent.com',
+      'avatars.githubusercontent.com',
+      'res.cloudinary.com',
     ],
   },
-
-  // Optional: Enable React strict mode for development
   reactStrictMode: true,
-
-  // Optional: Disable x-powered-by header for security
   poweredByHeader: false,
 };
 
-export default nextConfig;
+export default bundleAnalyzer(nextConfig);

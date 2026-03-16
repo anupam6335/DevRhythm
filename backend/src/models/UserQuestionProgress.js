@@ -16,6 +16,11 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     enum: ['Easy', 'Medium', 'Hard'],
     required: false,
   },
+  personalContentRef: {
+    type: String,
+    trime: true,
+    required: false,
+  },
   status: {
     type: String,
     enum: ["Not Started", "Attempted", "Solved", "Mastered"],

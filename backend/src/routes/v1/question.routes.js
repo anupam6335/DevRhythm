@@ -6,6 +6,25 @@ const validate = require('../../middleware/validator');
 const { questionValidator } = require('../../utils/validators');
 const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
+const Joi = require('joi');
+
+router.get('/search-leetcode',
+  auth,
+  rateLimiters.createMemoryLimiter(60 * 1000, 10),
+  validate(Joi.object({ 
+    q: Joi.string().min(2).required(),
+    type: Joi.string().valid('name', 'tag').default('name')
+  }), 'query'),
+  questionController.searchLeetCodeQuestions
+);
+
+// POST /questions/fetch-leetcode
+router.post('/fetch-leetcode',
+  auth,
+  rateLimiters.createMemoryLimiter(60 * 1000, 10),
+  validate(Joi.object({ url: Joi.string().uri().required() })),
+  questionController.fetchLeetCodeQuestion
+);
 
 router.get('/', auth, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
 router.get('/patterns', auth, cache(1800, 'questions:patterns'), questionController.getPatterns);
@@ -14,7 +33,15 @@ router.get('/statistics', auth, cache(3600, 'questions:statistics'), questionCon
 router.get('/deleted', auth, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
 router.get('/:id', auth, cache(3600, 'question'), validate(questionValidator.getQuestionById, 'params'), questionController.getQuestionById);
 router.get('/platform/:platform/:platformQuestionId', auth, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
-router.get('/similar/:id', auth, cache(3600, 'question:similar'), validate(questionValidator.getSimilarQuestions, 'params'), questionController.getSimilarQuestions);
+
+router.get('/similar/:id',
+  auth,
+  cache(3600, 'question:similar'),
+  validate(questionValidator.getSimilarQuestions, 'params'),
+  validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'), // new line
+  questionController.getSimilarQuestions
+);
+
 router.post('/', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.createQuestion), questionController.createQuestion);
 router.put('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.updateQuestion), questionController.updateQuestion);
 router.delete('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.deleteQuestion, 'params'), questionController.deleteQuestion);

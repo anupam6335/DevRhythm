@@ -158,7 +158,8 @@ const createOrUpdateProgress = Joi.object({
   }),
   confidenceLevel: Joi.number().integer().min(1).max(5),
   timeSpent: Joi.number().integer().min(0).max(480),
-  personalDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard').optional()
+  personalDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard').optional(),
+  personalContentRef: Joi.string().uri().allow('').optional(),
 });
 
 const updateStatus = Joi.object({
