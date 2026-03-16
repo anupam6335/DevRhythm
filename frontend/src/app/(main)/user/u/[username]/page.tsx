@@ -1,40 +1,46 @@
-'use client';
-
-import { use } from 'react';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { getCurrentUser } from '@/features/auth/server/getCurrentUser';
 import { UserPageWrapper } from '@/features/user/components';
-import SkeletonLoader from '@/shared/components/SkeletonLoader';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { SITE_NAME, SITE_URL } from '@/shared/config/seo';
 
-export default function OwnUserPage({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = use(params);
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
+  const user = await getCurrentUser();
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isLoading, router]);
-
-  useEffect(() => {
-    // After user is loaded, check if the URL username matches
-    if (!isLoading && user && user.username !== username) {
-      router.replace(`/user/${user.username}`);
-    }
-  }, [isLoading, user, username, router]);
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: '2rem' }}>
-        <SkeletonLoader variant="user-card" count={3} />
-      </div>
-    );
+  // If authenticated and the URL username matches the logged-in user's username
+  if (user && user.username === username) {
+    return {
+      title: `${user.displayName} (@${user.username}) · My Profile · ${SITE_NAME}`,
+      robots: 'noindex, nofollow', // Private page – do not index
+      alternates: {
+        canonical: `${SITE_URL}/user/u/${username}`,
+      },
+    };
   }
 
+  // Fallback (will likely be redirected, but just in case)
+  return {
+    title: `My Profile · ${SITE_NAME}`,
+    robots: 'noindex, nofollow',
+    alternates: {
+      canonical: `${SITE_URL}/user/u/${username}`,
+    },
+  };
+}
+
+export default async function OwnUserPage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  const user = await getCurrentUser();
+
+  // Not authenticated → redirect to login
   if (!user) {
-    return null; // will redirect
+    redirect('/login');
+  }
+
+  // Username mismatch → redirect to correct own profile URL
+  if (user.username !== username) {
+    redirect(`/user/u/${user.username}`);
   }
 
   return <UserPageWrapper user={user} isOwnProfile={true} />;

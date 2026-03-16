@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FiBookOpen, FiClock, FiRefreshCw } from 'react-icons/fi';
@@ -22,6 +24,7 @@ export interface QuestionsListProps {
   userId?: string;
   isOwnProfile?: boolean;
   limit?: number;
+  initialProgress?: PublicProgressItem[]; // server‑fetched data for public profiles
 }
 
 // Unified type
@@ -69,6 +72,7 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
   userId,
   isOwnProfile = false,
   limit = 6,
+  initialProgress,
 }) => {
   const queryKey = isOwnProfile
     ? progressKeys.list({
@@ -100,10 +104,12 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
   const { data, isLoading, isFetching, error } = useQuery<ProgressItem[]>({
     queryKey,
     queryFn,
-    enabled: isOwnProfile ? true : !!userId,
+    // Disable query if we already have initial data for public profile
+    enabled: (isOwnProfile ? true : !!userId) && !(initialProgress && !isOwnProfile),
+    // For public profile, use initialData as starting point
+    initialData: !isOwnProfile ? initialProgress : undefined,
     staleTime: 5 * 60 * 1000,
   });
-
 
   const showSkeleton = isLoading || (isFetching && !data);
 
@@ -112,7 +118,6 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
     (item: ProgressItem): Date => {
       if (isOwnProfile) {
         const ownItem = item as UserQuestionProgress;
-        // Prefer attempts.solvedAt, fallback to updatedAt
         const dateStr = ownItem.attempts?.solvedAt || ownItem.updatedAt;
         return safeParseDate(dateStr) || new Date(0);
       } else {
@@ -174,7 +179,6 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
           className={styles.viewAll}
         >
           View All →
-          
         </Link>
       </div>
       <div className={styles.timeline}>

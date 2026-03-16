@@ -26,9 +26,15 @@ export const AuthCallbackHandler: React.FC = () => {
     if (token && refreshToken && userId) {
       tokenStorage.setTokens(token, refreshToken, userId);
       refetch().then(() => {
-        const returnTo = localStorage.getItem('returnTo') || '/dashboard';
-        localStorage.removeItem('returnTo');
-        router.push(returnTo);
+        const returnTo = localStorage.getItem('returnTo');
+        // Avoid redirecting to login or home
+        if (returnTo && returnTo !== '/login' && returnTo !== '/') {
+          localStorage.removeItem('returnTo');
+          router.push(returnTo);
+        } else {
+          localStorage.removeItem('returnTo');
+          router.push('/dashboard');
+        }
       });
     } else {
       setError('Invalid authentication response');

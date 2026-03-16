@@ -49,5 +49,14 @@ export const heatmapService = {
     const query = format ? `?format=${format}` : '';
     const response = await apiClient.get(`/heatmap/export/${exportId}${query}`, { responseType: 'blob' });
     return response.data;
+  },
+
+  /**
+   * Get public heatmap data for a user (no authentication required)
+  */
+  async getPublicUserHeatmap(userId: string, year: number, params?: { simple?: boolean }): Promise<HeatmapData> {
+    const query = buildQueryString(params || {});
+    const response = await apiClient.get<HeatmapData>(`/users/${userId}/heatmap/${year}${query}`);
+    return response.data;
   }
 };
