@@ -17,6 +17,24 @@ export const questionService = {
     return response.data;
   },
 
+  async fetchLeetCodeQuestion(url: string): Promise<{ title: string; difficulty: string; tags: string[]; link: string }> {
+    const response = await apiClient.post<{ title: string; difficulty: string; tags: string[]; link: string }>(
+        '/questions/fetch-leetcode',
+        { url }
+      );
+      return response.data;
+  },
+
+  async searchLeetCodeQuestions(
+    query: string,
+    type: 'name' | 'tag' = 'name'
+  ): Promise<{ results: Array<{ title: string; slug: string; difficulty: string; tags: string[]; url: string }> }> {
+    const response = await apiClient.get('/questions/search-leetcode', {
+      params: { q: query, type }
+    });
+    return response.data;
+  },
+
   async getQuestionById(id: string) {
     const response = await apiClient.get<{ question: Question }>(`/questions/${id}`);
     return response.data.question;

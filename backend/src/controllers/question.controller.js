@@ -3,6 +3,51 @@ const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
+const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
+
+// generate a pattern name from tags
+const generatePatternFromTags = (tags) => {
+  if (!tags || tags.length === 0) return '';
+  // Use the first tag, capitalize first letter
+  const firstTag = tags[0];
+  return firstTag.charAt(0).toUpperCase() + firstTag.slice(1);
+};
+
+/**
+ * POST /api/v1/questions/fetch-leetcode
+ * Body: { url: "https://leetcode.com/problems/..." }
+ * Returns { title, difficulty, tags, link } if found.
+ */
+const fetchLeetCodeQuestion = async (req, res, next) => {
+  try {
+    const { url } = req.body;
+    if (!url) throw new AppError('URL is required', 400);
+
+    const details = await fetchProblemDetails(url);
+    res.json(formatResponse('Problem fetched from LeetCode', details));
+  } catch (error) {
+    // Let the error handler format the response
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/questions/search-leetcode?q=three%20sum&type=name
+ * GET /api/v1/questions/search-leetcode?q=binary%20search&type=tag
+ */
+const searchLeetCodeQuestions = async (req, res, next) => {
+  try {
+    const { q, type = 'name' } = req.query;
+    if (!q || q.length < 2) {
+      throw new AppError('Search query must be at least 2 characters', 400);
+    }
+
+    const results = await searchProblems(q, type);
+    res.json(formatResponse('LeetCode search results', { results }));
+  } catch (error) {
+    next(error);
+  }
+};
 
 const getQuestions = async (req, res, next) => {
   try {
@@ -35,9 +80,17 @@ const createQuestion = async (req, res, next) => {
     const existing = await Question.findOne({ platform: req.body.platform, platformQuestionId: req.body.platformQuestionId });
     if (existing) throw new AppError('Question with same platform and ID already exists', 409);
 
-    // Normalize pattern to array if it's a string
-    if (req.body.pattern && !Array.isArray(req.body.pattern)) {
-      req.body.pattern = [req.body.pattern];
+    // Auto‑generate pattern if not provided
+    let { pattern, tags } = req.body;
+    if (!pattern || pattern === '') {
+      pattern = generatePatternFromTags(tags || []);
+    }
+
+    // Normalize pattern to array (existing logic)
+    if (pattern && !Array.isArray(pattern)) {
+      req.body.pattern = [pattern];
+    } else {
+      req.body.pattern = pattern; // may be undefined or array
     }
 
     const question = await Question.create(req.body);
@@ -128,13 +181,127 @@ const getQuestionByPlatformId = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+/**
+ * GET /api/v1/questions/similar/:id?limit=10
+ * Returns questions similar to the given one based on pattern, tags, and title.
+ */
 const getSimilarQuestions = async (req, res, next) => {
   try {
-    const question = await Question.findById(req.params.id).select('similarQuestions');
-    if (!question) throw new AppError('Question not found', 404);
-    const similar = await Question.find({ _id: { $in: question.similarQuestions }, isActive: true }).select('_id title problemLink platform difficulty tags pattern');
+    const targetId = req.params.id;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const target = await Question.findById(targetId).select('pattern tags title');
+    if (!target) throw new AppError('Question not found', 404);
+
+    // Normalize target patterns to array
+    let targetPatterns = target.pattern || [];
+    if (!Array.isArray(targetPatterns)) targetPatterns = [targetPatterns];
+
+    // Build pre‑filter: at least one matching pattern or tag OR text search relevance
+    const filterConditions = [
+      { $text: { $search: target.title } } // always include text search
+    ];
+
+    // If there are patterns, add pattern overlap condition
+    if (targetPatterns.length > 0) {
+      filterConditions.push({ pattern: { $in: targetPatterns } });
+    }
+
+    // If there are tags, add tag overlap condition
+    if (target.tags && target.tags.length > 0) {
+      filterConditions.push({ tags: { $in: target.tags } });
+    }
+
+    const similar = await Question.aggregate([
+      {
+        $match: {
+          _id: { $ne: target._id },
+          isActive: true,
+          $or: filterConditions
+        }
+      },
+      {
+        $addFields: {
+          textScore: { $meta: 'textScore' },
+          // pattern array conversion (same as before)
+          patternArray: {
+            $cond: {
+              if: { $isArray: "$pattern" },
+              then: "$pattern",
+              else: {
+                $cond: {
+                  if: { $eq: [{ $type: "$pattern" }, "string"] },
+                  then: ["$pattern"],
+                  else: []
+                }
+              }
+            }
+          },
+          tagsArray: {
+            $cond: {
+              if: { $isArray: "$tags" },
+              then: "$tags",
+              else: {
+                $cond: {
+                  if: { $eq: [{ $type: "$tags" }, "string"] },
+                  then: ["$tags"],
+                  else: []
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          patternScore: {
+            $cond: {
+              if: {
+                $gt: [
+                  { $size: { $setIntersection: ["$patternArray", targetPatterns] } },
+                  0
+                ]
+              },
+              then: 100,
+              else: 0
+            }
+          },
+          tagOverlap: {
+            $size: { $setIntersection: ["$tagsArray", target.tags || []] }
+          }
+        }
+      },
+      {
+        $addFields: {
+          totalScore: {
+            $add: [
+              { $ifNull: ['$textScore', 0] },
+              { $multiply: ['$tagOverlap', 10] },
+              '$patternScore'
+            ]
+          }
+        }
+      },
+      { $sort: { totalScore: -1 } },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          problemLink: 1,
+          platform: 1,
+          difficulty: 1,
+          tags: 1,
+          pattern: 1,
+          totalScore: 1
+        }
+      }
+    ]);
+
     res.json(formatResponse('Similar questions retrieved successfully', { similarQuestions: similar }));
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getPatterns = async (req, res, next) => {
@@ -190,4 +357,6 @@ module.exports = {
   getPatterns,
   getTags,
   getStatistics,
+  fetchLeetCodeQuestion,
+  searchLeetCodeQuestions,
 };

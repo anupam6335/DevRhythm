@@ -88,6 +88,7 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
     if (confidenceLevel) updateData.confidenceLevel = confidenceLevel;
     if (req.body.personalDifficulty !== undefined) updateData.personalDifficulty = req.body.personalDifficulty;
+    if (req.body.personalContentRef !== undefined) updateData.personalContentRef = req.body.personalContentRef;
 
     // If status is being set to Solved and it wasn't Solved before, set solvedAt
     if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {

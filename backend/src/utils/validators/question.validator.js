@@ -23,9 +23,9 @@ const createQuestion = Joi.object({
   tags: Joi.array().items(Joi.string().trim()).default([]),
   // pattern can be string or array of strings
   pattern: Joi.alternatives().try(
-    Joi.string().trim(),
+    Joi.string().trim().allow(''),
     Joi.array().items(Joi.string().trim())
-  ).default(''),
+  ).optional(),
   solutionLinks: Joi.array().items(Joi.string().uri()).default([]),
   similarQuestions: Joi.array().items(Joi.string().hex().length(24)).default([]),
   contentRef: Joi.string().uri().allow(''),
