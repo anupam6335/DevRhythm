@@ -25,9 +25,12 @@ export const questionService = {
       return response.data;
   },
 
-  async searchLeetCodeQuestions(query: string): Promise<{ results: Array<{ title: string; slug: string; difficulty: string; tags: string[]; url: string }> }> {
+  async searchLeetCodeQuestions(
+    query: string,
+    type: 'name' | 'tag' = 'name'
+  ): Promise<{ results: Array<{ title: string; slug: string; difficulty: string; tags: string[]; url: string }> }> {
     const response = await apiClient.get('/questions/search-leetcode', {
-      params: { q: query }
+      params: { q: query, type }
     });
     return response.data;
   },

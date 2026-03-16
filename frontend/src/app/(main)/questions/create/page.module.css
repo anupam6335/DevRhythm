@@ -30,7 +30,6 @@
   display: block;
 }
 
-
 .resultList {
   list-style: none;
   margin-top: 1rem;
@@ -79,4 +78,17 @@
   margin-top: 1rem;
   color: var(--text-muted);
   font-style: italic;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.radioLabel input[type="radio"] {
+  accent-color: var(--accent-moss);
 }

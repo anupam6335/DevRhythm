@@ -190,29 +190,40 @@ const getSimilarQuestions = async (req, res, next) => {
     const targetId = req.params.id;
     const limit = parseInt(req.query.limit) || 10;
 
-    // Fetch the target question
     const target = await Question.findById(targetId).select('pattern tags title');
     if (!target) throw new AppError('Question not found', 404);
 
-    // Ensure target's pattern is an array (it may be a string)
+    // Normalize target patterns to array
     let targetPatterns = target.pattern || [];
-    if (!Array.isArray(targetPatterns)) {
-      targetPatterns = [targetPatterns];
+    if (!Array.isArray(targetPatterns)) targetPatterns = [targetPatterns];
+
+    // Build pre‑filter: at least one matching pattern or tag OR text search relevance
+    const filterConditions = [
+      { $text: { $search: target.title } } // always include text search
+    ];
+
+    // If there are patterns, add pattern overlap condition
+    if (targetPatterns.length > 0) {
+      filterConditions.push({ pattern: { $in: targetPatterns } });
     }
 
-    // Build the aggregation pipeline
+    // If there are tags, add tag overlap condition
+    if (target.tags && target.tags.length > 0) {
+      filterConditions.push({ tags: { $in: target.tags } });
+    }
+
     const similar = await Question.aggregate([
       {
         $match: {
           _id: { $ne: target._id },
           isActive: true,
-          $text: { $search: target.title }
+          $or: filterConditions
         }
       },
       {
         $addFields: {
           textScore: { $meta: 'textScore' },
-          // Convert pattern to array if it's a string
+          // pattern array conversion (same as before)
           patternArray: {
             $cond: {
               if: { $isArray: "$pattern" },
@@ -226,7 +237,6 @@ const getSimilarQuestions = async (req, res, next) => {
               }
             }
           },
-          // Convert tags to array if it's a string (though tags should always be array)
           tagsArray: {
             $cond: {
               if: { $isArray: "$tags" },
@@ -244,7 +254,6 @@ const getSimilarQuestions = async (req, res, next) => {
       },
       {
         $addFields: {
-          // patternScore: 100 if any pattern overlaps
           patternScore: {
             $cond: {
               if: {
@@ -257,7 +266,6 @@ const getSimilarQuestions = async (req, res, next) => {
               else: 0
             }
           },
-          // tagOverlap: number of common tags
           tagOverlap: {
             $size: { $setIntersection: ["$tagsArray", target.tags || []] }
           }
@@ -267,7 +275,7 @@ const getSimilarQuestions = async (req, res, next) => {
         $addFields: {
           totalScore: {
             $add: [
-              '$textScore',
+              { $ifNull: ['$textScore', 0] },
               { $multiply: ['$tagOverlap', 10] },
               '$patternScore'
             ]
@@ -285,7 +293,7 @@ const getSimilarQuestions = async (req, res, next) => {
           difficulty: 1,
           tags: 1,
           pattern: 1,
-          totalScore: 1  // can be removed if not needed
+          totalScore: 1
         }
       }
     ]);

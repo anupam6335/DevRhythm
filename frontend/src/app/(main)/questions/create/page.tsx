@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { useDebounceValue } from '@/shared/hooks/useDebounce';
 import { questionService } from '@/features/question/services/questionService';
 import { toast } from '@/shared/components/Toast';
@@ -38,15 +39,33 @@ interface LeetCodeSearchResult {
   url: string;
 }
 
+interface SearchResponse {
+  results: LeetCodeSearchResult[];
+}
+
 export default function CreateQuestionPage() {
   const router = useRouter();
   const [step, setStep] = useState<'search' | 'form'>('search');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<LeetCodeSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [searchType, setSearchType] = useState<'name' | 'tag'>('name');
   const [fetching, setFetching] = useState(false);
 
   const debouncedQuery = useDebounceValue(searchQuery, 500);
+
+  // React Query for search results – caches automatically
+  const {
+    data: searchResponse,
+    isLoading: searching,
+    error: searchError,
+  } = useQuery<SearchResponse>({
+    queryKey: ['leetcode-search', debouncedQuery, searchType],
+    queryFn: () => questionService.searchLeetCodeQuestions(debouncedQuery, searchType),
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 5 * 60 * 1000, // 5 minutes – data considered fresh
+    gcTime: 10 * 60 * 1000,   // 10 minutes cache (formerly cacheTime)
+  });
+
+  const searchResults = searchResponse?.results;
 
   const {
     register,
@@ -62,34 +81,10 @@ export default function CreateQuestionPage() {
     },
   });
 
-  // Search when debounced query changes
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!debouncedQuery || debouncedQuery.length < 2) {
-        setSearchResults([]);
-        return;
-      }
-      setSearching(true);
-      try {
-        const data = await questionService.searchLeetCodeQuestions(debouncedQuery);
-        setSearchResults(data.results);
-      } catch (error: any) {
-        toast.error(error.message || 'Search failed');
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    };
-
-    performSearch();
-  }, [debouncedQuery]);
-
-  // When user selects a result, fetch its details
   const handleSelectResult = async (result: LeetCodeSearchResult) => {
     setFetching(true);
     try {
       const data = await questionService.fetchLeetCodeQuestion(result.url);
-      // Populate form
       setValue('title', data.title);
       setValue('problemLink', data.link);
       setValue('difficulty', data.difficulty as any);
@@ -99,7 +94,6 @@ export default function CreateQuestionPage() {
       toast.success('Problem fetched – complete the remaining details');
     } catch (error: any) {
       toast.error(error.message || 'Could not fetch problem details. Please enter manually.');
-      // Still allow manual entry, keep URL as reference
       setValue('problemLink', result.url);
       setStep('form');
     } finally {
@@ -107,7 +101,6 @@ export default function CreateQuestionPage() {
     }
   };
 
-  // Manual skip to form
   const handleManualEntry = () => {
     setStep('form');
   };
@@ -132,10 +125,33 @@ export default function CreateQuestionPage() {
     return (
       <div className="devRhythmContainer" style={{ maxWidth: 600, margin: '2rem auto' }}>
         <h1>Create a New Question</h1>
-        <p>Search for a LeetCode problem by name, or skip to enter manually.</p>
+        <p>Search for a LeetCode problem by name or pattern, or skip to enter manually.</p>
+
+        {/* Search type toggle */}
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+          <label className={styles.radioLabel}>
+            <input
+              type="radio"
+              value="name"
+              checked={searchType === 'name'}
+              onChange={() => setSearchType('name')}
+            />
+            Search by name
+          </label>
+          <label className={styles.radioLabel}>
+            <input
+              type="radio"
+              value="tag"
+              checked={searchType === 'tag'}
+              onChange={() => setSearchType('tag')}
+            />
+            Search by pattern/tag
+          </label>
+        </div>
+
         <div style={{ marginTop: '1rem' }}>
           <Input
-            placeholder="e.g., three sum"
+            placeholder={searchType === 'name' ? "e.g., three sum" : "e.g., binary search"}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             fullWidth
@@ -146,7 +162,10 @@ export default function CreateQuestionPage() {
               <Loader size="sm" /> Searching...
             </div>
           )}
-          {!searching && searchResults.length > 0 && (
+          {searchError && (
+            <p className={styles.error}>Search failed. Please try again.</p>
+          )}
+          {!searching && searchResults && searchResults.length > 0 && (
             <ul className={styles.resultList}>
               {searchResults.map((result) => (
                 <li
@@ -161,7 +180,7 @@ export default function CreateQuestionPage() {
               ))}
             </ul>
           )}
-          {!searching && debouncedQuery && searchResults.length === 0 && (
+          {!searching && debouncedQuery && searchResults?.length === 0 && (
             <p className={styles.noResults}>No problems found. Try a different query.</p>
           )}
         </div>

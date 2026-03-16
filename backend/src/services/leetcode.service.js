@@ -1,6 +1,8 @@
 const axios = require('axios');
+const { client: redisClient } = require('../config/redis');
 
 const LEETCODE_GRAPHQL_URL = 'https://leetcode.com/graphql';
+const CACHE_TTL = 60 * 60;
 
 /**
  * Convert a user-friendly tag name to a LeetCode tag slug.
@@ -59,11 +61,26 @@ const fetchProblemDetails = async (url) => {
 };
 
 /**
- * Search LeetCode problems by name or tag.
+ * Search LeetCode problems by name or tag, with Redis caching.
  * @param {string} query - The search term.
  * @param {string} filterType - 'name' (default) or 'tag'.
  */
 const searchProblems = async (query, filterType = 'name') => {
+  const cacheKey = `leetcode:search:${filterType}:${query.toLowerCase()}`;
+
+  // Try to get from cache first
+  if (redisClient) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (err) {
+      console.warn('Redis cache read error:', err.message);
+    }
+  }
+
+  // Build filters
   const filters = {};
   if (filterType === 'tag') {
     const tagSlug = slugifyTag(query);
@@ -107,13 +124,20 @@ const searchProblems = async (query, filterType = 'name') => {
     });
 
     const questions = response.data?.data?.problemsetQuestionList?.questions || [];
-    return questions.map(q => ({
+    const results = questions.map(q => ({
       title: q.title,
       slug: q.titleSlug,
       difficulty: q.difficulty,
       tags: q.topicTags.map(t => t.name),
       url: `https://leetcode.com/problems/${q.titleSlug}/`,
     }));
+
+    // Store in cache if we got results
+    if (redisClient && results.length > 0) {
+      await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(results));
+    }
+
+    return results;
   } catch (error) {
     console.error('LeetCode search error:', error.message);
     throw new Error('Failed to search LeetCode');
