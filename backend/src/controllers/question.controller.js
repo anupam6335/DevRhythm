@@ -4,6 +4,7 @@ const { getPaginationParams, paginate } = require('../utils/helpers/pagination')
 const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
+const { applySorting } = require('../utils/helpers/sort');
 
 // generate a pattern name from tags
 const generatePatternFromTags = (tags) => {
@@ -59,12 +60,22 @@ const getQuestions = async (req, res, next) => {
     if (pattern) query.pattern = pattern;
     if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
     if (search) query.$text = { $search: search };
+
+    // Apply sorting with default by createdAt descending
+    let dbQuery = Question.find(query).skip(skip).limit(limit).select('-__v');
+    dbQuery = applySorting(dbQuery, req.query, { createdAt: -1 });
+
     const [questions, total] = await Promise.all([
-      Question.find(query).skip(skip).limit(limit).select('-__v'),
+      dbQuery,
       Question.countDocuments(query)
     ]);
-    res.json(formatResponse('Questions retrieved successfully', { questions }, { pagination: paginate(total, page, limit) }));
-  } catch (error) { next(error); }
+
+    res.json(formatResponse('Questions retrieved successfully', { questions }, {
+      pagination: paginate(total, page, limit)
+    }));
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getQuestionById = async (req, res, next) => {

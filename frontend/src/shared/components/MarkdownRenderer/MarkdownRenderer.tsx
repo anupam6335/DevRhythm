@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import clsx from 'clsx';
 import CodeBlock from '@/shared/components/CodeBlock';
 import styles from './MarkdownRenderer.module.css';
+import Image from 'next/image';
 
 export interface MarkdownRendererProps {
   /**
@@ -122,9 +123,24 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             );
           },
           // Images
-          img: ({ node, alt, src, ...props }) => (
-            <img src={src} alt={alt} className={styles.img} loading="lazy" {...props} />
-          ),
+          img: ({ node, alt, src, ...props }) => {
+            // Ensure src is a valid string; if not, don't render
+            if (!src || typeof src !== 'string') return null;
+            
+            return (
+              <span className={styles.imageWrapper}>
+                <Image
+                  src={src}
+                  alt={alt || ''}
+                  width={800}
+                  height={600}
+                  className={styles.img}
+                  loading="lazy"
+                  unoptimized 
+                />
+              </span>
+            );
+          },
           // Blockquotes
           blockquote: ({ node, ...props }) => (
             <blockquote className={styles.blockquote} {...props} />

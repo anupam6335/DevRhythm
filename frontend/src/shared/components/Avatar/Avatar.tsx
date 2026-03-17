@@ -1,4 +1,5 @@
 import React, { useState, forwardRef } from "react";
+import Image from "next/image";
 import { FaUser } from "react-icons/fa";
 import clsx from "clsx";
 import { extractInitials } from "@/shared/lib";
@@ -8,23 +9,23 @@ export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
 export type AvatarStatus = "online" | "offline" | "busy";
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Image source URL. If not provided, initials are shown. */
   src?: string;
-  /** Alternative text for the image (required if image is present). */
   alt?: string;
-  /** User's name used to generate initials (fallback when no image). */
   name?: string;
-  /** Size of the avatar. */
   size?: AvatarSize;
-  /** Status indicator (bottom‑right dot). */
   status?: AvatarStatus;
-  /** Badge content (e.g., number or icon). If provided, renders a badge. */
   badge?: React.ReactNode;
-  /** If true, applies a focus/selected ring. */
   ring?: boolean;
-  /** Additional class names. */
   className?: string;
 }
+
+const sizeMap = {
+  xs: 32,
+  sm: 40,
+  md: 48,
+  lg: 64,
+  xl: 96,
+};
 
 const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
   (
@@ -42,11 +43,8 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
     ref
   ) => {
     const [imgError, setImgError] = useState(false);
-
-    // Determine if we should render an image
     const shouldShowImage = src && !imgError;
 
-    // Fallback content: initials or default icon
     let fallbackContent: React.ReactNode;
     if (name) {
       fallbackContent = <span className={styles.initials}>{extractInitials(name)}</span>;
@@ -54,7 +52,6 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
       fallbackContent = <FaUser className={styles.defaultIcon} />;
     }
 
-    // Status label for screen readers
     const statusLabel = status
       ? {
           online: "Online",
@@ -63,7 +60,6 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
         }[status]
       : undefined;
 
-    // Badge may need to be announced
     const badgeProps = badge
       ? {
           role: typeof badge === "number" ? "status" : undefined,
@@ -83,11 +79,13 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
         {...rest}
       >
         {shouldShowImage ? (
-          <img
+          <Image
             src={src}
             alt={alt || name || "Avatar"}
             onError={() => setImgError(true)}
             className={styles.image}
+            width={sizeMap[size]}
+            height={sizeMap[size]}
           />
         ) : (
           <div className={styles.fallback}>{fallbackContent}</div>
@@ -114,18 +112,11 @@ Avatar.displayName = "Avatar";
 
 export default Avatar;
 
-// ----------------------------------------------------------------------
-// AvatarGroup Component (stacked avatars)
-// ----------------------------------------------------------------------
-
+// AvatarGroup unchanged
 export interface AvatarGroupProps {
-  /** Array of Avatar components or elements to stack */
   children: React.ReactNode;
-  /** Maximum number of avatars to show (remaining are hidden behind a count) */
   max?: number;
-  /** Size of the extra count avatar (defaults to "md") */
   size?: AvatarSize;
-  /** Additional class name */
   className?: string;
 }
 

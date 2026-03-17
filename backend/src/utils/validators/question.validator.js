@@ -5,9 +5,11 @@ const getQuestions = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
   platform: Joi.string().valid('LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'Other'),
   difficulty: Joi.string().valid('Easy', 'Medium', 'Hard'),
-  pattern: Joi.string().trim(), // query param remains single string
+  pattern: Joi.string().trim(),
   tags: Joi.array().items(Joi.string().trim()).single(),
   search: Joi.string().trim().min(1).max(100),
+  sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'difficulty', 'platform').default('createdAt'),
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
 });
 
 const getQuestionById = Joi.object({

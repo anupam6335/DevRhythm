@@ -15,6 +15,7 @@ import { QuestionFilterSidebar } from './QuestionFilterSidebar';
 import { QuestionFilterDrawer } from './QuestionFilterDrawer';
 import type { Filters } from './QuestionFilterControls';
 import styles from './QuestionsPageClient.module.css';
+import Link from 'next/link';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -23,6 +24,14 @@ const DEFAULT_FILTERS: Filters = {
   pattern: '',
   tags: [],
   sort: 'newest',
+};
+
+// Map frontend sort value to backend parameters
+const sortParamMap: Record<string, { sortBy: string; sortOrder: 'asc' | 'desc' }> = {
+  newest: { sortBy: 'createdAt', sortOrder: 'desc' },
+  oldest: { sortBy: 'createdAt', sortOrder: 'asc' },
+  difficulty: { sortBy: 'difficulty', sortOrder: 'asc' },
+  title: { sortBy: 'title', sortOrder: 'asc' },
 };
 
 const SORT_OPTIONS = [
@@ -37,41 +46,30 @@ export const QuestionsPageClient: React.FC = () => {
   const searchParams = useSearchParams();
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sort, setSort] = useState('newest'); // local sort state
 
-  // Parse URL params into filters (excluding sort)
+  // Parse URL params into filters (including sort)
   const filters = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
+    const sort = params.get('sort') || DEFAULT_FILTERS.sort;
     return {
       search: params.get('search') || DEFAULT_FILTERS.search,
       platform: params.get('platform') || DEFAULT_FILTERS.platform,
       difficulty: params.get('difficulty') || DEFAULT_FILTERS.difficulty,
       pattern: params.get('pattern') || DEFAULT_FILTERS.pattern,
       tags: params.getAll('tags'),
+      sort,
     };
   }, [searchParams]);
 
-  // Combine filters with local sort for child components
-  const filtersWithSort: Filters = useMemo(
-    () => ({
-      ...filters,
-      sort,
-    }),
-    [filters, sort]
-  );
-
-  // Update URL when filters change (debounced search is handled inside SearchBar)
+  // Update URL when filters change
   const updateFilters = (key: keyof Filters, value: any) => {
-    // Do NOT update URL for sort – it's local only
-    if (key === 'sort') {
-      setSort(value);
-      return;
-    }
-
     const params = new URLSearchParams(searchParams.toString());
+    
     if (key === 'tags') {
       params.delete('tags');
       (value as string[]).forEach((tag) => params.append('tags', tag));
+    } else if (key === 'sort') {
+      params.set('sort', value);
     } else {
       if (value && value !== '') {
         params.set(key, value);
@@ -86,14 +84,13 @@ export const QuestionsPageClient: React.FC = () => {
 
   const clearFilters = () => {
     router.push('?page=1');
-    setSort('newest'); // reset local sort
   };
 
   // Pagination
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 10;
 
-  // Build params for useQuestions (exclude sort)
+  // Build params for useQuestions, including sort
   const queryParams = useMemo(() => {
     const params: any = { page, limit };
     if (filters.search) params.search = filters.search;
@@ -101,6 +98,14 @@ export const QuestionsPageClient: React.FC = () => {
     if (filters.difficulty) params.difficulty = filters.difficulty;
     if (filters.pattern) params.pattern = filters.pattern;
     if (filters.tags.length) params.tags = filters.tags;
+
+    // Add sort parameters
+    const sortParams = sortParamMap[filters.sort];
+    if (sortParams) {
+      params.sortBy = sortParams.sortBy;
+      params.sortOrder = sortParams.sortOrder;
+    }
+
     return params;
   }, [page, limit, filters]);
 
@@ -117,30 +122,6 @@ export const QuestionsPageClient: React.FC = () => {
 
   const questions = questionsData?.questions ?? [];
   const pagination = questionsData?.pagination;
-
-  // Client‑side sorting based on local sort state
-  const sortedQuestions = useMemo(() => {
-    if (!questions.length) return [];
-    const sorted = [...questions];
-    switch (sort) {
-      case 'newest':
-        return sorted.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      case 'oldest':
-        return sorted.sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-      case 'difficulty': {
-        const difficultyOrder = { Easy: 1, Medium: 2, Hard: 3 };
-        return sorted.sort((a, b) => difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty]);
-      }
-      case 'title':
-        return sorted.sort((a, b) => a.title.localeCompare(b.title));
-      default:
-        return sorted;
-    }
-  }, [questions, sort]);
 
   // Options for dropdowns
   const platformOptions = useMemo(() => {
@@ -192,7 +173,7 @@ export const QuestionsPageClient: React.FC = () => {
             </Button>
           )}
           <Button asChild size={!isDesktop ? 'sm' : 'md'}>
-            <a href="/questions/create">Create New</a>
+            <Link href="/questions/create">Create New</Link>
           </Button>
         </div>
       </div>
@@ -201,7 +182,7 @@ export const QuestionsPageClient: React.FC = () => {
       {isDesktop ? (
         <div className={styles.desktopLayout}>
           <QuestionFilterSidebar
-            filters={filtersWithSort}
+            filters={filters}
             onFilterChange={updateFilters}
             onClearFilters={clearFilters}
             stats={statsData}
@@ -217,11 +198,12 @@ export const QuestionsPageClient: React.FC = () => {
                 Showing {start}–{end} of {total} questions
               </span>
             </div>
-            <QuestionList questions={sortedQuestions} isLoading={questionsLoading} />
+            <QuestionList questions={questions} isLoading={questionsLoading} />
             {pagination && pagination.pages > 1 && (
               <Pagination
                 currentPage={pagination.page}
                 totalPages={pagination.pages}
+                siblingCount={2}
                 onPageChange={(page) => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', page.toString());
@@ -242,7 +224,7 @@ export const QuestionsPageClient: React.FC = () => {
             </div>
             <div className={styles.sortRow}>
               <select
-                value={sort}
+                value={filters.sort}
                 onChange={(e) => updateFilters('sort', e.target.value)}
                 className={styles.sortSelect}
               >
@@ -254,12 +236,13 @@ export const QuestionsPageClient: React.FC = () => {
               </select>
             </div>
           </div>
-          <QuestionList questions={sortedQuestions} isLoading={questionsLoading} />
+          <QuestionList questions={questions} isLoading={questionsLoading} />
           {pagination && pagination.pages > 1 && (
             <div className={styles.paginationWrapper}>
               <Pagination
                 currentPage={pagination.page}
                 totalPages={pagination.pages}
+                siblingCount={2}
                 onPageChange={(page) => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', page.toString());
@@ -271,7 +254,7 @@ export const QuestionsPageClient: React.FC = () => {
           <QuestionFilterDrawer
             isOpen={drawerOpen}
             onClose={() => setDrawerOpen(false)}
-            filters={filtersWithSort}
+            filters={filters}
             onFilterChange={updateFilters}
             onClearFilters={clearFilters}
             stats={statsData}

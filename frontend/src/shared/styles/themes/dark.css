@@ -38,4 +38,5 @@
   --error: #a33d3d;
   --error-soft: rgba(163, 61, 61, 0.2);
   --error-focus-ring: 0 0 0 3px rgba(163, 61, 61, 0.5);
+  --error-rgb: 163, 61, 61;
 }

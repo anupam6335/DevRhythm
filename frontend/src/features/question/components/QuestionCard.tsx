@@ -7,7 +7,6 @@ import clsx from 'clsx';
 import Card from '@/shared/components/Card';
 import PlatformIcon from '@/shared/components/PlatformIcon';
 import Tooltip from '@/shared/components/Tooltip';
-import { slugify } from '@/shared/lib/stringUtils';
 import type { Question } from '@/shared/types';
 import styles from './QuestionCard.module.css';
 
@@ -17,7 +16,6 @@ interface QuestionCardProps {
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
   const lastUpdated = formatDistanceToNow(new Date(question.updatedAt), { addSuffix: true });
-  const slug = slugify(question.title);
 
   // Tags handling
   const displayedTags = question.tags.slice(0, 3);
@@ -29,7 +27,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
   const remainingPatterns = question.pattern && question.pattern.length > 1 ? question.pattern.slice(1) : [];
 
   return (
-    <Link href={`/questions/${slug}`} className={styles.cardLink}>
+    <Link href={`/questions/${question.platformQuestionId}`} className={styles.cardLink}>
       <Card className={styles.card}>
         <div className={styles.header}>
           <h3 className={styles.title}>{question.title}</h3>

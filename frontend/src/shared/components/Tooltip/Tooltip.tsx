@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useId } from 'react';
+import React, { useState, useRef, useEffect, useId, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import styles from './Tooltip.module.css';
@@ -44,14 +44,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const hideTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Update tooltip position based on trigger element's bounding rect
-  const updatePosition = () => {
+  const updatePosition = useCallback(() => {
     if (!triggerRef.current || !tooltipRef.current) return;
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipRect = tooltipRef.current.getBoundingClientRect();
     let top = 0;
     let left = 0;
 
-    const gap = 8; // space between trigger and tooltip
+    const gap = 8;
 
     switch (placement) {
       case 'top':
@@ -72,7 +72,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
         break;
     }
 
-    // Prevent tooltip from going off‑screen (basic boundary check)
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     if (left + tooltipRect.width > viewportWidth + window.scrollX) {
@@ -89,14 +88,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
 
     setPosition({ top, left });
-  };
+  }, [placement]);
 
   useEffect(() => {
     if (visible && !disabled) {
       if (hideTimeout.current) clearTimeout(hideTimeout.current);
       showTimeout.current = setTimeout(() => {
         setDelayedVisible(true);
-        // Wait for tooltip to be rendered before measuring
         requestAnimationFrame(updatePosition);
       }, delay);
     } else {
@@ -108,7 +106,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       if (showTimeout.current) clearTimeout(showTimeout.current);
       if (hideTimeout.current) clearTimeout(hideTimeout.current);
     };
-  }, [visible, delay, disabled]);
+  }, [visible, delay, disabled, updatePosition]);
 
   // Update position on scroll or resize while visible
   useEffect(() => {
@@ -121,7 +119,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       window.removeEventListener('scroll', handleScroll, true);
       window.removeEventListener('resize', handleResize);
     };
-  }, [delayedVisible]);
+  }, [delayedVisible, updatePosition]);
 
   const showTooltip = () => setVisible(true);
   const hideTooltip = () => setVisible(false);

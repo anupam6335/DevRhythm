@@ -194,6 +194,12 @@
 }
 
 /* Images – responsive, with a soft border */
+.imageWrapper {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
 .img {
   max-width: 100%;
   height: auto;
