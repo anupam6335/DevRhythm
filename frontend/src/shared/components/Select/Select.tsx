@@ -18,6 +18,10 @@ export interface SelectProps {
   onChange?: (value: string) => void;
   /** Placeholder text when nothing is selected */
   placeholder?: string;
+  /** Optional label displayed above the select */
+  label?: string;
+  /** Whether the field is required (adds an asterisk) */
+  required?: boolean;
   /** Disable the select */
   disabled?: boolean;
   /** Show error state */
@@ -27,7 +31,7 @@ export interface SelectProps {
 }
 
 /**
- * A custom, accessible dropdown select.
+ * A custom, accessible dropdown select with optional label.
  * Uses a button to trigger the options list and supports keyboard navigation.
  */
 export const Select: React.FC<SelectProps> = ({
@@ -35,6 +39,8 @@ export const Select: React.FC<SelectProps> = ({
   value,
   onChange,
   placeholder = 'Select an option',
+  label,
+  required = false,
   disabled = false,
   error = false,
   className,
@@ -45,7 +51,7 @@ export const Select: React.FC<SelectProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const id = useId();
-
+  const buttonId = `${id}-button`;
   const selectedOption = options.find((opt) => opt.value === value);
 
   useClickOutside(containerRef, () => setIsOpen(false));
@@ -71,7 +77,6 @@ export const Select: React.FC<SelectProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
-
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -120,6 +125,12 @@ export const Select: React.FC<SelectProps> = ({
         className
       )}
     >
+      {label && (
+        <label htmlFor={buttonId} className={styles.label}>
+          {label}
+          {required && <span className={styles.required}> *</span>}
+        </label>
+      )}
       <button
         ref={buttonRef}
         type="button"
@@ -128,8 +139,8 @@ export const Select: React.FC<SelectProps> = ({
         onKeyDown={handleKeyDown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-labelledby={`${id}-label`}
-        id={`${id}-button`}
+        aria-labelledby={label ? `${id}-label` : undefined}
+        id={buttonId}
         disabled={disabled}
       >
         <span className={styles.value}>
@@ -139,7 +150,6 @@ export const Select: React.FC<SelectProps> = ({
           className={clsx(styles.chevron, isOpen && styles.chevronOpen)}
         />
       </button>
-
       {isOpen && (
         <ul
           ref={listRef}

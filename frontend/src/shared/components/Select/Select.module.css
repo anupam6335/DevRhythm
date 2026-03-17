@@ -4,6 +4,19 @@
   font-family: var(--font-body);
 }
 
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.required {
+  color: var(--error);
+  margin-left: 2px;
+}
+
 .button {
   display: flex;
   align-items: center;

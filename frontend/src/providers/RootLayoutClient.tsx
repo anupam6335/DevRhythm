@@ -23,6 +23,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { pendingCount } = usePendingRevisions();
   const { progress } = useCurrentGoalProgress();
   const isDesktop = useMediaQuery('(min-width: 940px)');
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const handleQuickAdd = () => {
     setIsAddModalOpen(true);
@@ -36,7 +37,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         streakCount={user?.streak?.current || 0}
         onQuickAdd={handleQuickAdd}
       />
-      <main className="devRhythmContainer">{children}</main>
+      <main
+        className="devRhythmContainer"
+        style={isMobile ? { paddingBottom: '90px' } : undefined}
+      >
+        {children}
+      </main>
       {isDesktop && <Footer />}
       <AddProgressModal
         isOpen={isAddModalOpen}

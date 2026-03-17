@@ -319,7 +319,7 @@ export interface Question extends Timestamp {
   platformQuestionId: string;
   difficulty: Difficulty;
   tags: string[];
-  pattern?: string;
+  pattern?: string[];
   solutionLinks: string[];
   similarQuestions: ID[];
   contentRef?: string;

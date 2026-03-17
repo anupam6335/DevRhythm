@@ -1,0 +1,156 @@
+Create Question Page – Modern, Responsive Form Design
+
+The Create Question page (/questions/create) provides an intuitive, step‑by‑step form for adding a new problem to the DevRhythm database. It integrates the LeetCode fetch feature to auto‑populate fields, uses modern input patterns (tag chips, addable arrays, searchable selection), and follows a clean, card‑based layout that adapts gracefully to all screen sizes.
+
+Page Structure Overview
+
+```
++--------------------------------------------------+
+|  Header: "Create Question"        [Cancel] [Create] |
++--------------------------------------------------+
+|  ┌─────────────────────────────────────────────┐
+|  │  🔗 Fetch from LeetCode                      │
+|  │  ┌──────────────────────────────────┐  [Fetch] │
+|  │  │ https://leetcode.com/problems/...│         │
+|  │  └──────────────────────────────────┘         │
+|  └─────────────────────────────────────────────┘
+|
+|  ┌─────────────────────────────────────────────┐
+|  │  📝 Basic Information                        │
+|  │  • Title * (full width)                       │
+|  │  • Platform * + Platform ID * (inline)       │
+|  │  • Problem Link * (full width)               │
+|  │  • Difficulty * (radio group)                │
+|  └─────────────────────────────────────────────┘
+|
+|  ┌─────────────────────────────────────────────┐
+|  │  🏷️ Tags & Patterns                          │
+|  │  • Tags (chip input)                         │
+|  │  • Patterns (chip input)                     │
+|  └─────────────────────────────────────────────┘
+|
+|  ┌─────────────────────────────────────────────┐
+|  │  🔗 Solution Links                           │
+|  │  • List of URL inputs with remove buttons    │
+|  │  • [ + Add another link ]                    │
+|  └─────────────────────────────────────────────┘
+|
+|  ┌─────────────────────────────────────────────┐
+|  │  📚 Similar Questions                        │
+|  │  • Search bar to find questions              │
+|  │  • Selected questions as chips with remove   │
+|  └─────────────────────────────────────────────┘
+|
+|  ┌─────────────────────────────────────────────┐
+|  │  📎 Content Ref (optional)                   │
+|  │  • URL input                                  │
+|  └─────────────────────────────────────────────┘
++--------------------------------------------------+
+```
+
+All sections are enclosed in soft‑shadowed cards (--bg-surface, --shadow) with a small icon and heading. Required fields are marked with an asterisk (*).
+
+---
+
+Desktop Design (≥940px)
+
+· Layout: Single column, max‑width 800px centered within the main container. Each card has consistent padding (24px).
+· Fetch Card:
+  · Input field (flex‑grow) and a primary “Fetch” button (fixed width, 100px) on the same row.
+  · Input placeholder: https://leetcode.com/problems/...
+  · Button shows a loading spinner while fetching.
+· Basic Information Card:
+  · Title input: full width.
+  · Platform select and Platform ID input placed side by side (50% each) using flex.
+  · Problem Link input: full width.
+  · Difficulty: radio group with three options (Easy, Medium, Hard) displayed as inline chips (like buttons) – selected chip gets --accent-moss background.
+· Tags & Patterns Card:
+  · Tags: a chip input area where users can type and press Enter to add a tag. Existing tags appear as chips with a remove (×) icon. Suggestions from existing tags can be shown in a dropdown.
+  · Patterns: same chip input behavior.
+· Solution Links Card:
+  · List of URL inputs, each with a remove button (×) on the right.
+  · Below the list, a text link “+ Add another link” that appends a new empty input.
+· Similar Questions Card:
+  · Search bar (full width) with a search icon. As user types (debounced 300ms), a dropdown appears showing matching questions (title, platform, difficulty). Clicking a question adds it as a chip below the search bar.
+  · Selected questions appear as chips with a remove (×) icon. Each chip shows the question title and a small platform icon.
+· Content Ref Card: A single URL input.
+· Footer Actions: Cancel (secondary) and Create (primary) buttons, right‑aligned, placed after all cards (outside any card). Create button shows loading state on submit.
+
+---
+
+Tablet Design (768px – 939px)
+
+· Same single‑column layout, with reduced horizontal padding (16px per card).
+· Platform and ID inputs stack vertically (full width each) to avoid squeezing.
+· Difficulty chips may wrap if needed.
+· All other elements remain as desktop, but with slightly smaller text and input heights.
+
+---
+
+Mobile Design (≤767px)
+
+· Cards use 12px padding.
+· Fetch input and button stack: input full width, button below (full width, with margin‑top 8px).
+· Platform select and ID input stack vertically.
+· Difficulty chips may be displayed in a single row if they fit, otherwise wrap.
+· Tags and patterns chip inputs may show suggestions in a compact dropdown.
+· Solution links list: each input full width, remove button placed below the input (right‑aligned) to save horizontal space.
+· Similar questions search bar full width; selected chips may wrap.
+· Footer buttons stack vertically: Cancel above Create (or side‑by‑side if space permits – but stacking is safer).
+· All touch targets are at least 44px tall.
+
+---
+
+Interaction Flow: Fetch → Edit → Create
+
+1. Fetch from LeetCode
+   · User pastes a LeetCode problem URL into the input.
+   · Clicks “Fetch”.
+   · Button shows loading spinner, input disabled.
+   · On success, the form is populated:
+     · Title, Difficulty, Tags are set.
+     · Platform is set to “LeetCode”.
+     · Platform Question ID is extracted from the URL and set.
+     · Problem Link is set to the URL (optional – user can edit).
+   · On error, a toast appears with the error message; the form remains unchanged.
+2. Edit & Fill Additional Fields
+   · User can modify any pre‑filled fields.
+   · Adds tags/patterns, solution links, similar questions, etc.
+3. Create
+   · User clicks “Create”.
+   · Client‑side validation checks required fields.
+   · Button shows loading spinner, disabled.
+   · On success, redirect to the question detail page (/questions/[slug]) with a success toast.
+   · On validation error, inline messages appear below the relevant fields.
+   · On server error, a toast shows the error.
+
+---
+
+Visual Details & Consistency
+
+· Icons: Each card header uses a small icon (e.g., 📝, 🏷️, 🔗, 📚, 📎) to aid scannability. Icons are from a consistent set (e.g., Feather Icons or Font Awesome).
+· Typography: Card headings use --font-outfit (semi‑bold, 1rem, uppercase with letter‑spacing). Field labels use --font-commissioner (0.9rem, semi‑bold). Input text uses --font-commissioner (1rem).
+· Colors: Use the Zen palette (--bg-surface, --border, --accent-moss, --error). Input borders are --border-input. Focus rings use --focus-ring.
+· Chips: Use FilterChip component (already exists) with a remove icon. Selected state (for difficulty) uses --accent-moss background and white text.
+· Spacing: Consistent gaps (16px between cards, 12px between fields inside a card, 8px between chips).
+· Loading States: Buttons show a spinner. The fetch button also disables the input.
+
+---
+
+Components to Build / Reuse
+
+Component Source Notes
+Card shared Wrap each section
+Input shared For text/URL inputs
+Select shared Platform dropdown
+RadioGroup new? Difficulty chips – can be a custom component using FilterChip
+TagInput new Chips input with add on Enter, suggestions, remove
+SolutionLinks new Array of inputs with add/remove
+SimilarQuestionPicker new Search + selected chips
+Button shared Primary, secondary, loading states
+Toast shared For success/error messages
+
+All new components should be placed in features/question/components/.
+
+---
+This design is production‑ready and ready for implementation.

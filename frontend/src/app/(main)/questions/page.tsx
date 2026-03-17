@@ -1,11 +1,12 @@
-import React from 'react'
+// app/(main)/questions/page.tsx
+import { QuestionsPageClient } from '@/features/question/components/QuestionsPageClient';
+import { Metadata } from 'next';
 
-const page = () => {
-  return (
-    <div>
-      
-    </div>
-  )
+export const metadata: Metadata = {
+  title: 'Questions · DevRhythm',
+  description: 'Browse and filter coding problems from various platforms.',
+};
+
+export default function QuestionsPage() {
+  return <QuestionsPageClient />;
 }
-
-export default page

@@ -1,4 +1,4 @@
-import apiClient, { buildQueryString } from '@/shared/lib/apiClient';
+import apiClient, { ApiClientResponse, buildQueryString } from '@/shared/lib/apiClient';
 import type { Question } from '@/shared/types';
 import type { QuestionListResponse, QuestionStatistics } from '../types/question.types';
 
@@ -13,8 +13,11 @@ export const questionService = {
     search?: string;
   }) {
     const query = buildQueryString(params);
-    const response = await apiClient.get<QuestionListResponse>(`/questions${query}`);
-    return response.data;
+    const response = await apiClient.get<{ questions: Question[] }>(`/questions${query}`) as ApiClientResponse<{ questions: Question[] }>;
+    return {
+      questions: response.data.questions,
+      pagination: response.meta?.pagination,
+    };
   },
 
   async fetchLeetCodeQuestion(url: string): Promise<{ title: string; difficulty: string; tags: string[]; link: string }> {
