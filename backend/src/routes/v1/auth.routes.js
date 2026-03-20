@@ -9,7 +9,7 @@ router.get('/google', rateLimiters.oauthLimiter, authController.initiateGoogleOA
 router.get('/google/callback', rateLimiters.oauthLimiter, authController.handleGoogleCallback);
 router.get('/github', rateLimiters.oauthLimiter, authController.initiateGitHubOAuth);
 router.get('/github/callback', rateLimiters.oauthLimiter, authController.handleGitHubCallback);
-
+router.post('/exchange', rateLimiters.tokenLimiter, authController.exchangeCode);
 router.post('/logout', auth, rateLimiters.logoutLimiter, authController.logout);
 router.get('/session', auth, rateLimiters.tokenLimiter, authController.validateSession);
 router.post('/refresh', auth, rateLimiters.tokenLimiter, authController.refreshToken);

@@ -74,15 +74,16 @@ const resetShareToken = Joi.object({
   id: Joi.string().hex().length(24).required()
 });
 
-router.get('/', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 100), cache(60, 'shares:list'), validate(getShares, 'query'), shareController.getShares);
-router.get('/stats', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 100), cache(300, 'shares:stats'), shareController.getShareStats);
-router.get('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 100), cache(60, 'share'), validate(getShareById, 'params'), shareController.getShareById);
-router.post('/', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(createShare), shareController.createShare);
-router.put('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(updateShare), shareController.updateShare);
-router.delete('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(getShareById, 'params'), shareController.deleteShare);
-router.get('/token/:token', optionalAuth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 100), cache(60, 'share:token'), validate(getShareByToken, 'params'), shareController.getShareByToken);
-router.get('/user/:username', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 100), cache(300, 'shares:user:public'), validate(getUserPublicShares, 'params'), shareController.getUserPublicShares);
-router.post('/:id/refresh', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(refreshShare), shareController.refreshShare);
-router.post('/:id/reset-token', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(resetShareToken, 'params'), shareController.resetShareToken);
+// Use Redis-backed limiters
+router.get('/', auth, rateLimiters.shareUserLimiter, cache(60, 'shares:list'), validate(getShares, 'query'), shareController.getShares);
+router.get('/stats', auth, rateLimiters.shareUserLimiter, cache(300, 'shares:stats'), shareController.getShareStats);
+router.get('/:id', auth, rateLimiters.shareUserLimiter, cache(60, 'share'), validate(getShareById, 'params'), shareController.getShareById);
+router.post('/', auth, rateLimiters.shareCreateLimiter, validate(createShare), shareController.createShare);
+router.put('/:id', auth, rateLimiters.shareUpdateLimiter, validate(updateShare), shareController.updateShare);
+router.delete('/:id', auth, rateLimiters.shareDeleteLimiter, validate(getShareById, 'params'), shareController.deleteShare);
+router.get('/token/:token', optionalAuth, rateLimiters.shareTokenLimiter, cache(60, 'share:token'), validate(getShareByToken, 'params'), shareController.getShareByToken);
+router.get('/user/:username', auth, rateLimiters.shareUserLimiter, cache(300, 'shares:user:public'), validate(getUserPublicShares, 'params'), shareController.getUserPublicShares);
+router.post('/:id/refresh', auth, rateLimiters.shareRefreshLimiter, validate(refreshShare), shareController.refreshShare);
+router.post('/:id/reset-token', auth, rateLimiters.shareUpdateLimiter, validate(resetShareToken, 'params'), shareController.resetShareToken);
 
 module.exports = router;

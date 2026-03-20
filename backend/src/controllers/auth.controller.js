@@ -5,6 +5,7 @@ const { generateToken, generateRefreshToken } = require('../middleware/auth');
 const { invalidateUserCache } = require('../middleware/cache');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
+const AppError = require('../utils/errors/AppError'); // <-- ADD THIS LINE
 
 const initiateOAuth = (provider) => (req, res, next) => {
   const state = crypto.randomBytes(32).toString('hex');
@@ -29,36 +30,31 @@ const handleOAuthCallback = (provider) => (req, res, next) => {
       if (err || !user) {
         console.error('OAuth error:', err || info);
         // Redirect to frontend with error
-        const redirectUri = await redisClient.get(`devrhythm:auth:${provider}:state:${req.query.state}`);
-        const frontendUrl = redirectUri || config.frontendUrl;
-        return res.redirect(`${frontendUrl}?error=${encodeURIComponent(info?.message || 'Authentication failed')}`);
+        return res.redirect(`${config.frontendUrl}/auth/callback?error=${encodeURIComponent(info?.message || 'Authentication failed')}`);
       }
       
       const token = generateToken(user._id);
       const refreshToken = generateRefreshToken(user._id);
       
-      // Get the stored frontend redirect URI
-      const redirectUri = await redisClient.get(`devrhythm:auth:${provider}:state:${req.query.state}`);
-      await redisClient.del(`devrhythm:auth:${provider}:state:${req.query.state}`);
+      // Generate a one-time code
+      const code = crypto.randomBytes(32).toString('hex');
+      const codeKey = `devrhythm:auth:code:${code}`;
       
-      // Ensure we have a valid redirect URI
-      let frontendUrl;
-      if (redirectUri && (redirectUri.startsWith('http://') || redirectUri.startsWith('https://'))) {
-        frontendUrl = redirectUri;
-      } else {
-        frontendUrl = config.frontendUrl;
-      }
+      // Store tokens in Redis with 5 minute TTL
+      await redisClient.setEx(codeKey, 300, JSON.stringify({
+        userId: user._id.toString(),
+        token,
+        refreshToken
+      }));
       
-      // IMPORTANT: Redirect to frontend with tokens in URL
-      const redirectUrl = new URL(frontendUrl);
-      redirectUrl.searchParams.set('token', token);
-      redirectUrl.searchParams.set('refreshToken', refreshToken);
-      redirectUrl.searchParams.set('userId', user._id.toString());
+      // Redirect to frontend with only the code
+      const redirectUrl = new URL(`${config.frontendUrl}/auth/callback`);
+      redirectUrl.searchParams.set('code', code);
       
       res.redirect(redirectUrl.toString());
     } catch (error) {
       console.error('OAuth callback error:', error);
-      res.redirect(`${config.frontendUrl}?error=${encodeURIComponent('Internal server error')}`);
+      res.redirect(`${config.frontendUrl}/auth/callback?error=${encodeURIComponent('Internal server error')}`);
     }
   })(req, res, next);
 };
@@ -130,6 +126,42 @@ const getProviders = async (req, res, next) => {
   }
 };
 
+const exchangeCode = async (req, res, next) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      throw new AppError('Code is required', 400);
+    }
+    
+    const codeKey = `devrhythm:auth:code:${code}`;
+    const stored = await redisClient.get(codeKey);
+    if (!stored) {
+      throw new AppError('Invalid or expired code', 401);
+    }
+    
+    // Delete code immediately to prevent replay
+    await redisClient.del(codeKey);
+    
+    const { userId, token, refreshToken } = JSON.parse(stored);
+    
+    // Optionally set a secure HTTP‑only cookie for server‑side auth
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: config.isProduction,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
+    res.json(formatResponse('Code exchanged successfully', {
+      token,
+      refreshToken,
+      userId
+    }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   initiateGoogleOAuth: initiateOAuth('google'),
   handleGoogleCallback: handleOAuthCallback('google'),
@@ -138,5 +170,6 @@ module.exports = {
   logout,
   validateSession,
   refreshToken,
-  getProviders
+  getProviders,
+  exchangeCode,
 };

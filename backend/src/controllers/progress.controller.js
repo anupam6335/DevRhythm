@@ -70,6 +70,11 @@ const createOrUpdateProgress = async (req, res, next) => {
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
+    // Prevent manual setting to Mastered
+    if (status === 'Mastered') {
+      throw new AppError('Mastered status is automatically assigned and cannot be set manually', 400);
+    }
+
     console.log(`[createOrUpdateProgress] Called for user ${userId}, question ${questionId}, status=${status}`); // LOG
 
     const question = await Question.findById(questionId);
@@ -86,7 +91,7 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (notes !== undefined) updateData.notes = notes;
     if (keyInsights !== undefined) updateData.keyInsights = keyInsights;
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
-    if (confidenceLevel) updateData.confidenceLevel = confidenceLevel;
+    // confidenceLevel from request is ignored – it will be recalculated automatically
     if (req.body.personalDifficulty !== undefined) updateData.personalDifficulty = req.body.personalDifficulty;
     if (req.body.personalContentRef !== undefined) updateData.personalContentRef = req.body.personalContentRef;
 
@@ -124,7 +129,7 @@ const createOrUpdateProgress = async (req, res, next) => {
         notes,
         keyInsights,
         savedCode: savedCode ? { ...savedCode, lastUpdated: new Date() } : undefined,
-        confidenceLevel: confidenceLevel || 1,
+        // confidenceLevel not set – will be recalculated by hook
         totalTimeSpent: timeSpent || 0,
         personalDifficulty: req.body.personalDifficulty,
       });
@@ -148,6 +153,7 @@ const createOrUpdateProgress = async (req, res, next) => {
           console.log(`[createOrUpdateProgress] Job added successfully, jobId=${job.id}`); // LOG
         }
       } else if (status === 'Mastered' && oldStatus !== 'Mastered') {
+        // This block will never be reached because we prevent manual Mastered
         console.log(`[createOrUpdateProgress] Condition met: adding question.mastered job`); // LOG
         if (!jobQueue) {
           console.error('jobQueue is not available, cannot add job');
@@ -182,6 +188,11 @@ const createOrUpdateProgress = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
   try {
+    const { status } = req.body;
+    if (status === 'Mastered') {
+      throw new AppError('Mastered status is automatically assigned and cannot be set manually', 400);
+    }
+
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
@@ -211,18 +222,6 @@ const updateStatus = async (req, res, next) => {
           progressId: progress._id,
           timeSpent: 0,
           solvedAt: new Date()
-        });
-      }
-    } else if (req.body.status === 'Mastered' && oldStatus !== 'Mastered') {
-      if (!jobQueue) {
-        console.error('jobQueue is not available, cannot add job');
-      } else {
-        await jobQueue.add({
-          type: 'question.mastered',
-          userId,
-          questionId,
-          progressId: progress._id,
-          masteredAt: new Date()
         });
       }
     }
@@ -284,26 +283,8 @@ const updateNotes = async (req, res, next) => {
 };
 
 const updateConfidence = async (req, res, next) => {
-  try {
-    const userId = req.user._id;
-    const questionId = req.params.questionId;
-    
-    const progress = await UserQuestionProgress.findOneAndUpdate(
-      { userId, questionId },
-      {
-        $set: {
-          confidenceLevel: req.body.confidenceLevel,
-          updatedAt: new Date()
-        }
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    await invalidateProgressCache(userId);
-    await updateProgressPatternMastery(userId, questionId);
-
-    res.json(formatResponse('Confidence level updated successfully', { progress }));
-  } catch (error) { next(error); }
+  // This endpoint is now disabled – confidence is automatically calculated
+  next(new AppError('Confidence level is automatically calculated and cannot be set manually', 400));
 };
 
 const recordAttempt = async (req, res, next) => {
@@ -373,7 +354,7 @@ const recordAttempt = async (req, res, next) => {
 
 const recordRevision = async (req, res, next) => {
   try {
-    const { timeSpent, confidenceLevel } = req.body;
+    const { timeSpent } = req.body; // confidenceLevel from request is ignored – it will be recalculated
     const userId = req.user._id;
     const questionId = req.params.questionId;
     
@@ -384,10 +365,6 @@ const recordRevision = async (req, res, next) => {
         updatedAt: new Date()
       }
     };
-
-    if (confidenceLevel) {
-      update.$set.confidenceLevel = confidenceLevel;
-    }
 
     const progress = await UserQuestionProgress.findOneAndUpdate(
       { userId, questionId },
@@ -468,7 +445,6 @@ const getQuestionsByPersonalDifficulty = async (req, res, next) => {
       personalDifficulty: record.personalDifficulty,
       status: record.status,
       confidenceLevel: record.confidenceLevel,
-      // include any other relevant progress fields
     }));
 
     res.json(formatResponse(

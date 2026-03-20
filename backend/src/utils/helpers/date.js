@@ -1,43 +1,43 @@
 const getStartOfDay = (date = new Date()) => {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 };
 
 const getEndOfDay = (date = new Date()) => {
   const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
+  d.setUTCHours(23, 59, 59, 999);
   return d;
 };
 
 const getStartOfWeek = (date = new Date()) => {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+  d.setUTCDate(diff);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 };
 
 const getEndOfWeek = (date = new Date()) => {
   const d = getStartOfWeek(date);
-  d.setDate(d.getDate() + 6);
-  d.setHours(23, 59, 59, 999);
+  d.setUTCDate(d.getUTCDate() + 6);
+  d.setUTCHours(23, 59, 59, 999);
   return d;
 };
 
 const getStartOfMonth = (date = new Date()) => {
   const d = new Date(date);
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCDate(1);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 };
 
 const getEndOfMonth = (date = new Date()) => {
   const d = new Date(date);
-  d.setMonth(d.getMonth() + 1);
-  d.setDate(0);
-  d.setHours(23, 59, 59, 999);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  d.setUTCDate(0);
+  d.setUTCHours(23, 59, 59, 999);
   return d;
 };
 
@@ -66,7 +66,6 @@ const parseDate = (input) => {
     return new Date(input);
   }
   if (typeof input === 'string') {
-    // Try parsing as number if it's a numeric string
     const num = Number(input);
     if (!isNaN(num)) {
       if (num < 10000000000) {

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { recalculateProgress } = require('../services/progressAuto.service');
 
 const UserQuestionProgressSchema = new mongoose.Schema({
   userId: {
@@ -18,7 +19,7 @@ const UserQuestionProgressSchema = new mongoose.Schema({
   },
   personalContentRef: {
     type: String,
-    trime: true,
+    trim: true,
     required: false,
   },
   status: {
@@ -72,6 +73,39 @@ UserQuestionProgressSchema.index({ userId: 1, confidenceLevel: -1 });
 UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
 UserQuestionProgressSchema.index({ userId: 1, personalDifficulty: 1 });
 
+// ----- Auto‑recalculation hooks -----
+UserQuestionProgressSchema.post('save', async function(doc) {
+  if (doc.__recursing) return;
+  doc.__recursing = true;
+  try {
+    const changed = recalculateProgress(doc);
+    if (changed) {
+      await doc.save();
+    }
+  } catch (error) {
+    console.error('Progress auto‑recalc error (save):', error);
+  } finally {
+    delete doc.__recursing;
+  }
+});
+
+UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
+  if (!doc) return;
+  if (doc.__recursing) return;
+  doc.__recursing = true;
+  try {
+    const changed = recalculateProgress(doc);
+    if (changed) {
+      await doc.save();
+    }
+  } catch (error) {
+    console.error('Progress auto‑recalc error (update):', error);
+  } finally {
+    delete doc.__recursing;
+  }
+});
+
+// ----- Existing pattern‑mastery hooks -----
 UserQuestionProgressSchema.post('save', async function(doc) {
   try {
     const patternMasteryService = require('../services/patternMastery.service');
@@ -79,7 +113,7 @@ UserQuestionProgressSchema.post('save', async function(doc) {
       await patternMasteryService.updatePatternMasteryFromProgress(doc.userId, doc._id);
     }, 100);
   } catch (error) {
-    console.error('Pattern mastery post-save sync error:', error);
+    console.error('Pattern mastery post‑save sync error:', error);
   }
 });
 
@@ -92,7 +126,7 @@ UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
       }, 100);
     }
   } catch (error) {
-    console.error('Pattern mastery post-update sync error:', error);
+    console.error('Pattern mastery post‑update sync error:', error);
   }
 });
 
@@ -105,7 +139,7 @@ UserQuestionProgressSchema.post('findOneAndDelete', async function(doc) {
       }, 100);
     }
   } catch (error) {
-    console.error('Pattern mastery post-delete sync error:', error);
+    console.error('Pattern mastery post‑delete sync error:', error);
   }
 });
 
