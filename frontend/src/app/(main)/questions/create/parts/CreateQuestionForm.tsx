@@ -1,24 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FiSearch, FiTag, FiPaperclip, FiLink, FiEdit3 } from 'react-icons/fi';
 
-import { useCreateQuestion } from '../hooks/useCreateQuestion';
-import { usePatterns } from '../hooks/usePatterns';
-import { useTags } from '../hooks/useTags';
-import { ChipInput } from './ChipInput';
-import { SolutionLinksInput } from './SolutionLinksInput';
-import { LeetCodeSearch } from './LeetCodeSearch';
-import { LeetCodeUrlInput } from './LeetCodeUrlInput';
+
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
-import { prepareCreateQuestionPayload } from '../utils/questionHelpers';
+
 import { ROUTES } from '@/shared/config/routes';
 import styles from './CreateQuestionForm.module.css';
+import { prepareCreateQuestionPayload, useCreateQuestion, usePatterns, useTags } from '@/features/question';
+import { LeetCodeSearch } from './LeetCodeSearch';
+import { LeetCodeUrlInput } from './LeetCodeUrlInput';
+import { ChipInput } from './ChipInput';
+import { SolutionLinksInput } from './SolutionLinksInput';
 
 const platforms = [
   'LeetCode',
@@ -40,7 +39,7 @@ const questionSchema = z.object({
   tags: z.array(z.string()).default([]),
   pattern: z.array(z.string()).default([]),
   solutionLinks: z.array(z.string()).default([]),
-  contentRef: z.string().url().optional().or(z.literal('')),
+  contentRef: z.string().optional(),
 });
 
 type FormData = z.infer<typeof questionSchema>;
@@ -82,9 +81,12 @@ export const CreateQuestionForm: React.FC = () => {
     if (result.tags.length > 0) {
       setValue('pattern', [result.tags[0]]);
     }
+    if (result.description) {
+      setValue('contentRef', result.description);
+    }
   };
 
-  const handleUrlFetch = (data: any) => {
+  const handleUrlFetch = useCallback((data: any) => {
     setValue('title', data.title);
     setValue('problemLink', data.link);
     setValue('difficulty', data.difficulty as any);
@@ -98,7 +100,10 @@ export const CreateQuestionForm: React.FC = () => {
     if (data.tags.length > 0) {
       setValue('pattern', [data.tags[0]]);
     }
-  };
+    if (data.description) {
+      setValue('contentRef', data.description);
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: FormData) => {
     const payload = prepareCreateQuestionPayload(data);
@@ -131,7 +136,7 @@ export const CreateQuestionForm: React.FC = () => {
         <div className={styles.leftPanel}>
           <div className={styles.sourceCard}>
             <h2 className={styles.panelTitle}>
-              <FiSearch className={styles.panelIcon} /> Source
+               Find Question From Leetcode
             </h2>
 
             <div className={styles.sourceSection}>
@@ -199,6 +204,7 @@ export const CreateQuestionForm: React.FC = () => {
                     error={!!errors.platformQuestionId}
                     fullWidth
                     disabled={isSubmitting}
+                    readOnly
                     className={styles.input}
                   />
                   {errors.platformQuestionId && (
@@ -301,13 +307,14 @@ export const CreateQuestionForm: React.FC = () => {
             {/* Content Ref */}
             <section className={styles.detailsSection}>
               <h2 className={styles.sectionTitle}>
-                <FiPaperclip className={styles.sectionIcon} /> Content Ref (optional)
+                <FiPaperclip className={styles.sectionIcon} /> Problem Description
               </h2>
               <Input
                 {...register('contentRef')}
                 placeholder="https://..."
                 fullWidth
                 disabled={isSubmitting}
+                readOnly
                 className={styles.input}
               />
             </section>

@@ -20,12 +20,12 @@ export const questionService = {
     };
   },
 
-  async fetchLeetCodeQuestion(url: string): Promise<{ title: string; difficulty: string; tags: string[]; link: string }> {
-    const response = await apiClient.post<{ title: string; difficulty: string; tags: string[]; link: string }>(
-        '/questions/fetch-leetcode',
-        { url }
-      );
-      return response.data;
+  async fetchLeetCodeQuestion(url: string): Promise<{ title: string; difficulty: string; tags: string[]; link: string; description: string }> {
+    const response = await apiClient.post<{ title: string; difficulty: string; tags: string[]; link: string; description: string }>(
+      '/questions/fetch-leetcode',
+      { url }
+    );
+    return response.data;
   },
 
   async searchLeetCodeQuestions(

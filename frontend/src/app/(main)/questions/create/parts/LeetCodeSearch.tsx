@@ -3,13 +3,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiSearch } from 'react-icons/fi';
 import { useDebounceValue, useClickOutside } from '@/shared/hooks';
-import { useLeetCodeSearch } from '../hooks/useLeetCodeSearch';
+import { useLeetCodeSearch, useLeetCodeFetch } from '@/features/question';
 import Loader from '@/shared/components/Loader';
+import { toast } from '@/shared/components/Toast';
 import clsx from 'clsx';
 import styles from './LeetCodeSearch.module.css';
 
 interface LeetCodeSearchProps {
-  onSelect: (result: { title: string; slug: string; difficulty: string; tags: string[]; url: string }) => void;
+  onSelect: (result: {
+    title: string;
+    slug: string;
+    difficulty: string;
+    tags: string[];
+    url: string;
+    description: string; 
+  }) => void;
 }
 
 export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
@@ -20,6 +28,8 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
 
   const { data, isLoading, error } = useLeetCodeSearch(debouncedQuery, 'name');
   const results = data?.results ?? [];
+
+  const fetchMutation = useLeetCodeFetch();
 
   useClickOutside(containerRef, () => setIsOpen(false));
 
@@ -33,11 +43,35 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
-      case 'easy': return styles.easy;
-      case 'medium': return styles.medium;
-      case 'hard': return styles.hard;
-      default: return '';
+      case 'easy':
+        return styles.easy;
+      case 'medium':
+        return styles.medium;
+      case 'hard':
+        return styles.hard;
+      default:
+        return '';
     }
+  };
+
+  const handleSelect = (result: any) => {
+    // Fetch full problem details (including description) using the URL
+    fetchMutation.mutate(result.url, {
+      onSuccess: (fullData) => {
+        // Merge search result with fetched data
+        const enriched = {
+          ...result,
+          description: fullData.description || '',
+        };
+        onSelect(enriched);
+        setIsOpen(false);
+        setQuery('');
+      },
+      onError: (err) => {
+        toast.error('Failed to fetch problem details. Please try again.');
+        console.error(err);
+      },
+    });
   };
 
   return (
@@ -62,24 +96,30 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
                 key={result.slug}
                 type="button"
                 className={styles.resultItem}
-                onClick={() => {
-                  onSelect(result);
-                  setIsOpen(false);
-                  setQuery('');
-                }}
+                onClick={() => handleSelect(result)}
+                disabled={fetchMutation.isPending}
               >
                 <span className={styles.resultTitle}>{result.title}</span>
                 <div className={styles.resultMeta}>
-                  <span className={clsx(styles.difficultyPill, getDifficultyColor(result.difficulty))}>
+                  <span
+                    className={clsx(
+                      styles.difficultyPill,
+                      getDifficultyColor(result.difficulty)
+                    )}
+                  >
                     {result.difficulty}
                   </span>
                   {result.tags.length > 0 && (
                     <div className={styles.tags}>
-                      {result.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className={styles.tag}>{tag}</span>
+                      {result.tags.slice(0, 3).map((tag) => (
+                        <span key={tag} className={styles.tag}>
+                          {tag}
+                        </span>
                       ))}
                       {result.tags.length > 3 && (
-                        <span className={styles.tag}>+{result.tags.length - 3}</span>
+                        <span className={styles.tag}>
+                          +{result.tags.length - 3}
+                        </span>
                       )}
                     </div>
                   )}
@@ -87,11 +127,16 @@ export const LeetCodeSearch: React.FC<LeetCodeSearchProps> = ({ onSelect }) => {
               </button>
             ))
           ) : (
-            !isLoading && debouncedQuery.length >= 2 && (
-              <div className={styles.noResults}>No matching problems found.</div>
+            !isLoading &&
+            debouncedQuery.length >= 2 && (
+              <div className={styles.noResults}>
+                No matching problems found.
+              </div>
             )
           )}
-          {error && <div className={styles.error}>Search failed. Please try again.</div>}
+          {error && (
+            <div className={styles.error}>Search failed. Please try again.</div>
+          )}
         </div>
       )}
     </div>

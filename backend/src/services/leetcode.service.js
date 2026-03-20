@@ -32,6 +32,7 @@ const fetchProblemDetails = async (url) => {
       question(titleSlug: $titleSlug) {
         title
         difficulty
+        content
         topicTags {
           name
         }
@@ -53,6 +54,7 @@ const fetchProblemDetails = async (url) => {
       difficulty: question.difficulty,
       tags: question.topicTags.map(t => t.name),
       link: url,
+      description: question.content,
     };
   } catch (error) {
     console.error('LeetCode fetch error:', error.message);

@@ -1,9 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Breadcrumb from '@/shared/components/Breadcrumb';
-import { CreateQuestionForm } from '@/features/question/components/CreateQuestionForm';
+import { CreateQuestionForm } from './parts/CreateQuestionForm';
 import { ROUTES } from '@/shared/config/routes';
-import styles from './page.module.css';
 
 export const metadata: Metadata = {
   title: 'Create Question · DevRhythm',

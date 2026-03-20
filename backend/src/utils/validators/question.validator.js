@@ -23,14 +23,13 @@ const createQuestion = Joi.object({
   platformQuestionId: Joi.string().required(),
   difficulty: Joi.string().valid('Easy', 'Medium', 'Hard').required(),
   tags: Joi.array().items(Joi.string().trim()).default([]),
-  // pattern can be string or array of strings
   pattern: Joi.alternatives().try(
     Joi.string().trim().allow(''),
     Joi.array().items(Joi.string().trim())
   ).optional(),
   solutionLinks: Joi.array().items(Joi.string().uri()).default([]),
   similarQuestions: Joi.array().items(Joi.string().hex().length(24)).default([]),
-  contentRef: Joi.string().uri().allow(''),
+  contentRef: Joi.string().allow(''),
 });
 
 const updateQuestion = Joi.object({
@@ -40,14 +39,13 @@ const updateQuestion = Joi.object({
   platformQuestionId: Joi.string(),
   difficulty: Joi.string().valid('Easy', 'Medium', 'Hard'),
   tags: Joi.array().items(Joi.string().trim()),
-  // pattern can be string or array of strings
   pattern: Joi.alternatives().try(
     Joi.string().trim(),
     Joi.array().items(Joi.string().trim())
   ),
   solutionLinks: Joi.array().items(Joi.string().uri()),
   similarQuestions: Joi.array().items(Joi.string().hex().length(24)),
-  contentRef: Joi.string().uri().allow(''),
+  contentRef: Joi.string().allow(''),
 }).min(1);
 
 const deleteQuestion = Joi.object({

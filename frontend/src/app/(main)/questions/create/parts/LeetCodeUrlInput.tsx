@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FiLink } from 'react-icons/fi';
-import { useLeetCodeFetch } from '../hooks/useLeetCodeFetch';
-import Input from '@/shared/components/Input';
+import { useLeetCodeFetch } from '@/features/question';
 import Loader from '@/shared/components/Loader';
 import { toast } from '@/shared/components/Toast';
 import styles from './LeetCodeUrlInput.module.css';
 
 interface LeetCodeUrlInputProps {
-  onFetch: (data: { title: string; difficulty: string; tags: string[]; link: string }) => void;
+  onFetch: (data: { title: string; difficulty: string; tags: string[]; link: string; description?: string }) => void;
   disabled?: boolean;
 }
 
@@ -17,6 +16,7 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({ onFetch, dis
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const fetchMutation = useLeetCodeFetch();
+  const lastFetchedUrlRef = useRef<string>('');
 
   const validateAndFetch = useCallback((urlToValidate: string) => {
     if (!urlToValidate) {
@@ -30,16 +30,22 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({ onFetch, dis
       return;
     }
 
+    // Skip if same URL already fetched successfully
+    if (lastFetchedUrlRef.current === urlToValidate) {
+      return;
+    }
+
     setError(null);
     fetchMutation.mutate(urlToValidate, {
       onSuccess: (data) => {
+        lastFetchedUrlRef.current = urlToValidate;
         onFetch(data);
         toast.success('Problem details fetched');
-        setError(null);
       },
       onError: (err: any) => {
         setError(err.message || 'Failed to fetch problem');
         toast.error(err.message || 'Failed to fetch problem');
+        // Do not update lastFetchedUrlRef on error, allow retry
       },
     });
   }, [fetchMutation, onFetch]);
@@ -60,18 +66,26 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({ onFetch, dis
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    setUrl(newUrl);
+    // Reset last fetched URL if the input changes to a different URL
+    if (newUrl !== lastFetchedUrlRef.current) {
+      lastFetchedUrlRef.current = '';
+    }
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.inputWrapper}>
         <FiLink className={styles.linkIcon} />
-        <Input
+        <input
           type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={handleChange}
           onBlur={handleBlur}
           placeholder="https://leetcode.com/problems/..."
           disabled={disabled || fetchMutation.isPending}
-          fullWidth
           className={styles.input}
         />
         {fetchMutation.isPending && <Loader size="sm" className={styles.spinner} />}
