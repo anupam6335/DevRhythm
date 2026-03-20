@@ -43,8 +43,10 @@ export const questionService = {
     return response.data.question;
   },
 
-  async getQuestionByPlatformId(platform: string, platformQuestionId: string) {
-    const response = await apiClient.get<{ question: Question }>(`/questions/platform/${platform}/${platformQuestionId}`);
+  async getQuestionByPlatformId(platform: string, platformQuestionId: string): Promise<Question> {
+    const response = await apiClient.get<{ question: Question }>(
+      `/questions/platform/${platform}/${platformQuestionId}`
+    );
     return response.data.question;
   },
 

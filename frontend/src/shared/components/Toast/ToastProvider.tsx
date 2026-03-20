@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { memo } from 'react';
 import { Toaster, toast as hotToast, ToastOptions } from 'react-hot-toast';
 import Toast, { ToastProps } from './Toast';
 
@@ -47,17 +49,13 @@ export const toast = {
       { duration: 4000, ...toastOptions }
     );
   },
-  // Generic method to show any toast (pass a custom render function)
   custom: hotToast.custom,
   dismiss: hotToast.dismiss,
   remove: hotToast.remove,
 };
 
-interface ToastProviderProps {
+export interface ToastProviderProps {
   children: React.ReactNode;
-  /**
-   * Position of the toasts container (default: bottom-right)
-   */
   position?:
     | 'top-left'
     | 'top-center'
@@ -65,48 +63,37 @@ interface ToastProviderProps {
     | 'bottom-left'
     | 'bottom-center'
     | 'bottom-right';
-  /**
-   * Reverse order (newest on top)
-   */
   reverseOrder?: boolean;
-  /**
-   * Gap between toasts
-   */
   gutter?: number;
-  /**
-   * Container style
-   */
   containerStyle?: React.CSSProperties;
-  /**
-   * Container className
-   */
   containerClassName?: string;
 }
 
-export const ToastProvider: React.FC<ToastProviderProps> = ({
-  children,
-  position = 'bottom-right',
-  reverseOrder = false,
-  gutter = 8,
-  containerStyle,
-  containerClassName,
-}) => {
-  return (
-    <>
-      {children}
-      <Toaster
-        position={position}
-        reverseOrder={reverseOrder}
-        gutter={gutter}
-        containerStyle={containerStyle}
-        containerClassName={containerClassName}
-        // We are using custom toasts, so we can keep default toast options minimal
-        toastOptions={{
-          duration: 4000,
-        }}
-      />
-    </>
-  );
-};
+export const ToastProvider: React.FC<ToastProviderProps> = memo(
+  ({
+    children,
+    position = 'bottom-right',
+    reverseOrder = false,
+    gutter = 8,
+    containerStyle,
+    containerClassName,
+  }) => {
+    return (
+      <>
+        {children}
+        <Toaster
+          position={position}
+          reverseOrder={reverseOrder}
+          gutter={gutter}
+          containerStyle={containerStyle}
+          containerClassName={containerClassName}
+          toastOptions={{ duration: 4000 }}
+        />
+      </>
+    );
+  }
+);
+
+ToastProvider.displayName = 'ToastProvider';
 
 export default ToastProvider;

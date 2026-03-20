@@ -4,30 +4,46 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { tokenStorage } from '../utils/tokenStorage';
 import { useSession } from '../hooks/useSession';
+import apiClient from '@/shared/lib/apiClient';
+import SkeletonLoader from '@/shared/components/SkeletonLoader';
+import styles from './AuthCallbackHandler.module.css';
 
 export const AuthCallbackHandler: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { refetch } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const refreshToken = searchParams.get('refreshToken');
-    const userId = searchParams.get('userId');
+    const code = searchParams.get('code');
     const errorParam = searchParams.get('error');
 
     if (errorParam) {
-      setError(errorParam);
+      setError(decodeURIComponent(errorParam));
+      setIsLoading(false);
       setTimeout(() => router.push('/login'), 3000);
       return;
     }
 
-    if (token && refreshToken && userId) {
-      tokenStorage.setTokens(token, refreshToken, userId);
-      refetch().then(() => {
+    if (!code) {
+      setError('No authentication code provided');
+      setIsLoading(false);
+      setTimeout(() => router.push('/login'), 3000);
+      return;
+    }
+
+    // Exchange code for tokens
+    apiClient.post('/auth/exchange', { code })
+      .then((response) => {
+        const { token, refreshToken, userId } = response.data;
+        tokenStorage.setTokens(token, refreshToken, userId);
+
+        // Trigger background refetch – don't wait
+        refetch();
+
+        // Redirect immediately
         const returnTo = localStorage.getItem('returnTo');
-        // Avoid redirecting to login or home
         if (returnTo && returnTo !== '/login' && returnTo !== '/') {
           localStorage.removeItem('returnTo');
           router.push(returnTo);
@@ -35,16 +51,18 @@ export const AuthCallbackHandler: React.FC = () => {
           localStorage.removeItem('returnTo');
           router.push('/dashboard');
         }
+      })
+      .catch((err) => {
+        console.error('Code exchange error:', err);
+        setError(err.message || 'Authentication failed');
+        setIsLoading(false);
+        setTimeout(() => router.push('/login'), 3000);
       });
-    } else {
-      setError('Invalid authentication response');
-      setTimeout(() => router.push('/login'), 3000);
-    }
   }, [searchParams, router, refetch]);
 
   if (error) {
     return (
-      <div className="callback-error">
+      <div className={styles.error}>
         <h2>Authentication Error</h2>
         <p>{error}</p>
         <p>Redirecting to login...</p>
@@ -53,9 +71,11 @@ export const AuthCallbackHandler: React.FC = () => {
   }
 
   return (
-    <div className="callback-loading">
-      <h2>Completing authentication...</h2>
-      <p>Please wait while we log you in.</p>
+    <div className={styles.loading}>
+      <SkeletonLoader variant="card" width={300} height={120} />
+      <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+        Completing authentication...
+      </p>
     </div>
   );
 };

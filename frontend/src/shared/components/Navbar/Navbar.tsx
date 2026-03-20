@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -60,6 +60,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const groupsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Memoize the toggle function to avoid recreating it on each render
+  const toggleDropdown = useCallback((id: DropdownId) => {
+    setOpenDropdown((prev) => (prev === id ? null : id));
+  }, []);
+
+  // Close all dropdowns when clicking outside (handled by useClickOutside)
+  // But we also close when clicking on a link inside dropdown – that's fine.
+
   useClickOutside(questionsRef, () => {
     if (openDropdown === 'questions') setOpenDropdown(null);
   });
@@ -73,17 +81,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (openDropdown === 'profile') setOpenDropdown(null);
   });
 
+  // Scroll effect for sticky navbar background
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const toggleDropdown = (id: DropdownId) => {
-    setOpenDropdown((prev) => (prev === id ? null : id));
-  };
-
-  const isActive = (href: string) => pathname === href;
+  // Helper to check active route
+  const isActive = useCallback((href: string) => pathname === href, [pathname]);
 
   // Build login URL with returnTo parameter (only if not already on login)
   const loginHref = pathname && !pathname.startsWith('/login')

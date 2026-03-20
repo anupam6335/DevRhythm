@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -14,10 +16,6 @@ export interface NotFoundPageProps {
   actionHref?: string;
 }
 
-/**
- * A modern 404 page with a floating illustration, gradient title,
- * and a consistent Button component.
- */
 export const NotFoundPage: React.FC<NotFoundPageProps> = ({
   className,
   title = 'Page not found',
@@ -25,14 +23,15 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
   actionText = 'Go back home',
   actionHref,
 }) => {
-  const preventDownload = (e: React.MouseEvent) => e.preventDefault();
+  // Memoize the event handler to avoid recreation on each render
+  const preventDownload = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
 
   return (
     <div className={clsx(styles.container, className)}>
       <div className={styles.content}>
-        {/* Decorative large 404 in background */}
         <div className={styles.big404} aria-hidden="true">404</div>
-
         <div className={styles.illustration}>
           <Image
             src="/images/illustrations/404-doodle.png"
@@ -45,10 +44,8 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
             draggable={false}
           />
         </div>
-
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.message}>{message}</p>
-
         {actionHref && (
           <Button
             asChild
@@ -65,4 +62,4 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
   );
 };
 
-export default NotFoundPage;
+export default React.memo(NotFoundPage);

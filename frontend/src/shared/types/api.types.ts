@@ -347,6 +347,8 @@ export interface UserQuestionProgress extends Timestamp {
   revisionCount: number;
   totalTimeSpent: number;
   confidenceLevel: number;
+  personalDifficulty?: Difficulty;        
+  personalContentRef?: string;             
 }
 
 export interface PublicProgressItem {
@@ -490,7 +492,7 @@ export interface CreateQuestionRequest {
   platformQuestionId: string;
   difficulty: Difficulty;
   tags?: string[];
-  pattern?: string;
+  pattern?: string | string[];
   solutionLinks?: string[];
   similarQuestions?: ID[];
   contentRef?: string;
