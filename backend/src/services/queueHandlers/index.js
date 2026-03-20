@@ -9,6 +9,7 @@ const { handleGroupGoalProgress } = require('./groupGoalProgress.handler');
 const { handleGroupGoalCompleted } = require('./groupGoalCompleted.handler');
 const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handler');
 const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
+const { handleRevisionSchedule } = require('./revisionSchedule.hanlder');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -30,6 +31,9 @@ const processJob = async (job) => {
     case 'follower.new':
       await handleFollowerNew(job);
       break;
+    case 'revision.schedule':
+        await handleRevisionSchedule(job);
+        break;
     case 'revision.completed':
       await handleRevisionCompleted(job);
       break;

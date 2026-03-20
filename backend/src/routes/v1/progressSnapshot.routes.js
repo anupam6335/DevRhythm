@@ -37,7 +37,7 @@ router.get('/latest/:period',
 
 router.post('/refresh',
   auth,
-  rateLimiters.createMemoryLimiter(60 * 60 * 1000, 5),
+  rateLimiters.createRedisLimiter(60 * 60 * 1000, 5, 'snapshot:refresh'), // custom
   validate(refreshSchema),
   progressSnapshotController.refreshSnapshot
 );

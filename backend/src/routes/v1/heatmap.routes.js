@@ -7,15 +7,9 @@ const Joi = require('joi');
 const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
 
-const heatmapLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 100);
-const refreshLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 10);
-const exportLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 5);
-const statsLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 150);
-const filterLimiter = rateLimiters.createMemoryLimiter(60 * 60 * 1000, 100);
-
 router.get('/', 
   auth, 
-  heatmapLimiter,
+  rateLimiters.heatmapGetLimiter,
   cache(15 * 60, 'heatmap:current'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -26,7 +20,7 @@ router.get('/',
 
 router.get('/stats', 
   auth, 
-  statsLimiter,
+  rateLimiters.heatmapStatsLimiter,
   cache(10 * 60, 'heatmap:stats'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional()
@@ -36,7 +30,7 @@ router.get('/stats',
 
 router.get('/filter', 
   auth, 
-  filterLimiter,
+  rateLimiters.heatmapFilterLimiter,
   cache(15 * 60, 'heatmap:filter'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -52,7 +46,7 @@ router.get('/filter',
 
 router.get('/:year', 
   auth, 
-  heatmapLimiter,
+  rateLimiters.heatmapGetLimiter,
   cache(15 * 60, 'heatmap:year'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).required()
@@ -65,7 +59,7 @@ router.get('/:year',
 
 router.post('/refresh', 
   auth, 
-  refreshLimiter,
+  rateLimiters.heatmapRefreshLimiter,
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     forceFullRefresh: Joi.boolean().default(false)
@@ -75,7 +69,7 @@ router.post('/refresh',
 
 router.post('/export', 
   auth, 
-  exportLimiter,
+  rateLimiters.heatmapExportLimiter,
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     format: Joi.string().valid('json', 'csv').default('json'),
@@ -86,6 +80,7 @@ router.post('/export',
 
 router.get('/export/:exportId', 
   auth,
+  rateLimiters.heatmapExportLimiter,
   validate(Joi.object({
     exportId: Joi.string().required()
   }), 'params'),

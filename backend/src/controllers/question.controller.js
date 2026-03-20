@@ -5,6 +5,7 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
 const { applySorting } = require('../utils/helpers/sort');
+const { jobQueue } = require('../services/queue.service');
 
 // generate a pattern name from tags
 const generatePatternFromTags = (tags) => {
@@ -105,6 +106,13 @@ const createQuestion = async (req, res, next) => {
     }
 
     const question = await Question.create(req.body);
+    
+    await jobQueue.add({
+      type: 'revision.schedule',
+      userId: req.user._id,
+      questionId: question._id,
+      baseDate: new Date(),
+    });
     
     await invalidateQuestionCache(question._id, question.platform, question.platformQuestionId);
     
@@ -304,6 +312,7 @@ const getSimilarQuestions = async (req, res, next) => {
           difficulty: 1,
           tags: 1,
           pattern: 1,
+          platformQuestionId: 1,
           totalScore: 1
         }
       }

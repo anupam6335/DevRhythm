@@ -19,7 +19,7 @@ const leaderboardQuery = Joi.object({
 
 router.get('/:type',
   auth,
-  rateLimiters.leaderboardLimiter,
+  rateLimiters.leaderboardLimiter, // Redis-backed
   cache(300, 'leaderboard'),
   validate(leaderboardParams, 'params'),
   validate(leaderboardQuery, 'query'),
@@ -37,7 +37,7 @@ router.get('/:type/my-rank',
 
 router.post('/:type/refresh',
   auth,
-  rateLimiters.createMemoryLimiter(60 * 60 * 1000, 5),
+  rateLimiters.createRedisLimiter(60 * 60 * 1000, 5, 'leaderboard:refresh'), // custom high‑limit
   validate(leaderboardParams, 'params'),
   validate(Joi.object({ date: Joi.date().iso() }), 'query'),
   leaderboardController.refreshLeaderboard

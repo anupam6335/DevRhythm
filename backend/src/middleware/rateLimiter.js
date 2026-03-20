@@ -17,39 +17,94 @@ const createMemoryLimiter = (windowMs, max) => {
   });
 };
 
-const oauthLimiter = createMemoryLimiter(15 * 60 * 1000, 50);
-const tokenLimiter = createMemoryLimiter(15 * 60 * 1000, 100);
-const logoutLimiter = createMemoryLimiter(15 * 60 * 1000, 20);
-const userLimiter = createMemoryLimiter(15 * 60 * 1000, 100);
-const progressSnapshotLimiter = createMemoryLimiter(15 * 60 * 1000, 30);
-const notificationReadLimiter = createMemoryLimiter(15 * 60 * 1000, 60);
-const leaderboardLimiter = createMemoryLimiter(15 * 60 * 1000, 100);
-const publicLimiter = createMemoryLimiter(60 * 1000, 30);
+// Try to load Redis store
+let RedisStore;
+let redisStoreAvailable = false;
+try {
+  RedisStore = require('rate-limit-redis');
+  redisStoreAvailable = true;
+} catch (e) {
+  console.warn('rate-limit-redis not installed, using memory store');
+}
 
-const createRedisLimiter = async (windowMs, max, keyPrefix) => {
-  try {
-    const RedisStore = require('rate-limit-redis');
-    return rateLimit({
-      store: new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-        prefix: `devrhythm:ratelimit:${keyPrefix}`
-      }),
-      windowMs,
-      max,
-      message: {
-        success: false,
-        statusCode: 429,
-        message: 'Too many requests, please try again later.',
-        data: null,
-        meta: {},
-        error: { code: 'RATE_LIMIT_EXCEEDED' }
-      }
-    });
-  } catch (error) {
-    console.warn('Redis rate limiter failed, using memory limiter:', error.message);
-    return createMemoryLimiter(windowMs, max);
+// Create a Redis limiter if possible, otherwise fallback to memory
+const createRedisLimiter = (windowMs, max, keyPrefix) => {
+  if (redisStoreAvailable && redisClient && redisClient.isReady) {
+    try {
+      return rateLimit({
+        store: new RedisStore({
+          sendCommand: (...args) => redisClient.sendCommand(args),
+          prefix: `devrhythm:ratelimit:${keyPrefix}`
+        }),
+        windowMs,
+        max,
+        message: {
+          success: false,
+          statusCode: 429,
+          message: 'Too many requests, please try again later.',
+          data: null,
+          meta: {},
+          error: { code: 'RATE_LIMIT_EXCEEDED' }
+        }
+      });
+    } catch (error) {
+      console.warn(`Redis limiter failed for ${keyPrefix}, using memory:`, error.message);
+    }
   }
+  return createMemoryLimiter(windowMs, max);
 };
+
+// ===== Predefined limiters (Redis-backed if possible) =====
+const oauthLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'oauth');
+const tokenLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'token');
+const logoutLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'logout');
+const userLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'user');
+const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'snapshot');
+const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'notification');
+const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'leaderboard');
+const publicLimiter = createRedisLimiter(60 * 1000, 30, 'public');
+
+// Question endpoints
+const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:create');
+const questionUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:update');
+const questionDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'question:delete');
+const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 10, 'leetcode:search');
+const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 10, 'leetcode:fetch');
+
+// Progress endpoints
+const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'progress:update');
+
+// Revision endpoints
+const revisionCompleteLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'revision:complete');
+
+// Share endpoints
+const shareCreateLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'share:create');
+const shareUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'share:update');
+const shareDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'share:delete');
+const shareTokenLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:token');
+const shareUserLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:user');
+const shareRefreshLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'share:refresh');
+
+// Follow endpoints
+const followLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'follow');
+const unfollowLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'unfollow');
+const followGetLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'follow:get');
+
+// Group endpoints
+const groupCreateLimiter = createRedisLimiter(15 * 60 * 1000, 10, 'group:create');
+const groupUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:update');
+const groupDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 5, 'group:delete');
+const groupJoinLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'group:join');
+const groupLeaveLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'group:leave');
+const groupGoalLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:goal');
+const groupChallengeLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:challenge');
+
+// Heatmap endpoints
+const heatmapGetLimiter = createRedisLimiter(60 * 60 * 1000, 100, 'heatmap:get');
+const heatmapRefreshLimiter = createRedisLimiter(60 * 60 * 1000, 10, 'heatmap:refresh');
+const heatmapExportLimiter = createRedisLimiter(60 * 60 * 1000, 5, 'heatmap:export');
+const heatmapStatsLimiter = createRedisLimiter(60 * 60 * 1000, 150, 'heatmap:stats');
+const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 100, 'heatmap:filter');
 
 module.exports = {
   oauthLimiter,
@@ -59,7 +114,44 @@ module.exports = {
   progressSnapshotLimiter,
   notificationReadLimiter,
   leaderboardLimiter,
-  publicLimiter,        
-  createRedisLimiter,
-  createMemoryLimiter
+  publicLimiter,
+
+  questionCreateLimiter,
+  questionUpdateLimiter,
+  questionDeleteLimiter,
+  leetcodeSearchLimiter,
+  leetcodeFetchLimiter,
+
+  progressUpdateLimiter,
+
+  revisionCompleteLimiter,
+
+  shareCreateLimiter,
+  shareUpdateLimiter,
+  shareDeleteLimiter,
+  shareTokenLimiter,
+  shareUserLimiter,
+  shareRefreshLimiter,
+
+  followLimiter,
+  unfollowLimiter,
+  followGetLimiter,
+
+  groupCreateLimiter,
+  groupUpdateLimiter,
+  groupDeleteLimiter,
+  groupJoinLimiter,
+  groupLeaveLimiter,
+  groupGoalLimiter,
+  groupChallengeLimiter,
+
+  heatmapGetLimiter,
+  heatmapRefreshLimiter,
+  heatmapExportLimiter,
+  heatmapStatsLimiter,
+  heatmapFilterLimiter,
+
+  // Keep helpers for any custom use
+  createMemoryLimiter,
+  createRedisLimiter
 };

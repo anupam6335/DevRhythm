@@ -156,14 +156,15 @@ const createOrUpdateProgress = Joi.object({
     language: Joi.string().required(),
     code: Joi.string().required()
   }),
-  confidenceLevel: Joi.number().integer().min(1).max(5),
+  // confidenceLevel removed – it is automatically calculated
   timeSpent: Joi.number().integer().min(0).max(480),
   personalDifficulty: Joi.string().valid('Easy', 'Medium', 'Hard').optional(),
   personalContentRef: Joi.string().uri().allow('').optional(),
 });
 
 const updateStatus = Joi.object({
-  status: Joi.string().valid('Not Started', 'Attempted', 'Solved', 'Mastered').required()
+  status: Joi.string().valid('Not Started', 'Attempted', 'Solved').required()
+  // Mastered is not allowed here – controller will also reject
 });
 
 const updateCode = Joi.object({
@@ -178,6 +179,7 @@ const updateNotes = Joi.object({
 
 const updateConfidence = Joi.object({
   confidenceLevel: Joi.number().integer().min(1).max(5).required()
+  // This endpoint is now disabled in controller
 });
 
 const recordAttempt = Joi.object({
@@ -186,8 +188,8 @@ const recordAttempt = Joi.object({
 });
 
 const recordRevision = Joi.object({
-  timeSpent: Joi.number().integer().min(0).max(480).default(0),
-  confidenceLevel: Joi.number().integer().min(1).max(5)
+  timeSpent: Joi.number().integer().min(0).max(480).default(0)
+  // confidenceLevel removed – automatically calculated
 });
 
 const deleteProgress = Joi.object({
@@ -229,6 +231,7 @@ const completeRevision = Joi.object({
   completedAt: Joi.date().default(() => new Date()),
   status: Joi.string().valid('completed', 'skipped').default('completed'),
   confidenceLevel: Joi.number().integer().min(1).max(5)
+  // confidenceLevel may be accepted but will be ignored in handler
 });
 
 const rescheduleRevision = Joi.object({

@@ -10,7 +10,7 @@ const Joi = require('joi');
 
 router.get('/search-leetcode',
   auth,
-  rateLimiters.createMemoryLimiter(60 * 1000, 10),
+  rateLimiters.leetcodeSearchLimiter,
   validate(Joi.object({ 
     q: Joi.string().min(2).required(),
     type: Joi.string().valid('name', 'tag').default('name')
@@ -18,34 +18,25 @@ router.get('/search-leetcode',
   questionController.searchLeetCodeQuestions
 );
 
-// POST /questions/fetch-leetcode
 router.post('/fetch-leetcode',
   auth,
-  rateLimiters.createMemoryLimiter(60 * 1000, 10),
+  rateLimiters.leetcodeFetchLimiter,
   validate(Joi.object({ url: Joi.string().uri().required() })),
   questionController.fetchLeetCodeQuestion
 );
 
-router.get('/', auth, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
-router.get('/patterns', auth, cache(1800, 'questions:patterns'), questionController.getPatterns);
-router.get('/tags', auth, cache(1800, 'questions:tags'), questionController.getTags);
-router.get('/statistics', auth, cache(3600, 'questions:statistics'), questionController.getStatistics);
-router.get('/deleted', auth, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
-router.get('/:id', auth, cache(3600, 'question'), validate(questionValidator.getQuestionById, 'params'), questionController.getQuestionById);
-router.get('/platform/:platform/:platformQuestionId', auth, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
-
-router.get('/similar/:id',
-  auth,
-  cache(3600, 'question:similar'),
-  validate(questionValidator.getSimilarQuestions, 'params'),
-  validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'), // new line
-  questionController.getSimilarQuestions
-);
-
-router.post('/', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.createQuestion), questionController.createQuestion);
-router.put('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.updateQuestion), questionController.updateQuestion);
-router.delete('/:id', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.deleteQuestion, 'params'), questionController.deleteQuestion);
-router.post('/:id/restore', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.restoreQuestion, 'params'), questionController.restoreQuestion);
-router.delete('/:id/permanent', auth, rateLimiters.createMemoryLimiter(15 * 60 * 1000, 50), validate(questionValidator.permanentDeleteQuestion, 'params'), questionController.permanentDeleteQuestion);
+router.get('/', auth, rateLimiters.userLimiter, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
+router.get('/patterns', auth, rateLimiters.userLimiter, cache(1800, 'questions:patterns'), questionController.getPatterns);
+router.get('/tags', auth, rateLimiters.userLimiter, cache(1800, 'questions:tags'), questionController.getTags);
+router.get('/statistics', auth, rateLimiters.userLimiter, cache(3600, 'questions:statistics'), questionController.getStatistics);
+router.get('/deleted', auth, rateLimiters.userLimiter, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
+router.get('/platform/:platform/:platformQuestionId', auth, rateLimiters.userLimiter, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
+router.get('/:id', auth, rateLimiters.userLimiter, cache(3600, 'question'), validate(questionValidator.getQuestionById, 'params'), questionController.getQuestionById);
+router.get('/similar/:id', auth, rateLimiters.userLimiter, cache(3600, 'question:similar'), validate(questionValidator.getSimilarQuestions, 'params'), validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'), questionController.getSimilarQuestions);
+router.post('/', auth, rateLimiters.questionCreateLimiter, validate(questionValidator.createQuestion), questionController.createQuestion);
+router.put('/:id', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.updateQuestion), questionController.updateQuestion);
+router.delete('/:id', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.deleteQuestion, 'params'), questionController.deleteQuestion);
+router.post('/:id/restore', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.restoreQuestion, 'params'), questionController.restoreQuestion);
+router.delete('/:id/permanent', auth, rateLimiters.questionDeleteLimiter, validate(questionValidator.permanentDeleteQuestion, 'params'), questionController.permanentDeleteQuestion);
 
 module.exports = router;
