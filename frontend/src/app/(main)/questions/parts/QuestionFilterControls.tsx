@@ -12,8 +12,7 @@ import {
 import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
 import FilterChip from '@/shared/components/FilterChip';
-import { MultiSelect } from './MultiSelect';
-import type { MultiSelectOption } from './MultiSelect';
+import { MultiSelect } from '@/app/(main)/questions/parts/MultiSelect';
 import styles from './QuestionFilterControls.module.css';
 
 export interface Filters {

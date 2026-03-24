@@ -35,7 +35,6 @@ export interface NavbarProps {
   pendingRevisionsCount?: number;
   dailyGoalProgress?: { completed: number; target: number };
   streakCount?: number;
-  onQuickAdd: () => void;
   className?: string;
 }
 
@@ -45,7 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingRevisionsCount = 0,
   dailyGoalProgress = { completed: 0, target: 3 },
   streakCount = 0,
-  onQuickAdd,
   className,
 }) => {
   const { user, logout } = useSession();
@@ -66,8 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   // Close all dropdowns when clicking outside (handled by useClickOutside)
-  // But we also close when clicking on a link inside dropdown – that's fine.
-
   useClickOutside(questionsRef, () => {
     if (openDropdown === 'questions') setOpenDropdown(null);
   });
@@ -266,7 +262,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="Close menu"
               leftIcon={<FiX />}
             />
-
             <div className={styles.drawerContent}>
               <div className={styles.drawerThemeToggle}>
                 <span>Theme</span>
@@ -385,9 +380,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </Link>
 
-          <button className={styles.quickAddButton} onClick={onQuickAdd} aria-label="Add solved question">
+          {/* Quick Add – now a Link to create question page */}
+          <Link
+            href={ROUTES.QUESTIONS.CREATE}
+            className={styles.quickAddButton}
+            aria-label="Add solved question"
+          >
             <FiPlus />
-          </button>
+          </Link>
 
           <Link
             href={ROUTES.GROUPS.ROOT}

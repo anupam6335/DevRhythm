@@ -1,10 +1,11 @@
 const Question = require('../models/Question');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
+const { applySorting } = require('../utils/helpers/sort');
+const { slugify } = require('../utils/helpers/string');
 const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
-const { applySorting } = require('../utils/helpers/sort');
 const { jobQueue } = require('../services/queue.service');
 
 // generate a pattern name from tags
@@ -87,27 +88,49 @@ const getQuestionById = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
- const createQuestion = async (req, res, next) => {
-   try {
-     const existing = await Question.findOne({ platform: req.body.platform, platformQuestionId: req.body.platformQuestionId });
-     if (existing) throw new AppError('Question with same platform and ID already exists', 409);
+const createQuestion = async (req, res, next) => {
+  try {
+    // Auto‑generate platformQuestionId if not provided
+    let platformQuestionId = req.body.platformQuestionId;
+    if (!platformQuestionId || platformQuestionId.trim() === '') {
+      if (!req.body.title) {
+        throw new AppError('Title is required to generate question ID', 400);
+      }
 
-     // Auto‑generate pattern if not provided
-     let { pattern, tags } = req.body;
-     if (!pattern || pattern === '') {
-       pattern = generatePatternFromTags(tags || []);
-     }
+      const baseSlug = slugify(req.body.title);
+      let slug = baseSlug;
+      let counter = 1;
 
-     // Normalize pattern to array
-     if (pattern && !Array.isArray(pattern)) {
-       req.body.pattern = [pattern];
-     } else {
-       req.body.pattern = pattern;
-     }
+      // Ensure uniqueness for this platform
+      while (await Question.findOne({ platform: req.body.platform, platformQuestionId: slug })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
 
-     const question = await Question.create(req.body);
-     
-     // Add job to extract test cases from contentRef
+      platformQuestionId = slug;
+      req.body.platformQuestionId = slug; // store back for creation
+    }
+
+    // Check duplicate (now with the possibly generated ID)
+    const existing = await Question.findOne({ platform: req.body.platform, platformQuestionId: req.body.platformQuestionId });
+    if (existing) throw new AppError('Question with same platform and ID already exists', 409);
+
+    // Auto‑generate pattern if not provided
+    let { pattern, tags } = req.body;
+    if (!pattern || pattern === '') {
+      pattern = generatePatternFromTags(tags || []);
+    }
+
+    // Normalize pattern to array
+    if (pattern && !Array.isArray(pattern)) {
+      req.body.pattern = [pattern];
+    } else {
+      req.body.pattern = pattern;
+    }
+
+    const question = await Question.create(req.body);
+
+    // Add job to extract test cases from contentRef
     if (question.contentRef) {
       await jobQueue.add({
         type: 'question.extract_testcases',
@@ -115,20 +138,20 @@ const getQuestionById = async (req, res, next) => {
       });
     }
 
-     await jobQueue.add({
-       type: 'revision.schedule',
-       userId: req.user._id,
-       questionId: question._id,
-       baseDate: new Date(),
-     });
-     
-     await invalidateQuestionCache(question._id, question.platform, question.platformQuestionId);
-     
-     res.status(201).json(formatResponse('Question created successfully', { question }));
-   } catch (error) {
-     next(error);
-   }
- };
+    await jobQueue.add({
+      type: 'revision.schedule',
+      userId: req.user._id,
+      questionId: question._id,
+      baseDate: new Date(),
+    });
+
+    await invalidateQuestionCache(question._id, question.platform, question.platformQuestionId);
+
+    res.status(201).json(formatResponse('Question created successfully', { question }));
+  } catch (error) {
+    next(error);
+  }
+};
 
 const updateQuestion = async (req, res, next) => {
   try {

@@ -4,7 +4,7 @@ import React from 'react';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import EmptyState from '@/shared/components/EmptyState';
 import { FiInbox } from 'react-icons/fi';
-import { QuestionCard } from './QuestionCard';
+import { QuestionCard } from '@/app/(main)/questions/parts/QuestionCard';
 import type { Question } from '@/shared/types';
 import styles from './QuestionList.module.css';
 

@@ -20,7 +20,7 @@ const createQuestion = Joi.object({
   title: Joi.string().trim().required().min(2).max(200),
   problemLink: Joi.string().uri().required(),
   platform: Joi.string().valid('LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'Other').required(),
-  platformQuestionId: Joi.string().required(),
+  platformQuestionId: Joi.string().allow('').optional(),
   difficulty: Joi.string().valid('Easy', 'Medium', 'Hard').required(),
   tags: Joi.array().items(Joi.string().trim()).default([]),
   pattern: Joi.alternatives().try(

@@ -3,10 +3,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { IoClose } from 'react-icons/io5';
-import { QuestionFilterControls, Filters } from './QuestionFilterControls';
+import { QuestionFilterControls, Filters } from '@/app/(main)/questions/parts/QuestionFilterControls';
 import Button from '@/shared/components/Button';
 import Divider from '@/shared/components/Divider';
-import { QuestionStatistics } from '../types/question.types';
+import { QuestionStatistics } from '@/features/question/types/question.types';
 
 import styles from './QuestionFilterDrawer.module.css';
 

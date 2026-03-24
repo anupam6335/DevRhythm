@@ -1,11 +1,10 @@
-export * from './components/QuestionsPageClient';
-export * from './components/QuestionCard';
-export * from './components/QuestionList';
-export * from './components/QuestionFilterSidebar';
-export * from './components/QuestionFilterDrawer';
-export * from './components/QuestionFilterControls';
-export * from './components/SimilarQuestionsInput';
-export * from './components/MultiSelect';
+// export * from '../../app/(main)/questions/parts/QuestionsPageClient';
+// export * from '../../app/(main)/questions/parts/QuestionCard';
+// export * from '../../app/(main)/questions/parts/QuestionList';
+// export * from '../../app/(main)/questions/parts/QuestionFilterSidebar';
+// export * from '../../app/(main)/questions/parts/QuestionFilterDrawer';
+// export * from '../../app/(main)/questions/parts/QuestionFilterControls';
+// export * from '../../app/(main)/questions/parts/MultiSelect';
 export * from './types/question.types';
 export * from './hooks/useQuestions';
 export * from './hooks/useDeletedQuestions';

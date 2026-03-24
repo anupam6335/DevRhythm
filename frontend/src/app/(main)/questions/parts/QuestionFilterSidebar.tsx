@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { QuestionFilterControls, Filters } from './QuestionFilterControls';
+import { QuestionFilterControls, Filters } from '@/app/(main)/questions/parts/QuestionFilterControls';
 import Button from '@/shared/components/Button';
 import StatCard from '@/shared/components/StatCard';
 import Divider from '@/shared/components/Divider';
-import type { QuestionStatistics } from '../types/question.types';
+import type { QuestionStatistics } from '@/features/question/types/question.types';
 import styles from './QuestionFilterSidebar.module.css';
 
 interface QuestionFilterSidebarProps {

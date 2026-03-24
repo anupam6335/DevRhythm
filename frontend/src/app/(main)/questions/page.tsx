@@ -2,9 +2,8 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Breadcrumb from '@/shared/components/Breadcrumb';
-import { QuestionsPageClient } from '@/features/question/components/QuestionsPageClient';
+import { QuestionsPageClient } from '@/app/(main)/questions/parts/QuestionsPageClient';
 import { ROUTES } from '@/shared/config/routes';
-import styles from './page.module.css';
 
 export const metadata: Metadata = {
   title: 'Questions · DevRhythm',

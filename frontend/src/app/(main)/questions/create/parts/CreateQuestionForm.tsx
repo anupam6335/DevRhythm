@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FiSearch, FiTag, FiPaperclip, FiLink, FiEdit3 } from 'react-icons/fi';
 
-
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
-
 import { ROUTES } from '@/shared/config/routes';
 import styles from './CreateQuestionForm.module.css';
-import { prepareCreateQuestionPayload, useCreateQuestion, usePatterns, useTags } from '@/features/question';
+import {
+  prepareCreateQuestionPayload,
+  useCreateQuestion,
+  usePatterns,
+  useTags,
+} from '@/features/question';
 import { LeetCodeSearch } from './LeetCodeSearch';
 import { LeetCodeUrlInput } from './LeetCodeUrlInput';
 import { ChipInput } from './ChipInput';
@@ -44,10 +47,19 @@ const questionSchema = z.object({
 
 type FormData = z.infer<typeof questionSchema>;
 
+// Helper to generate a slug from a title (matches backend logic)
+const generateSlug = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')   // remove non-word chars (except spaces and hyphens)
+    .replace(/[\s_-]+/g, '-')    // replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, '');    // trim leading/trailing hyphens
+};
+
 export const CreateQuestionForm: React.FC = () => {
   const router = useRouter();
   const createMutation = useCreateQuestion();
-
   const { data: patternOptions = [] } = usePatterns();
   const { data: tagOptions = [] } = useTags();
 
@@ -56,6 +68,7 @@ export const CreateQuestionForm: React.FC = () => {
     handleSubmit,
     control,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(questionSchema),
@@ -68,7 +81,17 @@ export const CreateQuestionForm: React.FC = () => {
     },
   });
 
+  const [autoGenerateId, setAutoGenerateId] = useState(true);
   const [fetchSource, setFetchSource] = useState<'search' | 'url' | null>(null);
+  const title = watch('title');
+
+  // Auto‑generate platformQuestionId when title changes and auto‑generation is active
+  useEffect(() => {
+    if (autoGenerateId && title) {
+      const slug = generateSlug(title);
+      setValue('platformQuestionId', slug);
+    }
+  }, [title, autoGenerateId, setValue]);
 
   const handleLeetCodeSearchSelect = (result: any) => {
     setValue('title', result.title);
@@ -77,7 +100,8 @@ export const CreateQuestionForm: React.FC = () => {
     setValue('tags', result.tags);
     setValue('platformQuestionId', result.slug);
     setValue('platform', 'LeetCode');
-    setFetchSource('search');
+    setAutoGenerateId(false);               // disable auto‑generation after LeetCode fetch
+    setFetchSource('search');               // mark that data came from search
     if (result.tags.length > 0) {
       setValue('pattern', [result.tags[0]]);
     }
@@ -86,24 +110,28 @@ export const CreateQuestionForm: React.FC = () => {
     }
   };
 
-  const handleUrlFetch = useCallback((data: any) => {
-    setValue('title', data.title);
-    setValue('problemLink', data.link);
-    setValue('difficulty', data.difficulty as any);
-    setValue('tags', data.tags);
-    setValue('platform', 'LeetCode');
-    const match = data.link.match(/\/problems\/([^/]+)/);
-    if (match) {
-      setValue('platformQuestionId', match[1]);
-    }
-    setFetchSource('url');
-    if (data.tags.length > 0) {
-      setValue('pattern', [data.tags[0]]);
-    }
-    if (data.description) {
-      setValue('contentRef', data.description);
-    }
-  }, [setValue]);
+  const handleUrlFetch = useCallback(
+    (data: any) => {
+      setValue('title', data.title);
+      setValue('problemLink', data.link);
+      setValue('difficulty', data.difficulty as any);
+      setValue('tags', data.tags);
+      setValue('platform', 'LeetCode');
+      const match = data.link.match(/\/problems\/([^/]+)/);
+      if (match) {
+        setValue('platformQuestionId', match[1]);
+      }
+      setAutoGenerateId(false);             // disable auto‑generation after URL fetch
+      setFetchSource('url');                // mark that data came from URL fetch
+      if (data.tags.length > 0) {
+        setValue('pattern', [data.tags[0]]);
+      }
+      if (data.description) {
+        setValue('contentRef', data.description);
+      }
+    },
+    [setValue]
+  );
 
   const onSubmit = async (data: FormData) => {
     const payload = prepareCreateQuestionPayload(data);
@@ -115,13 +143,21 @@ export const CreateQuestionForm: React.FC = () => {
     router.push(ROUTES.QUESTIONS.ROOT);
   };
 
+  // Determine if the description field should be read‑only (i.e., came from LeetCode)
+  const isDescriptionReadOnly = fetchSource !== null;
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
       {/* Header */}
       <div className={styles.header}>
         <h1 className={styles.title}>Create Question</h1>
         <div className={styles.actions}>
-          <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
@@ -196,7 +232,7 @@ export const CreateQuestionForm: React.FC = () => {
                 </div>
                 <div className={styles.field}>
                   <label htmlFor="platformQuestionId" className={styles.label}>
-                    ID <span className={styles.required}>*</span>
+                    ID
                   </label>
                   <Input
                     id="platformQuestionId"
@@ -235,7 +271,12 @@ export const CreateQuestionForm: React.FC = () => {
                 <div className={styles.radioGroup}>
                   {difficulties.map((d) => (
                     <label key={d} className={styles.radio}>
-                      <input type="radio" value={d} {...register('difficulty')} disabled={isSubmitting} />
+                      <input
+                        type="radio"
+                        value={d}
+                        {...register('difficulty')}
+                        disabled={isSubmitting}
+                      />
                       <span>{d}</span>
                     </label>
                   ))}
@@ -311,12 +352,17 @@ export const CreateQuestionForm: React.FC = () => {
               </h2>
               <Input
                 {...register('contentRef')}
-                placeholder="https://..."
+                placeholder={isDescriptionReadOnly ? "Auto-filled from LeetCode" : "Add Problem Description..."}
                 fullWidth
                 disabled={isSubmitting}
-                readOnly
+                readOnly={isDescriptionReadOnly}
                 className={styles.input}
               />
+              {isDescriptionReadOnly && (
+                <p className={styles.hint} style={{ marginTop: '0.25rem', color: 'var(--accent-moss)' }}>
+                  Description fetched from LeetCode (read‑only)
+                </p>
+              )}
             </section>
           </div>
         </div>
