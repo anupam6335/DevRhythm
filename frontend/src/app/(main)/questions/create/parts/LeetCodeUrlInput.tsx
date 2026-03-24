@@ -8,56 +8,93 @@ import { toast } from '@/shared/components/Toast';
 import styles from './LeetCodeUrlInput.module.css';
 
 interface LeetCodeUrlInputProps {
-  onFetch: (data: { title: string; difficulty: string; tags: string[]; link: string; description?: string }) => void;
+  onFetch: (data: {
+    title: string;
+    difficulty: string;
+    tags: string[];
+    link: string;
+    description?: string;
+  }) => void;
   disabled?: boolean;
 }
 
-export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({ onFetch, disabled }) => {
+export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
+  onFetch,
+  disabled,
+}) => {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const fetchMutation = useLeetCodeFetch();
   const lastFetchedUrlRef = useRef<string>('');
+  const fetchingUrlRef = useRef<string | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const validateAndFetch = useCallback((urlToValidate: string) => {
-    if (!urlToValidate) {
+  const validateAndFetch = useCallback(
+    (urlToValidate: string) => {
+      if (!urlToValidate) {
+        setError(null);
+        return;
+      }
+
+      const isValidLeetCodeUrl =
+        /^https?:\/\/(www\.)?leetcode\.com\/problems\/[^/]+\/?/.test(
+          urlToValidate
+        );
+      if (!isValidLeetCodeUrl) {
+        setError('Please enter a valid LeetCode problem URL');
+        return;
+      }
+
+      // Skip if the same URL was already fetched successfully
+      if (lastFetchedUrlRef.current === urlToValidate) {
+        return;
+      }
+
+      // Skip if we're already fetching the same URL
+      if (fetchingUrlRef.current === urlToValidate) {
+        return;
+      }
+
       setError(null);
-      return;
-    }
+      fetchingUrlRef.current = urlToValidate;
 
-    const isValidLeetCodeUrl = /^https?:\/\/(www\.)?leetcode\.com\/problems\/[^/]+\/?/.test(urlToValidate);
-    if (!isValidLeetCodeUrl) {
-      setError('Please enter a valid LeetCode problem URL');
-      return;
-    }
-
-    // Skip if same URL already fetched successfully
-    if (lastFetchedUrlRef.current === urlToValidate) {
-      return;
-    }
-
-    setError(null);
-    fetchMutation.mutate(urlToValidate, {
-      onSuccess: (data) => {
-        lastFetchedUrlRef.current = urlToValidate;
-        onFetch(data);
-        toast.success('Problem details fetched');
-      },
-      onError: (err: any) => {
-        setError(err.message || 'Failed to fetch problem');
-        toast.error(err.message || 'Failed to fetch problem');
-        // Do not update lastFetchedUrlRef on error, allow retry
-      },
-    });
-  }, [fetchMutation, onFetch]);
+      fetchMutation.mutate(urlToValidate, {
+        onSuccess: (data) => {
+          fetchingUrlRef.current = null;
+          lastFetchedUrlRef.current = urlToValidate;
+          onFetch(data);
+          toast.success('Problem details fetched');
+        },
+        onError: (err: any) => {
+          fetchingUrlRef.current = null;
+          // Don't show error toast for cancellations
+          if (err?.code !== 'ERR_CANCELED' && !err?.message?.includes('canceled')) {
+            setError(err.message || 'Failed to fetch problem');
+            toast.error(err.message || 'Failed to fetch problem');
+          }
+        },
+      });
+    },
+    [fetchMutation, onFetch]
+  );
 
   // Debounced fetch
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (url) {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    if (url) {
+      debounceTimeoutRef.current = setTimeout(() => {
         validateAndFetch(url);
+      }, 500);
+    }
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
-    }, 500);
-    return () => clearTimeout(timeout);
+    };
   }, [url, validateAndFetch]);
 
   const handleBlur = () => {
@@ -72,6 +109,10 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({ onFetch, dis
     // Reset last fetched URL if the input changes to a different URL
     if (newUrl !== lastFetchedUrlRef.current) {
       lastFetchedUrlRef.current = '';
+    }
+    // Reset fetching URL ref when URL changes
+    if (newUrl !== fetchingUrlRef.current) {
+      fetchingUrlRef.current = null;
     }
   };
 

@@ -29,6 +29,7 @@ try {
 
 // Create a Redis limiter if possible, otherwise fallback to memory
 const createRedisLimiter = (windowMs, max, keyPrefix) => {
+  // Use Redis store if available and ready
   if (redisStoreAvailable && redisClient && redisClient.isReady) {
     try {
       return rateLimit({
@@ -38,6 +39,8 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
         }),
         windowMs,
         max,
+        // Explicitly enable the Retry-After header (default is false, but we want it)
+        skipHeaders: false,
         message: {
           success: false,
           statusCode: 429,
@@ -45,12 +48,18 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
           data: null,
           meta: {},
           error: { code: 'RATE_LIMIT_EXCEEDED' }
+        },
+        // Optional: ensure Retry-After is set even if the store doesn't
+        onLimitReached: (req, res, options) => {
+          // Set Retry-After header to the number of seconds remaining in the window
+          res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
         }
       });
     } catch (error) {
       console.warn(`Redis limiter failed for ${keyPrefix}, using memory:`, error.message);
     }
   }
+  // Fallback to memory store
   return createMemoryLimiter(windowMs, max);
 };
 
@@ -68,8 +77,8 @@ const publicLimiter = createRedisLimiter(60 * 1000, 30, 'public');
 const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:create');
 const questionUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:update');
 const questionDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'question:delete');
-const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 10, 'leetcode:search');
-const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 10, 'leetcode:fetch');
+const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 30, 'leetcode:search');
+const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 30, 'leetcode:fetch');
 
 // Progress endpoints
 const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'progress:update');

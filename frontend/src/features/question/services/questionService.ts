@@ -20,20 +20,28 @@ export const questionService = {
     };
   },
 
-  async fetchLeetCodeQuestion(url: string): Promise<{ title: string; difficulty: string; tags: string[]; link: string; description: string }> {
-    const response = await apiClient.post<{ title: string; difficulty: string; tags: string[]; link: string; description: string }>(
-      '/questions/fetch-leetcode',
-      { url }
-    );
+  async fetchLeetCodeQuestion(
+    url: string,
+    signal?: AbortSignal
+  ): Promise<{ title: string; difficulty: string; tags: string[]; link: string; description: string }> {
+    const response = await apiClient.post<{
+      title: string;
+      difficulty: string;
+      tags: string[];
+      link: string;
+      description: string;
+    }>('/questions/fetch-leetcode', { url }, { signal });
     return response.data;
   },
 
   async searchLeetCodeQuestions(
     query: string,
-    type: 'name' | 'tag' = 'name'
+    type: 'name' | 'tag' = 'name',
+    signal?: AbortSignal
   ): Promise<{ results: Array<{ title: string; slug: string; difficulty: string; tags: string[]; url: string }> }> {
     const response = await apiClient.get('/questions/search-leetcode', {
-      params: { q: query, type }
+      params: { q: query, type },
+      signal,
     });
     return response.data;
   },
@@ -105,5 +113,5 @@ export const questionService = {
 
   async permanentDeleteQuestion(id: string) {
     await apiClient.delete(`/questions/${id}/permanent`);
-  }
+  },
 };
