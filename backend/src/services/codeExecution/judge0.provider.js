@@ -91,23 +91,11 @@ class Judge0Provider extends BaseCodeExecutionProvider {
   }
 
   async execute({ language, code, stdin }) {
-
     const langId = LANGUAGE_IDS[language];
     if (!langId) throw new Error(`Unsupported language: ${language}`);
-
     const template = TEMPLATES[language];
     if (!template) throw new Error(`Template missing for language: ${language}`);
-
-    // For Python, user code is inserted at top level (no extra indentation)
-    // For other languages, indent each line by 4 spaces to fit inside the function
-    let insertedCode = code;
-    if (language !== 'python') {
-      const indent = ' '.repeat(4);
-      insertedCode = code.split('\n').map(line => line ? indent + line : line).join('\n');
-    }
-
-    // Replace the placeholder with the (possibly indented) user code
-    const sourceCode = template.replace('{{USER_CODE}}', insertedCode);
+    const sourceCode = template.replace('{{USER_CODE}}', this._indentCode(code, language !== 'python'));
 
     const payload = {
       source_code: sourceCode,
@@ -117,35 +105,49 @@ class Judge0Provider extends BaseCodeExecutionProvider {
       memory_limit: this.memoryLimit,
     };
 
-    const url = `${this.apiUrl}/submissions?wait=true&fields=stdout,stderr,compile_output,status`;
+    const url = `${this.apiUrl}/submissions?wait=true&fields=stdout,stderr,status`;
+    const response = await axios.post(url, payload, {
+      timeout: Math.max(10000, (this.cpuTimeLimit + 2) * 1000),
+    });
+    const result = response.data;
+    return {
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      exitCode: result.status?.id === 3 ? 0 : 1,
+    };
+  }
 
-    try {
-      const response = await axios.post(url, payload, {
-        timeout: Math.max(10000, (this.cpuTimeLimit + 2) * 1000),
-      });
-      const result = response.data;
-      const stdout = result.stdout || '';
-      const stderr = result.stderr || '';
-      const compileOutput = result.compile_output || '';
-      const exitCode = result.status?.id === 3 ? 0 : 1;
+  async executeBatch({ language, code, testCases }) {
+    const langId = LANGUAGE_IDS[language];
+    if (!langId) throw new Error(`Unsupported language: ${language}`);
+    const template = TEMPLATES[language];
+    if (!template) throw new Error(`Template missing for language: ${language}`);
+    const sourceCode = template.replace('{{USER_CODE}}', this._indentCode(code, language !== 'python'));
 
-      const errorMsg = compileOutput ? compileOutput : (stderr || undefined);
+    const submissions = testCases.map(tc => ({
+      source_code: sourceCode,
+      language_id: langId,
+      stdin: tc.stdin,
+      cpu_time_limit: this.cpuTimeLimit,
+      memory_limit: this.memoryLimit,
+    }));
 
-      return {
-        stdout,
-        stderr: errorMsg || stderr,
-        exitCode,
-        compileOutput,
-      };
-    } catch (error) {
-      console.error('Judge0 execution error:', error.message);
-      return {
-        stdout: '',
-        stderr: error.response?.data?.message || error.message,
-        exitCode: 1,
-        error: 'Execution service error',
-      };
-    }
+    const url = `${this.apiUrl}/submissions/batch?wait=true&fields=stdout,stderr,status`;
+    const response = await axios.post(url, { submissions }, {
+      timeout: Math.max(10000, (this.cpuTimeLimit + 2) * 1000),
+    });
+    const results = response.data;
+    return results.map(result => ({
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      exitCode: result.status?.id === 3 ? 0 : 1,
+    }));
+  }
+
+  _indentCode(code, shouldIndent) {
+    if (!shouldIndent) return code;
+    const indent = ' '.repeat(4);
+    return code.split('\n').map(line => line ? indent + line : line).join('\n');
   }
 }
 

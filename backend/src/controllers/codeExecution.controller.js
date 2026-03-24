@@ -1,4 +1,4 @@
-const { executeCode } = require('../services/codeExecution.service');
+const { executeBatch } = require('../services/codeExecution.service');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
@@ -14,6 +14,7 @@ const runCode = async (req, res, next) => {
   try {
     let { language, code, stdin, expected, testCases, questionId } = req.body;
 
+    // Validate input
     if (!SUPPORTED_LANGUAGES.includes(language)) {
       throw new AppError(`Unsupported language. Supported: ${SUPPORTED_LANGUAGES.join(', ')}`, 400);
     }
@@ -30,9 +31,7 @@ const runCode = async (req, res, next) => {
       UserQuestionProgress.findOne({ userId: req.user._id, questionId }),
     ]);
 
-    if (!question) {
-      throw new AppError('Question not found', 404);
-    }
+    if (!question) throw new AppError('Question not found', 404);
 
     // Extract default test cases from question
     let defaultTestCases = [];
@@ -43,7 +42,7 @@ const runCode = async (req, res, next) => {
       }));
     }
 
-    // Extract user's custom test cases from progress (if any)
+    // Extract user's custom test cases from progress
     let userCustomTestCases = [];
     if (userProgress && userProgress.customTestCases && Array.isArray(userProgress.customTestCases)) {
       userCustomTestCases = userProgress.customTestCases.map(tc => ({
@@ -55,16 +54,11 @@ const runCode = async (req, res, next) => {
     // Build the final list of test cases
     let finalTestCases = [];
 
-    // If request provides testCases, combine default + user custom + request custom
     if (testCases && Array.isArray(testCases)) {
       finalTestCases = [...defaultTestCases, ...userCustomTestCases, ...testCases];
-    }
-    // Else if request provides legacy stdin, treat as a single test case
-    else if (stdin !== undefined) {
+    } else if (stdin !== undefined) {
       finalTestCases = [...defaultTestCases, ...userCustomTestCases, { stdin: stdin || '', expected: expected || '' }];
-    }
-    // Else use only default + user custom
-    else {
+    } else {
       finalTestCases = [...defaultTestCases, ...userCustomTestCases];
     }
 
@@ -72,29 +66,31 @@ const runCode = async (req, res, next) => {
       throw new AppError('No test cases available for this question', 400);
     }
 
-    // Execute all test cases
-    const results = [];
-    let passedCount = 0;
+    // Execute all test cases in a single batch
+    const batchResults = await executeBatch({ language, code, testCases: finalTestCases });
 
-    for (const testCase of finalTestCases) {
-      const result = await executeCode({ language, code, stdin: testCase.stdin });
-      const actualOutput = result.stdout;
+    // Process results
+    const results = batchResults.map((res, idx) => {
+      const testCase = finalTestCases[idx];
+      const actualOutput = res.stdout;
       const expectedOutput = testCase.expected || '';
       const normalizedActual = normalize(actualOutput);
       const normalizedExpected = normalize(expectedOutput);
       const passed = (normalizedExpected !== '') ? (normalizedActual === normalizedExpected) : false;
 
-      results.push({
+      return {
         input: testCase.stdin,
         output: actualOutput,
         expected: expectedOutput,
-        error: result.stderr,
-        exitCode: result.exitCode,
+        error: res.stderr,
+        exitCode: res.exitCode,
         passed,
-      });
+      };
+    });
 
-      if (passed) passedCount++;
-    }
+    const passedCount = results.filter(r => r.passed).length;
+    const totalCount = finalTestCases.length;
+    const allPassed = passedCount === totalCount;
 
     // Save custom test cases if provided in request
     let customToSave = [];
@@ -105,7 +101,6 @@ const runCode = async (req, res, next) => {
     }
 
     if (customToSave.length > 0) {
-      // Update or create user progress with the new custom test cases
       const update = {
         $set: {
           customTestCases: customToSave.map(tc => ({
@@ -122,11 +117,8 @@ const runCode = async (req, res, next) => {
       );
     }
 
-    const totalCount = finalTestCases.length;
-    const allPassed = passedCount === totalCount;
-
-    // Save execution history
-    await CodeExecutionHistory.create({
+    // Save execution history (non‑blocking) and keep only last 10
+    CodeExecutionHistory.create({
       userId: req.user._id,
       questionId,
       language,
@@ -147,8 +139,24 @@ const runCode = async (req, res, next) => {
         userCustomTestCasesCount: userCustomTestCases.length,
         customTestCasesCount: customToSave.length,
       },
-    });
+    }).then(async () => {
+      // Count how many entries exist for this user and question
+      const total = await CodeExecutionHistory.countDocuments({ userId: req.user._id, questionId });
+      if (total > 10) {
+        // Find IDs of oldest entries to delete (skip latest 10)
+        const toDelete = await CodeExecutionHistory.find({ userId: req.user._id, questionId })
+          .sort({ executedAt: -1 })
+          .skip(10)
+          .select('_id')
+          .lean();
+        if (toDelete.length) {
+          const ids = toDelete.map(d => d._id);
+          await CodeExecutionHistory.deleteMany({ _id: { $in: ids } });
+        }
+      }
+    }).catch(err => console.error('Failed to save/cleanup execution history:', err));
 
+    // Return response
     return res.json(formatResponse('Code executed successfully', {
       questionId,
       results,
