@@ -47,7 +47,11 @@ const fetchProblemDetails = async (url) => {
     });
 
     const question = response.data?.data?.question;
-    if (!question) throw new Error('Problem not found on LeetCode');
+    if (!question) {
+      const error = new Error('Problem not found on LeetCode');
+      error.statusCode = 404;
+      throw error;
+    }
 
     return {
       title: question.title,
@@ -57,6 +61,8 @@ const fetchProblemDetails = async (url) => {
       description: question.content,
     };
   } catch (error) {
+    // If it's a 404 error we already threw, rethrow it as is
+    if (error.statusCode === 404) throw error;
     console.error('LeetCode fetch error:', error.message);
     throw new Error('Failed to fetch problem from LeetCode');
   }
@@ -146,4 +152,7 @@ const searchProblems = async (query, filterType = 'name') => {
   }
 };
 
-module.exports = { fetchProblemDetails, searchProblems };
+module.exports = {
+  fetchProblemDetails,
+  searchProblems,
+};

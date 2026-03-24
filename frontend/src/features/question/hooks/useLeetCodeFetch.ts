@@ -8,7 +8,6 @@ export function useLeetCodeFetch() {
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [cooldownTimer, setCooldownTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Cancel any ongoing request when a new one starts
   const cancelPrevious = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -16,50 +15,56 @@ export function useLeetCodeFetch() {
     abortControllerRef.current = new AbortController();
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      if (cooldownTimer) {
-        clearTimeout(cooldownTimer);
-      }
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (cooldownTimer) clearTimeout(cooldownTimer);
     };
   }, [cooldownTimer]);
 
   return useMutation({
     mutationFn: async (url: string) => {
-      // If we're in cooldown, reject immediately
       if (retryAfter && retryAfter > Date.now()) {
         const waitSeconds = Math.ceil((retryAfter - Date.now()) / 1000);
-        throw new Error(`Rate limited. Please wait ${waitSeconds} seconds before retrying.`);
+        throw new Error(`Rate limited. Please wait ${waitSeconds} seconds.`);
       }
       cancelPrevious();
       return questionService.fetchLeetCodeQuestion(url, abortControllerRef.current?.signal);
     },
     onError: (error: any) => {
+      // Check if the request was cancelled (ignore)
+      if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled')) {
+        return;
+      }
+
+      const status = error.response?.status;
+
       // Handle 429 rate limit
-      if (error.response?.status === 429) {
+      if (status === 429) {
         const retryAfterHeader = error.response?.headers?.['retry-after'];
-        let waitSeconds = 60; // fallback to 60 seconds
+        let waitSeconds = 60;
         if (retryAfterHeader && !isNaN(parseInt(retryAfterHeader))) {
           waitSeconds = parseInt(retryAfterHeader);
         }
         const retryTimestamp = Date.now() + waitSeconds * 1000;
         setRetryAfter(retryTimestamp);
 
-        // Clear any existing cooldown timer
-        if (cooldownTimer) {
-          clearTimeout(cooldownTimer);
-        }
+        if (cooldownTimer) clearTimeout(cooldownTimer);
         const timer = setTimeout(() => setRetryAfter(null), waitSeconds * 1000);
         setCooldownTimer(timer);
 
         toast.error(`Too many requests. Please wait ${waitSeconds} seconds.`);
-      } else {
-        toast.error(error.message || 'Failed to fetch LeetCode problem');
+        return;
       }
+
+      // Handle 404 Not Found – permanent error, no retry
+      if (status === 404) {
+        toast.error('Problem not found on LeetCode. Please check the URL.');
+        return;
+      }
+
+      // All other errors
+      toast.error(error.message || 'Failed to fetch LeetCode problem');
     },
   });
 }

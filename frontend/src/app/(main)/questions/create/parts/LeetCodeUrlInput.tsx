@@ -26,6 +26,7 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fetchMutation = useLeetCodeFetch();
   const lastFetchedUrlRef = useRef<string>('');
+  const failedUrlRef = useRef<string>('');
   const fetchingUrlRef = useRef<string | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -50,6 +51,12 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
         return;
       }
 
+      // Skip if the URL previously failed with a permanent error (e.g., 404)
+      if (failedUrlRef.current === urlToValidate) {
+        setError('This problem could not be found. Please check the URL.');
+        return;
+      }
+
       // Skip if we're already fetching the same URL
       if (fetchingUrlRef.current === urlToValidate) {
         return;
@@ -62,15 +69,33 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
         onSuccess: (data) => {
           fetchingUrlRef.current = null;
           lastFetchedUrlRef.current = urlToValidate;
+          failedUrlRef.current = '';
           onFetch(data);
           toast.success('Problem details fetched');
         },
         onError: (err: any) => {
           fetchingUrlRef.current = null;
-          // Don't show error toast for cancellations
-          if (err?.code !== 'ERR_CANCELED' && !err?.message?.includes('canceled')) {
-            setError(err.message || 'Failed to fetch problem');
-            toast.error(err.message || 'Failed to fetch problem');
+
+          // Ignore cancellation errors
+          if (err?.code === 'ERR_CANCELED' || err?.message?.includes('canceled')) {
+            return;
+          }
+
+          // If it's a 404, mark the URL as permanently failed
+          if (err.response?.status === 404) {
+            failedUrlRef.current = urlToValidate;
+            const errorMessage = 'Problem not found on LeetCode. Please check the URL.';
+            setError(errorMessage);
+            toast.error(errorMessage);
+            return;
+          }
+
+          // For other errors (network, rate-limit, etc.) show generic message
+          const errorMessage = err.message || 'Failed to fetch problem';
+          setError(errorMessage);
+          // Avoid duplicate toast for rate-limit (already handled in hook)
+          if (err.response?.status !== 429) {
+            toast.error(errorMessage);
           }
         },
       });
@@ -106,13 +131,16 @@ export const LeetCodeUrlInput: React.FC<LeetCodeUrlInputProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value;
     setUrl(newUrl);
-    // Reset last fetched URL if the input changes to a different URL
+
+    // Reset success and failure tracking when the URL changes
     if (newUrl !== lastFetchedUrlRef.current) {
       lastFetchedUrlRef.current = '';
     }
-    // Reset fetching URL ref when URL changes
     if (newUrl !== fetchingUrlRef.current) {
       fetchingUrlRef.current = null;
+    }
+    if (newUrl !== failedUrlRef.current) {
+      failedUrlRef.current = '';
     }
   };
 
