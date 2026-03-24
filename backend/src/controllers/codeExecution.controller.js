@@ -2,7 +2,8 @@ const { executeCode } = require('../services/codeExecution.service');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
-const UserQuestionProgress = require('../models/UserQuestionProgress'); // <-- import
+const UserQuestionProgress = require('../models/UserQuestionProgress');
+const CodeExecutionHistory = require('../models/CodeExecutionHistory');
 
 const SUPPORTED_LANGUAGES = ['cpp', 'python', 'java', 'javascript'];
 
@@ -26,7 +27,7 @@ const runCode = async (req, res, next) => {
     // Fetch question and user progress
     const [question, userProgress] = await Promise.all([
       Question.findById(questionId).lean(),
-      UserQuestionProgress.findOne({ userId: req.user._id, questionId })
+      UserQuestionProgress.findOne({ userId: req.user._id, questionId }),
     ]);
 
     if (!question) {
@@ -123,6 +124,30 @@ const runCode = async (req, res, next) => {
 
     const totalCount = finalTestCases.length;
     const allPassed = passedCount === totalCount;
+
+    // Save execution history
+    await CodeExecutionHistory.create({
+      userId: req.user._id,
+      questionId,
+      language,
+      code,
+      testCases: results.map(r => ({
+        stdin: r.input,
+        expected: r.expected,
+        output: r.output,
+        error: r.error,
+        exitCode: r.exitCode,
+        passed: r.passed,
+      })),
+      summary: {
+        passedCount,
+        totalCount,
+        allPassed,
+        defaultTestCasesCount: defaultTestCases.length,
+        userCustomTestCasesCount: userCustomTestCases.length,
+        customTestCasesCount: customToSave.length,
+      },
+    });
 
     return res.json(formatResponse('Code executed successfully', {
       questionId,

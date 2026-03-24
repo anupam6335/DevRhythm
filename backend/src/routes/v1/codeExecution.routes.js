@@ -4,6 +4,8 @@ const codeExecutionController = require('../../controllers/codeExecution.control
 const { auth } = require('../../middleware/auth');
 const validate = require('../../middleware/validator');
 const Joi = require('joi');
+const CodeExecutionHistory = require('../../models/CodeExecutionHistory');
+const { formatResponse } = require('../../utils/helpers/response');
 
 const testCaseSchema = Joi.object({
   stdin: Joi.string().allow('').default(''),
@@ -25,5 +27,21 @@ router.post('/execute',
   validate(executeSchema),
   codeExecutionController.runCode
 );
+
+router.get('/history', auth, async (req, res, next) => {
+  try {
+    const { questionId, limit = 20, page = 1 } = req.query;
+    const query = { userId: req.user._id };
+    if (questionId) query.questionId = questionId;
+    const history = await CodeExecutionHistory.find(query)
+      .sort({ executedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .lean();
+    res.json(formatResponse('History retrieved', { history }));
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router;
