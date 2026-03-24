@@ -45,6 +45,11 @@ const QuestionSchema = new mongoose.Schema({
   contentRef: {
     type: String,
   },
+  testCases: [{
+    stdin: { type: String, default: '' },
+    expected: { type: String, required: true },
+    isDefault: { type: Boolean, default: true } 
+  }],
   isActive: {
     type: Boolean,
     default: true,
