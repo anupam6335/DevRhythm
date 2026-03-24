@@ -10,6 +10,7 @@ const { handleGroupGoalCompleted } = require('./groupGoalCompleted.handler');
 const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handler');
 const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
 const { handleRevisionSchedule } = require('./revisionSchedule.hanlder');
+const { handleQuestionExtractTestCases } = require('./questionExtractTestCases.hanlder');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -32,8 +33,8 @@ const processJob = async (job) => {
       await handleFollowerNew(job);
       break;
     case 'revision.schedule':
-        await handleRevisionSchedule(job);
-        break;
+      await handleRevisionSchedule(job);
+      break;
     case 'revision.completed':
       await handleRevisionCompleted(job);
       break;
@@ -51,6 +52,9 @@ const processJob = async (job) => {
       break;
     case 'group.challenge_completed':
       await handleGroupChallengeCompleted(job);
+      break;
+    case 'question.extract_testcases':
+      await handleQuestionExtractTestCases(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);
