@@ -6,6 +6,7 @@
 // export * from '../../app/(main)/questions/parts/QuestionFilterControls';
 // export * from '../../app/(main)/questions/parts/MultiSelect';
 export * from './types/question.types';
+export * from './hooks/useQuestionDetails';
 export * from './hooks/useQuestions';
 export * from './hooks/useDeletedQuestions';
 export * from './hooks/useQuestion';

@@ -1,10 +1,11 @@
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Question = require('../models/Question');
-const { formatResponse } = require('../utils/helpers/response');
-const { paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate } = require('../utils/helpers');
+const UserQuestionProgress = require('../models/UserQuestionProgress');
+const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate } = require("../utils/helpers");
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
+const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
 
 const calculateSpacedRepetitionSchedule = (baseDate, schedule = [1, 3, 7, 14, 30]) => {
@@ -178,9 +179,27 @@ const getQuestionRevision = async (req, res, next) => {
   }
 };
 
+const getQuestionRevisionByPlatform = async (req, res, next) => {
+  try {
+    const { platform, platformQuestionId } = req.params;
+    const question = await Question.findOne({ platform, platformQuestionId, isActive: true });
+    if (!question) throw new AppError('Question not found', 404);
+
+    const revision = await RevisionSchedule.findOne({
+      userId: req.user._id,
+      questionId: question._id,
+    });
+
+    if (!revision) throw new AppError('Revision schedule not found', 404);
+
+    res.json(formatResponse('Revision schedule retrieved successfully', { revision }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createRevision = async (req, res, next) => {
   try {
-
     let { baseDate = new Date(), schedule } = req.body;
     
     let baseDateObj;
@@ -207,6 +226,16 @@ const createRevision = async (req, res, next) => {
     const question = await Question.findById(req.params.questionId);
     if (!question) {
       throw new AppError('Question not found', 404);
+    }
+
+    // Ensure the user has solved the question before creating a revision schedule
+    const progress = await UserQuestionProgress.findOne({
+      userId: req.user._id,
+      questionId: req.params.questionId,
+      status: { $in: ['Solved', 'Mastered'] }
+    });
+    if (!progress) {
+      throw new AppError('Cannot create revision schedule for an unsolved question. Please solve it first.', 400);
     }
     
     let revisionSchedule;
@@ -247,53 +276,23 @@ const createRevision = async (req, res, next) => {
 
 const completeRevision = async (req, res, next) => {
   try {
-    const { completedAt = new Date(), status = 'completed', confidenceLevel } = req.body;
-
-    const revision = await RevisionSchedule.findOne({
-      _id: req.params.revisionId,
-      userId: req.user._id,
-    });
-
+    const { revisionId } = req.params;
+    const revision = await RevisionSchedule.findOne({ _id: revisionId, userId: req.user._id });
     if (!revision) throw new AppError('Revision schedule not found', 404);
-    if (revision.currentRevisionIndex >= revision.schedule.length) {
-      throw new AppError('All revisions already completed', 400);
+    
+    const today = new Date();
+    const result = await revisionActivityService.checkAndCompleteRevision(
+      req.user._id,
+      revision.questionId,
+      today,
+      'manual'
+    );
+    
+    if (!result.completed) {
+      throw new AppError(result.message, 400);
     }
-
-    const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-
-    revision.completedRevisions.push({
-      date: scheduledDate,
-      completedAt,
-      status,
-    });
-
-    // Only increment if there are more revisions left
-    if (revision.currentRevisionIndex < revision.schedule.length - 1) {
-      revision.currentRevisionIndex += 1;
-    } else {
-      // This was the last revision, mark as completed
-      revision.status = 'completed';
-    }
-
-    revision.updatedAt = new Date();
-    await revision.save();
-
-    // Emit event
-    if (jobQueue) {
-      await jobQueue.add({
-        type: 'revision.completed',
-        userId: req.user._id,
-        revisionId: revision._id,
-        questionId: revision.questionId,
-        completedAt,
-        revisionIndex: revision.currentRevisionIndex - 1, // index that was just completed
-        status,
-      });
-    }
-
-    await invalidateCache(`revisions:*:user:${req.user._id}:*`);
-
-    res.json(formatResponse('Revision marked as completed', { revision }));
+    
+    res.json(formatResponse(result.message, { revisionCompleted: true }));
   } catch (error) {
     next(error);
   }
@@ -301,57 +300,98 @@ const completeRevision = async (req, res, next) => {
 
 const completeQuestionRevision = async (req, res, next) => {
   try {
-    const todayStart = getStartOfDay();
-    const todayEnd = getEndOfDay();
+    const { questionId } = req.params;
+    const today = new Date();
+    const result = await revisionActivityService.checkAndCompleteRevision(
+      req.user._id,
+      questionId,
+      today,
+      'manual'
+    );
+    
+    if (!result.completed) {
+      throw new AppError(result.message, 400);
+    }
+    
+    res.json(formatResponse(result.message, { revisionCompleted: true }));
+  } catch (error) {
+    next(error);
+  }
+};
 
-    const revision = await RevisionSchedule.findOne({
+const recordTimeSpent = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+    const { minutes } = req.body;
+    const today = new Date();
+
+    // 1. Record time in Redis
+    await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
+
+    // 2. Update UserQuestionProgress
+    let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
-      questionId: req.params.questionId,
-      status: 'active',
-      schedule: { $elemMatch: { $gte: todayStart, $lte: todayEnd } },
-      $expr: {
-        $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
-      },
+      questionId
     });
 
-    if (!revision) throw new AppError('No pending revision for today', 404);
-
-    const { completedAt = new Date(), status = 'completed', confidenceLevel } = req.body;
-    const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-
-    revision.completedRevisions.push({
-      date: scheduledDate,
-      completedAt,
-      status,
-    });
-
-    // Only increment if there are more revisions left
-    if (revision.currentRevisionIndex < revision.schedule.length - 1) {
-      revision.currentRevisionIndex += 1;
-    } else {
-      revision.status = 'completed';
-    }
-
-    revision.updatedAt = new Date();
-    await revision.save();
-
-    // Emit event
-    const { jobQueue } = require('../services/queue.service');
-    if (jobQueue) {
-      await jobQueue.add({
-        type: 'revision.completed',
+    if (!progress) {
+      progress = new UserQuestionProgress({
         userId: req.user._id,
-        revisionId: revision._id,
-        questionId: revision.questionId,
-        completedAt,
-        revisionIndex: revision.currentRevisionIndex - 1,
-        status,
+        questionId,
+        totalTimeSpent: minutes,
+        status: 'Attempted',
+        attempts: { count: 1, lastAttemptAt: new Date(), firstAttemptAt: new Date() }
       });
+    } else {
+      progress.totalTimeSpent += minutes;
+      if (progress.status === 'Not Started') {
+        progress.status = 'Attempted';
+        if (!progress.attempts.firstAttemptAt) progress.attempts.firstAttemptAt = new Date();
+        progress.attempts.lastAttemptAt = new Date();
+        progress.attempts.count = (progress.attempts.count || 0) + 1;
+      } else {
+        progress.attempts.lastAttemptAt = new Date();
+        progress.attempts.count = (progress.attempts.count || 0) + 1;
+      }
+    }
+    await progress.save();
+
+    // 3. Create revision schedule if total time >= 20 AND no schedule exists
+    const existingRevision = await RevisionSchedule.findOne({
+      userId: req.user._id,
+      questionId
+    });
+    if (!existingRevision && progress.totalTimeSpent >= 20) {
+      const baseDate = new Date();
+      const schedule = [1, 3, 7, 14, 30].map(days => {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + days);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      });
+      await RevisionSchedule.create({
+        userId: req.user._id,
+        questionId,
+        schedule,
+        baseDate,
+        status: 'active'
+      });
+      await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     }
 
-    await invalidateCache(`revisions:*:user:${req.user._id}:*`);
+    // 4. Check if revision can be completed (existing)
+    const result = await revisionActivityService.checkAndCompleteRevision(
+      req.user._id,
+      questionId,
+      today,
+      'auto'
+    );
 
-    res.json(formatResponse('Revision marked as completed', { revision }));
+    if (result.completed) {
+      return res.json(formatResponse(result.message, { revisionCompleted: true }));
+    }
+
+    res.json(formatResponse('Time recorded successfully', { minutes }));
   } catch (error) {
     next(error);
   }
@@ -457,7 +497,7 @@ const getOverdueRevisions = async (req, res, next) => {
       status: 'active',
       $expr: {
         $and: [
-          { $lt: ['$schedule', { $size: '$schedule' }] },
+          { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] },
           { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, today] },
         ],
       },
@@ -490,9 +530,11 @@ module.exports = {
   getTodayRevisions,
   getUpcomingRevisions,
   getQuestionRevision,
+  getQuestionRevisionByPlatform,
   createRevision,
   completeRevision,
   completeQuestionRevision,
+  recordTimeSpent,
   rescheduleRevision,
   deleteRevision,
   deleteQuestionRevision,

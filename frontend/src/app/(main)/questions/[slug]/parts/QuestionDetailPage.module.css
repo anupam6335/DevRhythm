@@ -1,0 +1,571 @@
+/* ===== Page Layout ===== */
+.page {
+  padding: 2rem 0;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.statusBadge.notstarted {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.statusBadge.attempted {
+  color: var(--accent-moss);
+  border-color: var(--accent-moss);
+}
+.statusBadge.solved {
+  color: #2e7d32;
+  border-color: #2e7d32;
+}
+.statusBadge.mastered {
+  color: #d68b5c;
+  border-color: #d68b5c;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ===== Metadata Bar ===== */
+.metadataBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.metadataItem {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Difficulty badge */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.badge[data-difficulty="easy"] {
+  color: #2e7d32;
+  border-color: #2e7d32;
+}
+.badge[data-difficulty="medium"] {
+  color: #ed6c02;
+  border-color: #ed6c02;
+}
+.badge[data-difficulty="hard"] {
+  color: #d32f2f;
+  border-color: #d32f2f;
+}
+
+.personalBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  background-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  border: 1px solid var(--accent-moss);
+}
+
+.tag {
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  transition: background 0.2s ease;
+  display: inline-block;
+}
+.tag:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+}
+
+.linkIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.linkIcon:hover {
+  background-color: var(--hover-surface);
+  border-color: var(--accent-moss);
+  color: var(--text-primary);
+}
+
+.solutionSelect {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.25rem;
+}
+
+/* ===== Progress Card Wrapper ===== */
+.progressCardWrapper {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+/* ===== Two‑Column Layout ===== */
+.pageLayout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.fullWindow .pageLayout {
+  grid-template-columns: 30% 70%;
+}
+
+.leftColumn,
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0; /* allow children to shrink below natural width */
+}
+
+/* ===== Right Column Sticky Behavior (Desktop only) ===== */
+@media (min-width: 940px) {
+  .rightColumn {
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+  }
+}
+
+/* ===== Problem Statement ===== */
+.problemStatement {
+  border: 1px solid var(--border);
+  padding: 1rem;
+  background-color: var(--bg-surface);
+  border-radius: var(--radius);
+  overflow-x: auto; /* handle wide content like long code lines */
+  /* no max-height, no overflow-y – expands naturally */
+}
+
+.problemStatement h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.problemStatement .content {
+  font-family: var(--font-body);
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.problemStatement .content p {
+  margin-bottom: 1rem;
+}
+
+.problemStatement .content pre {
+  background: var(--code-bg);
+  padding: 1rem;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--border);
+  font-family: var(--font-code);
+  font-size: 0.9rem;
+  margin: 1rem 0;
+  line-height: 1.6;
+}
+
+.problemStatement .content pre strong {
+  display: inline-block;
+  min-width: 100px;
+  font-weight: 600;
+  color: var(--accent-moss);
+}
+
+.problemStatement .content p strong.example {
+  display: inline-block;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  border-left: 3px solid var(--accent-moss);
+  padding-left: 0.75rem;
+}
+
+.problemStatement .content p + pre {
+  margin-top: 0.5rem;
+}
+
+.problemStatement .content code {
+  font-family: var(--font-code);
+  background: var(--code-bg);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+.problemStatement .content ul,
+.problemStatement .content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.problemStatement .content blockquote {
+  border-left: 4px solid var(--accent-moss);
+  padding-left: 1rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.problemStatement .content .example {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+}
+
+/* Responsive images */
+.problemStatement .content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1rem auto;
+}
+
+/* Fallback message */
+.fallback {
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 1rem;
+  text-align: center;
+}
+
+/* ===== Similar Questions Section ===== */
+.similarSection {
+  margin-top: 2rem;
+}
+
+.separator {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px dashed var(--border);
+}
+
+.personalNotes {
+  margin-top: 0.5rem;
+}
+
+.personalNotes h3 {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: var(--accent-moss);
+}
+
+/* ===== Tabs Wrapper ===== */
+.tabsWrapper {
+  margin-top: 2rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* ===== Tab Content Areas ===== */
+.problemContent {
+  margin-top: 1rem;
+}
+
+.tabContent {
+  margin-top: 1rem;
+}
+
+/* Left column tabs – pill variant styling */
+.leftColumn :global(.pills .tab) {
+  border-radius: var(--radius, 6px);
+}
+.leftColumn :global(.pills .tab.active) {
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+}
+.leftColumn :global(.pills .tab.active:hover:not(.disabled)) {
+  background-color: var(--primary-action-hover);
+}
+
+
+/* Full‑window mode */
+.fullWindow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background: var(--bg-surface);
+  overflow-y: auto;
+  padding: 1rem 2rem;
+}
+
+.fullWindow .rightColumn {
+  top: 0rem;
+}
+
+.fullWindowHeader {
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  z-index: 10;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.closeFullWindowButton {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+}
+
+.closeFullWindowButton:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+}
+
+/* Full‑window button with continuous ripple (three rings) */
+.fullWindowButtonWrapper {
+  position: relative;
+  display: inline-flex;
+  isolation: isolate;
+}
+
+.rippleRing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 2rem;
+  transform: translate(-50%, -50%) scale(1);
+  border: 1px solid rgba(var(--accent-moss-rgb), 0.5);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Staggered delays for three rings */
+.rippleRing:nth-child(1) {
+  animation: ripplePulse 3s infinite ease-out;
+  animation-delay: 0s;
+}
+.rippleRing:nth-child(2) {
+  animation: ripplePulse 3s infinite ease-out;
+  animation-delay: 1s;
+}
+.rippleRing:nth-child(3) {
+  animation: ripplePulse 3s infinite ease-out;
+  animation-delay: 2s;
+}
+
+@keyframes ripplePulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.fullWindowButton {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.1s ease;
+}
+
+.fullWindowButton:active {
+  transform: scale(0.98);
+}
+
+/* ===== Responsive Breakpoints ===== */
+@media (max-width: 940px) {
+  .pageLayout {
+    grid-template-columns: 1fr;
+  }
+  /* Remove sticky on tablet/mobile */
+  .rightColumn {
+    position: static;
+  }
+}
+
+/* Tablet (768px – 939px) */
+@media (min-width: 768px) and (max-width: 939px) {
+  /* Header: keep title and actions on same row, allow wrap */
+  .header {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  /* Metadata bar: use a flexible grid for better wrapping */
+  .metadataBar {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, auto));
+    gap: 0.5rem;
+    align-items: center;
+    padding-bottom: 0.75rem;
+  }
+
+  /* Ensure items don't break awkwardly */
+  .metadataItem,
+  .badge,
+  .personalBadge,
+  .tag,
+  .linkIcon {
+    white-space: nowrap;
+  }
+
+  /* Reduce font sizes slightly for better fit */
+  .title {
+    font-size: 1.6rem;
+  }
+
+  .tag,
+  .linkIcon,
+  .badge,
+  .personalBadge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+  }
+}
+
+/* Mobile (≤767px) */
+@media (max-width: 767px) {
+  /* Header: stack title and actions vertically */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .titleRow {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .title {
+    font-size: 1.4rem;
+    flex: 1;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  /* Metadata bar: vertical stack with proper spacing */
+  .metadataBar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+  }
+
+  /* Make tags and links wrap naturally */
+  .tag,
+  .linkIcon {
+    display: inline-block;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Adjust font sizes */
+  .metadataItem,
+  .badge,
+  .personalBadge,
+  .tag,
+  .linkIcon {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 1.3rem;
+  }
+}

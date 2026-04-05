@@ -1,5 +1,5 @@
 import apiClient, { ApiClientResponse, buildQueryString } from '@/shared/lib/apiClient';
-import type { Question } from '@/shared/types';
+import type { Question, RevisionSchedule, UserQuestionProgress } from '@/shared/types';
 import type { QuestionListResponse, QuestionStatistics } from '../types/question.types';
 
 export const questionService = {
@@ -18,6 +18,17 @@ export const questionService = {
       questions: response.data.questions,
       pagination: response.meta?.pagination,
     };
+  },
+
+  async getQuestionDetails(id: string) {
+    const response = await apiClient.get<{
+      question: Question;
+      progress: UserQuestionProgress | null;
+      revision: RevisionSchedule | null;
+      codeExecutionHistory: any[];
+      activityLogs: any[];
+    }>(`/questions/${id}/details`);
+    return response.data;
   },
 
   async fetchLeetCodeQuestion(

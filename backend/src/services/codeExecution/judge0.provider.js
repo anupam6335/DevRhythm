@@ -8,35 +8,8 @@ const LANGUAGE_IDS = {
   javascript: 63,
 };
 
-// Templates with placeholders for user code
 const TEMPLATES = {
-  cpp: `
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <unordered_map>
-#include <set>
-#include <algorithm>
-#include <sstream>
-using namespace std;
-
-string solve(string input) {
-    // --- USER CODE START ---
-{{USER_CODE}}
-    // --- USER CODE END ---
-}
-
-int main() {
-    string input, line;
-    while (getline(cin, line)) {
-        input += line + "\\n";
-    }
-    string output = solve(input);
-    cout << output;
-    return 0;
-}
-`,
+cpp: `{{USER_CODE}}`,
   python: `
 {{USER_CODE}}
 
@@ -46,27 +19,7 @@ if __name__ == "__main__":
     output = solve(input_data)
     sys.stdout.write(output)
 `,
-  java: `
-import java.util.*;
-
-public class Main {
-    public static String solve(String user_input) {
-        // --- USER CODE START ---
-{{USER_CODE}}
-        // --- USER CODE END ---
-    }
-
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        StringBuilder inputBuilder = new StringBuilder();
-        while (scanner.hasNextLine()) {
-            inputBuilder.append(scanner.nextLine()).append("\\n");
-        }
-        String output = solve(inputBuilder.toString());
-        System.out.print(output);
-    }
-}
-`,
+  java: `{{USER_CODE}}`,
   javascript: `
 const fs = require('fs');
 
@@ -106,8 +59,10 @@ class Judge0Provider extends BaseCodeExecutionProvider {
     };
 
     const url = `${this.apiUrl}/submissions?wait=true&fields=stdout,stderr,status`;
+    // Increase timeout for Java (30s) to accommodate JVM startup and isolation overhead
+    const timeout = language === 'java' ? 50000 : 30000;
     const response = await axios.post(url, payload, {
-      timeout: Math.max(10000, (this.cpuTimeLimit + 2) * 1000),
+      timeout: Math.max(timeout, (this.cpuTimeLimit + 2) * 1000),
     });
     const result = response.data;
     return {
@@ -124,24 +79,30 @@ class Judge0Provider extends BaseCodeExecutionProvider {
     if (!template) throw new Error(`Template missing for language: ${language}`);
     const sourceCode = template.replace('{{USER_CODE}}', this._indentCode(code, language !== 'python'));
 
-    const submissions = testCases.map(tc => ({
-      source_code: sourceCode,
-      language_id: langId,
-      stdin: tc.stdin,
-      cpu_time_limit: this.cpuTimeLimit,
-      memory_limit: this.memoryLimit,
-    }));
+    // Increase timeout for Java (30s) to accommodate JVM startup and isolation overhead
+    const timeout = language === 'java' ? 50000 : 30000;
 
-    const url = `${this.apiUrl}/submissions/batch?wait=true&fields=stdout,stderr,status`;
-    const response = await axios.post(url, { submissions }, {
-      timeout: Math.max(10000, (this.cpuTimeLimit + 2) * 1000),
+    const promises = testCases.map(async (tc) => {
+      const payload = {
+        source_code: sourceCode,
+        language_id: langId,
+        stdin: tc.stdin,
+        cpu_time_limit: this.cpuTimeLimit,
+        memory_limit: this.memoryLimit,
+      };
+      const url = `${this.apiUrl}/submissions?wait=true&fields=stdout,stderr,status`;
+      const response = await axios.post(url, payload, {
+        timeout: Math.max(timeout, (this.cpuTimeLimit + 2) * 1000),
+      });
+      const result = response.data;
+      return {
+        stdout: result.stdout || '',
+        stderr: result.stderr || '',
+        exitCode: result.status?.id === 3 ? 0 : 1,
+      };
     });
-    const results = response.data;
-    return results.map(result => ({
-      stdout: result.stdout || '',
-      stderr: result.stderr || '',
-      exitCode: result.status?.id === 3 ? 0 : 1,
-    }));
+
+    return Promise.all(promises);
   }
 
   _indentCode(code, shouldIndent) {

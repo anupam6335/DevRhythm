@@ -1,0 +1,204 @@
+.timeline {
+  position: relative;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.timelineItem {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+  border-radius: var(--radius);
+  transition: background-color 0.3s ease;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: slideUp 0.3s ease forwards;
+}
+
+.timelineItem:hover {
+  background-color: var(--hover-surface);
+}
+
+/* Marker */
+.marker {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  z-index: 2;
+  background-color: var(--bg-surface);
+}
+
+.marker:hover {
+  transform: scale(1.1);
+}
+
+/* Completed marker */
+.marker.completed {
+  background-color: #2e7d32;
+  border: 2px solid #2e7d32;
+  color: white;
+  box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.4);
+  animation: none;
+}
+.marker.completed.pulse {
+  animation: pulseGreen 0.2s ease-out;
+}
+
+.checkIcon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+/* Upcoming marker */
+.marker.upcoming {
+  border: 2px solid var(--border);
+  background-color: transparent;
+}
+
+/* Connector line (pseudo‑element) */
+.timelineItem:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 11px; /* half of marker width + 2px border */
+  top: 32px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--border);
+  z-index: 1;
+}
+
+/* Content */
+.content {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.date {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.status {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.statusCompleted {
+  color: #2e7d32;
+  border-color: #2e7d32;
+}
+.statusCurrent {
+  color: var(--accent-moss);
+  border-color: var(--accent-moss);
+}
+.statusUpcoming {
+  color: var(--text-secondary);
+}
+.overdue {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.markButton {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+
+/* Animations */
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGreen {
+  0% {
+    box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(46, 125, 50, 0.2);
+    transform: scale(1.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(46, 125, 50, 0);
+    transform: scale(1);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .timelineItem {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .marker:hover {
+    transform: none;
+  }
+  .marker.completed.pulse {
+    animation: none;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  .statusRow {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .markButton {
+    width: 100%;
+    justify-content: center;
+  }
+  .timelineItem:not(:last-child)::after {
+    width: 1px;
+    border-left: 1px dashed var(--border);
+    background: none;
+    left: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .date {
+    font-size: 0.85rem;
+  }
+  .status {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
+  .markButton {
+    padding: 0.5rem;
+  }
+}

@@ -64,7 +64,7 @@ const handleQuestionSolved = async (job) => {
     await invalidateUserCache(userId);
     console.log(`[question.solved] User stats updated for ${userId}`);
 
-    // --- 2. Update PatternMastery for each pattern ---
+    // --- 2. Update PatternMastery for each pattern (with validation fixes) ---
     if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
         let pattern = await PatternMastery.findOne({ userId, patternName });
@@ -84,10 +84,30 @@ const handleQuestionSolved = async (job) => {
         pattern.solvedCount += 1;
         pattern.totalAttempts += 1;
         pattern.successfulAttempts += 1;
-        pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
+
+        // FIX: Ensure successfulAttempts never exceeds totalAttempts
+        if (pattern.successfulAttempts > pattern.totalAttempts) {
+          console.warn(`[pattern] Data inconsistency for ${patternName}: successfulAttempts=${pattern.successfulAttempts}, totalAttempts=${pattern.totalAttempts}. Correcting.`);
+          pattern.successfulAttempts = pattern.totalAttempts;
+        }
+
+        // FIX: Clamp successRate to [0,100]
+        pattern.successRate = pattern.totalAttempts > 0
+          ? Math.min(100, (pattern.successfulAttempts / pattern.totalAttempts) * 100)
+          : 0;
+
         const totalPatternQuestions = await Question.countDocuments({ pattern: patternName });
-        pattern.masteryRate = totalPatternQuestions > 0 ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100) : 0;
-        pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
+        // FIX: Clamp masteryRate to [0,100]
+        pattern.masteryRate = totalPatternQuestions > 0
+          ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100)
+          : 0;
+
+        // Recalculate confidence level based on clamped masteryRate
+        pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5
+          : pattern.masteryRate >= 60 ? 4
+          : pattern.masteryRate >= 40 ? 3
+          : pattern.masteryRate >= 20 ? 2 : 1;
+
         pattern.lastPracticed = solvedDate;
         pattern.lastUpdated = new Date();
 
@@ -110,7 +130,7 @@ const handleQuestionSolved = async (job) => {
       console.log(`[question.solved] Pattern mastery updated for patterns: ${question.pattern.join(', ')}`);
     }
 
-    // --- 3. Update RevisionSchedule ---
+    // --- 3. Update RevisionSchedule (auto‑complete first revision) ---
     const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
     if (!existingRevision) {
       const baseDate = solvedDate;
@@ -120,13 +140,25 @@ const handleQuestionSolved = async (job) => {
         d.setHours(0, 0, 0, 0);
         return d;
       });
+
+      // Create the schedule with the first revision already marked as completed
       await RevisionSchedule.create({
         userId,
         questionId,
         schedule,
         baseDate,
         status: 'active',
+        currentRevisionIndex: 1, // Start from the second revision (index 1)
+        completedRevisions: [{
+          date: schedule[0],          // The first scheduled revision date
+          completedAt: new Date(),    // Completed at the moment of solving
+          status: 'completed'
+        }]
       });
+
+      console.log(`[question.solved] Revision schedule created with first revision auto‑completed for user ${userId}, question ${questionId}`);
+    } else {
+      console.log(`[question.solved] Revision schedule already exists for user ${userId}, question ${questionId}`);
     }
     await invalidateCache(`revisions:*:user:${userId}:*`);
 

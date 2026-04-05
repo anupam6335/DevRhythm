@@ -6,16 +6,14 @@ const Question = require('../../models/Question');
  */
 const extractTestCasesFromHtml = (html) => {
   const $ = cheerio.load(html);
-  const text = $('body').text(); // get all text, tags stripped
+  const text = $('body').text();
   const testCases = [];
 
-  // Pattern: Input: ... Output: ... until next section (Example, Explanation, Constraints, or end)
-  const regex = /Input:\s*(.*?)\s*Output:\s*(.*?)(?=\s*(?:Example|Explanation|Constraints|$))/gs;
+  const regex = /Input:?\s*(.*?)\s*Output:?\s*(.*?)(?=\s*(?:Example|Explanation|Constraints|$))/gs;
   let match;
   while ((match = regex.exec(text)) !== null) {
     let stdin = match[1].trim();
     let expected = match[2].trim();
-    // Clean up: replace newlines with spaces, collapse multiple spaces
     stdin = stdin.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
     expected = expected.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
     if (stdin && expected) {
@@ -23,7 +21,6 @@ const extractTestCasesFromHtml = (html) => {
     }
   }
 
-  // Deduplicate by normalized content
   const unique = [];
   const seen = new Set();
   for (const tc of testCases) {
@@ -34,7 +31,6 @@ const extractTestCasesFromHtml = (html) => {
     }
   }
 
-  // Limit to 3 test cases
   return unique.slice(0, 3);
 };
 
@@ -62,9 +58,18 @@ const handleQuestionExtractTestCases = async (job) => {
       return;
     }
 
+    // Save extracted test cases
     question.testCases = extracted;
     await question.save();
     console.log(`[extract-testcases] Added ${extracted.length} test cases to question ${questionId}`);
+
+    // Lazy load jobQueue to avoid circular dependency
+    const { jobQueue } = require('../queue.service');
+    await jobQueue.add({
+      type: 'question.generate_runner',
+      questionId: question._id,
+    });
+    console.log(`[extract-testcases] Queued runner generation for question ${questionId}`);
   } catch (error) {
     console.error(`[extract-testcases] Error for question ${questionId}:`, error);
     throw error;

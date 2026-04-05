@@ -1,0 +1,258 @@
+.card {
+  border: 1px solid var(--border);
+  background-color: var(--bg-surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* No box-shadow – strictly forbidden */
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.content {
+  padding: 1rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Left column (metrics) */
+.leftColumn {
+  flex: 1.5;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.metricRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  transition: background-color 0.2s ease;
+  border-radius: var(--radius);
+}
+.metricRow:hover {
+  background-color: var(--hover-surface);
+}
+
+.icon {
+  width: 1.2rem;
+  color: var(--accent-moss);
+  font-size: 1rem;
+}
+
+.metricValue {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+  min-width: 2rem;
+}
+
+.metricLabel {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.overdue {
+  color: var(--error);
+  margin-left: 0.25rem;
+}
+
+.progressIndicator {
+  margin-top: 0.5rem;
+}
+
+.progressText {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.progressBar {
+  width: 100%;
+  height: 4px;
+  background-color: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: var(--accent-moss);
+  transition: width 0.3s ease;
+}
+
+.markButton {
+  margin-top: 0.5rem;
+  width: auto;
+  align-self: flex-start;
+}
+
+@media (max-width: 768px) {
+  .markButton {
+    width: 100%;
+  }
+}
+
+/* Right column (time spent) – enhanced for visibility */
+.rightColumn {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background-color: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1px solid var(--accent-moss);
+}
+
+.timeBlock {
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+.timeBlock:hover {
+  transform: scale(1.02);
+}
+
+.timeNumber {
+  font-size: 4rem;
+  font-weight: 800;
+  font-family: var(--font-code);
+  line-height: 1;
+  color: var(--accent-moss);
+  text-shadow: 0 0 2px rgba(var(--accent-moss-rgb), 0.3);
+}
+
+.timeLabel {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.timeSub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.revisionProgress {
+  width: 100%;
+  text-align: center;
+}
+
+.revisionCircles {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.circle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+.circleFilled {
+  background-color: var(--accent-moss);
+}
+.circleEmpty {
+  background-color: var(--border);
+}
+.revisionLabel {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.markSolvedButton {
+  margin-bottom: 0.75rem;
+  width: 100%;
+  background-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  border: none;
+  transition: var(--transition);
+}
+
+.markSolvedButton:hover:not(:disabled) {
+  background-color: var(--primary-action-hover);
+  transform: translateY(-1px);
+}
+
+.markSolvedButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .leftColumn {
+    width: 100%;
+  }
+  .rightColumn {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0.75rem;
+  }
+  .timeBlock {
+    flex: 1;
+  }
+  .revisionProgress {
+    flex: 1;
+  }
+  .timeNumber {
+    font-size: 2.5rem;
+  }
+  .revisionCircles {
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .rightColumn {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+  .revisionProgress {
+    width: auto;
+  }
+  .metricRow {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+}

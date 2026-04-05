@@ -1,7 +1,7 @@
 import { serverFetch } from '@/shared/lib/serverApiClient';
-import type { Question } from '@/shared/types';
+import type { Question, Platform } from '@/shared/types';
 import type { QuestionListResponse, QuestionStatistics } from '../types/question.types';
-import apiClient, { buildQueryString } from '@/shared/lib/apiClient'; // can reuse the helper
+import { buildQueryString } from '@/shared/lib/apiClient';
 
 export const questionServiceServer = {
   async getQuestions(params?: {
@@ -19,14 +19,41 @@ export const questionServiceServer = {
 
   async getQuestionByPlatformId(platform: string, platformQuestionId: string): Promise<Question> {
     const data = await serverFetch<{ question: Question }>(
-      `/questions/platform/${platform}/${platformQuestionId}`
+      `/questions/platform/${platform}/${platformQuestionId}`,
+      { cache: 'no-store' } // Force fresh data
     );
     return data.question;
   },
 
   async getQuestionById(id: string) {
-    const data = await serverFetch<{ question: Question }>(`/questions/${id}`);
+    const data = await serverFetch<{ question: Question }>(`/questions/${id}`, { cache: 'no-store' });
     return data.question;
+  },
+
+  async getQuestionBySlug(slug: string): Promise<Question> {
+    const platforms: Platform[] = [
+      'LeetCode',
+      'Codeforces',
+      'HackerRank',
+      'AtCoder',
+      'CodeChef',
+      'GeeksForGeeks',
+      'Other',
+    ];
+
+    for (const platform of platforms) {
+      try {
+        const data = await serverFetch<{ question: Question }>(
+          `/questions/platform/${platform}/${slug}`,
+          { cache: 'no-store' }
+        );
+        return data.question;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    throw new Error(`Question with slug "${slug}" not found`);
   },
 
   async getPatterns() {
@@ -43,8 +70,12 @@ export const questionServiceServer = {
     const data = await serverFetch<{ statistics: QuestionStatistics }>('/questions/statistics');
     return data.statistics;
   },
+
   async getSimilarQuestions(id: string): Promise<Question[]> {
-    const data = await serverFetch<{ similarQuestions: Question[] }>(`/questions/similar/${id}?limit=10`);
+    const data = await serverFetch<{ similarQuestions: Question[] }>(
+      `/questions/similar/${id}?limit=9`,
+      { cache: 'no-store' }
+    );
     return data.similarQuestions;
   },
 

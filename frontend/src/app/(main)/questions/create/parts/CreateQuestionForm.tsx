@@ -2,11 +2,12 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FiSearch, FiTag, FiPaperclip, FiLink, FiEdit3 } from 'react-icons/fi';
-
+import {
+  FiSearch, FiTag, FiPaperclip, FiLink, FiEdit3, FiPlus, FiTrash2,
+} from 'react-icons/fi';
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
 import { ROUTES } from '@/shared/config/routes';
@@ -33,6 +34,11 @@ const platforms = [
 ] as const;
 const difficulties = ['Easy', 'Medium', 'Hard'] as const;
 
+const testCaseSchema = z.object({
+  stdin: z.string().optional(),
+  expected: z.string().min(1, 'Expected output is required'),
+});
+
 const questionSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   problemLink: z.string().url('Must be a valid URL'),
@@ -43,18 +49,18 @@ const questionSchema = z.object({
   pattern: z.array(z.string()).default([]),
   solutionLinks: z.array(z.string()).default([]),
   contentRef: z.string().optional(),
+  testCases: z.array(testCaseSchema).default([]),
 });
 
 type FormData = z.infer<typeof questionSchema>;
 
-// Helper to generate a slug from a title (matches backend logic)
 const generateSlug = (text: string): string => {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')   // remove non-word chars (except spaces and hyphens)
-    .replace(/[\s_-]+/g, '-')    // replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, '');    // trim leading/trailing hyphens
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 };
 
 export const CreateQuestionForm: React.FC = () => {
@@ -78,14 +84,20 @@ export const CreateQuestionForm: React.FC = () => {
       pattern: [],
       solutionLinks: [],
       contentRef: '',
+      testCases: [],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'testCases',
   });
 
   const [autoGenerateId, setAutoGenerateId] = useState(true);
   const [fetchSource, setFetchSource] = useState<'search' | 'url' | null>(null);
   const title = watch('title');
 
-  // Auto‑generate platformQuestionId when title changes and auto‑generation is active
+  // Auto‑generate platformQuestionId when title changes
   useEffect(() => {
     if (autoGenerateId && title) {
       const slug = generateSlug(title);
@@ -100,14 +112,15 @@ export const CreateQuestionForm: React.FC = () => {
     setValue('tags', result.tags);
     setValue('platformQuestionId', result.slug);
     setValue('platform', 'LeetCode');
-    setAutoGenerateId(false);               // disable auto‑generation after LeetCode fetch
-    setFetchSource('search');               // mark that data came from search
+    setAutoGenerateId(false);
+    setFetchSource('search');
     if (result.tags.length > 0) {
       setValue('pattern', [result.tags[0]]);
     }
     if (result.description) {
       setValue('contentRef', result.description);
     }
+    setValue('testCases', []);
   };
 
   const handleUrlFetch = useCallback(
@@ -121,21 +134,57 @@ export const CreateQuestionForm: React.FC = () => {
       if (match) {
         setValue('platformQuestionId', match[1]);
       }
-      setAutoGenerateId(false);             // disable auto‑generation after URL fetch
-      setFetchSource('url');                // mark that data came from URL fetch
+      setAutoGenerateId(false);
+      setFetchSource('url');
       if (data.tags.length > 0) {
         setValue('pattern', [data.tags[0]]);
       }
       if (data.description) {
         setValue('contentRef', data.description);
       }
+      setValue('testCases', []);
     },
     [setValue]
   );
 
+  // Generate HTML examples from test cases and append to contentRef
+  const appendExamplesToContent = useCallback((currentContent: string, testCases: FormData['testCases']) => {
+    if (testCases.length === 0) return currentContent;
+    let examplesHtml = '';
+    testCases.forEach((tc, idx) => {
+      const inputDisplay = tc.stdin?.replace(/\\n/g, '\n') || '';
+      examplesHtml += `
+        <p><strong class="example">Example ${idx + 1}:</strong></p>
+        <pre>
+<strong>Input:</strong> ${inputDisplay}
+<strong>Output:</strong> ${tc.expected}
+        </pre>
+      `;
+    });
+    // Avoid duplication: check if content already contains these examples? (optional)
+    return currentContent + examplesHtml;
+  }, []);
+
   const onSubmit = async (data: FormData) => {
-    const payload = prepareCreateQuestionPayload(data);
-    const result = await createMutation.mutateAsync(payload);
+    const isManual = fetchSource === null;
+    let finalContentRef = data.contentRef || '';
+
+    if (isManual && data.testCases.length > 0) {
+      finalContentRef = appendExamplesToContent(finalContentRef, data.testCases);
+    }
+
+    const payload = prepareCreateQuestionPayload({
+      ...data,
+      contentRef: finalContentRef,
+    });
+
+    const submitData = {
+      ...payload,
+      isManual,
+      testCases: isManual ? data.testCases : undefined,
+    };
+
+    const result = await createMutation.mutateAsync(submitData);
     router.push(`/questions/${result.platformQuestionId}`);
   };
 
@@ -143,12 +192,10 @@ export const CreateQuestionForm: React.FC = () => {
     router.push(ROUTES.QUESTIONS.ROOT);
   };
 
-  // Determine if the description field should be read‑only (i.e., came from LeetCode)
   const isDescriptionReadOnly = fetchSource !== null;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-      {/* Header */}
       <div className={styles.header}>
         <h1 className={styles.title}>Create Question</h1>
         <div className={styles.actions}>
@@ -166,20 +213,17 @@ export const CreateQuestionForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Two‑column layout */}
       <div className={styles.columns}>
         {/* Left panel – Source */}
         <div className={styles.leftPanel}>
           <div className={styles.sourceCard}>
             <h2 className={styles.panelTitle}>
-               Find Question From Leetcode
+              Find Question From Leetcode
             </h2>
-
             <div className={styles.sourceSection}>
               <div className={styles.sourceLabel}>Search LeetCode Problem</div>
               <LeetCodeSearch onSelect={handleLeetCodeSearchSelect} />
             </div>
-
             <div className={styles.sourceSection}>
               <div className={styles.sourceLabel}> Or paste URL</div>
               <LeetCodeUrlInput onFetch={handleUrlFetch} disabled={isSubmitting} />
@@ -188,7 +232,7 @@ export const CreateQuestionForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Right panel – Details (with continuous dashed line) */}
+        {/* Right panel – Details */}
         <div className={styles.rightPanel}>
           <div className={styles.detailsScroll}>
             {/* Basic Information */}
@@ -345,14 +389,74 @@ export const CreateQuestionForm: React.FC = () => {
               />
             </section>
 
-            {/* Content Ref */}
+            {/* Test Cases (only for manual questions) */}
+            {fetchSource === null && (
+              <section className={styles.detailsSection}>
+                <h2 className={styles.sectionTitle}>
+                  <FiPaperclip className={styles.sectionIcon} /> Test Cases
+                </h2>
+                <div className={styles.testCasesList}>
+                  {fields.map((field, index) => (
+                    <div key={field.id} className={styles.testCaseRow}>
+                      <div className={styles.testCaseField}>
+                        <label>Input (stdin)</label>
+                        <input
+                          type="text"
+                          {...register(`testCases.${index}.stdin`)}
+                          placeholder="Use \n for newline, e.g., 2 3 6 7\n7"
+                          className={styles.testCaseInput}
+                        />
+                        <small className={styles.inputHint}>
+                          Use \n to separate multiple lines of input
+                        </small>
+                      </div>
+                      <div className={styles.testCaseField}>
+                        <label>Expected Output</label>
+                        <input
+                          type="text"
+                          {...register(`testCases.${index}.expected`)}
+                          placeholder="e.g., [[2,2,3],[7]]"
+                          className={styles.testCaseInput}
+                        />
+                        {errors.testCases?.[index]?.expected && (
+                          <p className={styles.error}>
+                            {errors.testCases[index]?.expected?.message}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className={styles.removeTestCase}
+                        aria-label="Remove test case"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => append({ stdin: '', expected: '' })}
+                    className={styles.addTestCase}
+                  >
+                    <FiPlus /> Add test case
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Problem Description */}
             <section className={styles.detailsSection}>
               <h2 className={styles.sectionTitle}>
                 <FiPaperclip className={styles.sectionIcon} /> Problem Description
               </h2>
               <Input
                 {...register('contentRef')}
-                placeholder={isDescriptionReadOnly ? "Auto-filled from LeetCode" : "Add Problem Description..."}
+                placeholder={
+                  isDescriptionReadOnly
+                    ? 'Auto-filled from LeetCode'
+                    : 'Add Problem Description (HTML allowed)'
+                }
                 fullWidth
                 disabled={isSubmitting}
                 readOnly={isDescriptionReadOnly}

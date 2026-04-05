@@ -98,6 +98,23 @@
   transform: translateY(0);
 }
 
+/* ===== Error Variant ===== */
+.error {
+  background-color: var(--error);
+  color: var(--primary-text-on-action);
+  border-color: var(--error);
+}
+.error:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--error-soft);
+  border-color: var(--error);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow);
+}
+.error:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
 /* ===== Sizes ===== */
 .sm {
   padding: 0.4rem 1rem;

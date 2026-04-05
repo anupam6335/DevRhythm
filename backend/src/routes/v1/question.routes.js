@@ -31,7 +31,24 @@ router.get('/tags', auth, rateLimiters.userLimiter, cache(1800, 'questions:tags'
 router.get('/statistics', auth, rateLimiters.userLimiter, cache(3600, 'questions:statistics'), questionController.getStatistics);
 router.get('/deleted', auth, rateLimiters.userLimiter, cache(300, 'questions:deleted'), validate(questionValidator.getQuestions, 'query'), questionController.getDeletedQuestions);
 router.get('/platform/:platform/:platformQuestionId', auth, rateLimiters.userLimiter, cache(3600, 'question:platform'), validate(questionValidator.getQuestionByPlatformId, 'params'), questionController.getQuestionByPlatformId);
+router.get('/platform/:platform/:platformQuestionId/details',
+  auth,
+  rateLimiters.userLimiter,
+  cache(30, 'question-details:platform'),
+  validate(Joi.object({
+    platform: Joi.string().valid('LeetCode', 'Codeforces', 'HackerRank', 'AtCoder', 'CodeChef', 'Other').required(),
+    platformQuestionId: Joi.string().required()
+  }), 'params'),
+  questionController.getQuestionDetailsByPlatform
+);
 router.get('/:id', auth, rateLimiters.userLimiter, cache(3600, 'question'), validate(questionValidator.getQuestionById, 'params'), questionController.getQuestionById);
+router.get('/:id/details',
+  auth,
+  rateLimiters.userLimiter,
+  cache(30, 'question-details'),
+  validate(Joi.object({ id: Joi.string().hex().length(24).required() }), 'params'),
+  questionController.getQuestionDetails
+);
 router.get('/similar/:id', auth, rateLimiters.userLimiter, cache(3600, 'question:similar'), validate(questionValidator.getSimilarQuestions, 'params'), validate(Joi.object({ limit: Joi.number().integer().min(1).max(50).optional() }), 'query'), questionController.getSimilarQuestions);
 router.post('/', auth, rateLimiters.questionCreateLimiter, validate(questionValidator.createQuestion), questionController.createQuestion);
 router.put('/:id', auth, rateLimiters.questionUpdateLimiter, validate(questionValidator.updateQuestion), questionController.updateQuestion);

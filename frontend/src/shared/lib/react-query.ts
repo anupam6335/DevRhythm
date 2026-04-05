@@ -130,3 +130,8 @@ export const notificationKeys = {
   unreadCount: () => [...notificationKeys.all, 'unreadCount'] as const,
   detail: (id: string) => [...notificationKeys.all, 'detail', id] as const,
 };
+
+export const codeExecutionKeys = {
+  all: ['codeExecution'] as const,
+  history: (questionId: string, params?: any) => [...codeExecutionKeys.all, 'history', questionId, params] as const,
+};

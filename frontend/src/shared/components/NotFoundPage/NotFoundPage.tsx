@@ -8,11 +8,20 @@ import { HiHome } from 'react-icons/hi';
 import Button from '@/shared/components/Button';
 import styles from './NotFoundPage.module.css';
 
+export interface NotFoundPageAction {
+  text: string;
+  href: string;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'error';
+}
+
 export interface NotFoundPageProps {
   className?: string;
   title?: string;
   message?: string;
+  actions?: NotFoundPageAction[];
+  /** @deprecated Use `actions` instead */
   actionText?: string;
+  /** @deprecated Use `actions` instead */
   actionHref?: string;
 }
 
@@ -20,13 +29,21 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
   className,
   title = 'Page not found',
   message = 'Sorry, we couldn’t find the page you’re looking for.',
-  actionText = 'Go back home',
+  actions,
+  actionText,
   actionHref,
 }) => {
-  // Memoize the event handler to avoid recreation on each render
   const preventDownload = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
   }, []);
+
+  // Determine which buttons to render
+  let buttons: NotFoundPageAction[] = [];
+  if (actions && actions.length > 0) {
+    buttons = actions;
+  } else if (actionText && actionHref) {
+    buttons = [{ text: actionText, href: actionHref, variant: 'primary' }];
+  }
 
   return (
     <div className={clsx(styles.container, className)}>
@@ -46,17 +63,20 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({
         </div>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.message}>{message}</p>
-        {actionHref && (
-          <Button
-            asChild
-            variant="primary"
-            size="lg"
-            leftIcon={<HiHome />}
-            className={styles.button}
-          >
-            <Link href={actionHref}>{actionText}</Link>
-          </Button>
-        )}
+        <div className={styles.buttonGroup}>
+          {buttons.map((btn, idx) => (
+            <Button
+              key={idx}
+              asChild
+              variant={btn.variant || 'primary'}
+              size="lg"
+              leftIcon={btn.variant === 'primary' ? <HiHome /> : undefined}
+              className={styles.button}
+            >
+              <Link href={btn.href}>{btn.text}</Link>
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );

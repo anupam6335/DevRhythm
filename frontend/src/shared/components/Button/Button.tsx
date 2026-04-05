@@ -3,7 +3,7 @@ import { FaSpinner } from 'react-icons/fa';
 import clsx from 'clsx';
 import styles from './Button.module.css';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'error';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
