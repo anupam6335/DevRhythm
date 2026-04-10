@@ -12,7 +12,7 @@ router.get('/github/callback', rateLimiters.oauthLimiter, authController.handleG
 router.post('/exchange', rateLimiters.tokenLimiter, authController.exchangeCode);
 router.post('/logout', auth, rateLimiters.logoutLimiter, authController.logout);
 router.get('/session', auth, rateLimiters.tokenLimiter, authController.validateSession);
-router.post('/refresh', auth, rateLimiters.tokenLimiter, authController.refreshToken);
+router.post('/refresh', rateLimiters.tokenLimiter, authController.refreshToken);
 router.get('/providers', cache(3600, 'auth:providers'), authController.getProviders);
 
 module.exports = router;

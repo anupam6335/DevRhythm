@@ -59,6 +59,12 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     max: 5,
     default: 1,
   },
+  customTestCases: [{
+    stdin: { type: String, required: true },
+    expected: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  }],
 }, {
   timestamps: true,
 });

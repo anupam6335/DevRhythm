@@ -1,11 +1,69 @@
 import { useMutation } from '@tanstack/react-query';
+import { useRef, useState, useEffect } from 'react';
 import { questionService } from '../services/questionService';
 import { toast } from '@/shared/components/Toast';
 
 export function useLeetCodeFetch() {
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
+  const [cooldownTimer, setCooldownTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const cancelPrevious = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (cooldownTimer) clearTimeout(cooldownTimer);
+    };
+  }, [cooldownTimer]);
+
   return useMutation({
-    mutationFn: (url: string) => questionService.fetchLeetCodeQuestion(url),
+    mutationFn: async (url: string) => {
+      if (retryAfter && retryAfter > Date.now()) {
+        const waitSeconds = Math.ceil((retryAfter - Date.now()) / 1000);
+        throw new Error(`Rate limited. Please wait ${waitSeconds} seconds.`);
+      }
+      cancelPrevious();
+      return questionService.fetchLeetCodeQuestion(url, abortControllerRef.current?.signal);
+    },
     onError: (error: any) => {
+      // Check if the request was cancelled (ignore)
+      if (error?.code === 'ERR_CANCELED' || error?.message?.includes('canceled')) {
+        return;
+      }
+
+      const status = error.response?.status;
+
+      // Handle 429 rate limit
+      if (status === 429) {
+        const retryAfterHeader = error.response?.headers?.['retry-after'];
+        let waitSeconds = 60;
+        if (retryAfterHeader && !isNaN(parseInt(retryAfterHeader))) {
+          waitSeconds = parseInt(retryAfterHeader);
+        }
+        const retryTimestamp = Date.now() + waitSeconds * 1000;
+        setRetryAfter(retryTimestamp);
+
+        if (cooldownTimer) clearTimeout(cooldownTimer);
+        const timer = setTimeout(() => setRetryAfter(null), waitSeconds * 1000);
+        setCooldownTimer(timer);
+
+        toast.error(`Too many requests. Please wait ${waitSeconds} seconds.`);
+        return;
+      }
+
+      // Handle 404 Not Found – permanent error, no retry
+      if (status === 404) {
+        toast.error('Problem not found on LeetCode. Please check the URL.');
+        return;
+      }
+
+      // All other errors
       toast.error(error.message || 'Failed to fetch LeetCode problem');
     },
   });

@@ -5,7 +5,7 @@ const patternMasteryService = require('../services/patternMastery.service');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
-const { invalidateProgressCache } = require('../middleware/cache');
+const { invalidateProgressCache, invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('../services/queue.service'); 
 
 const updateProgressPatternMastery = async (userId, questionId) => {
@@ -17,6 +17,14 @@ const updateProgressPatternMastery = async (userId, questionId) => {
   } catch (error) {
     console.error('Pattern mastery sync failed:', error);
   }
+};
+
+// Helper to invalidate the question details cache for both ID and platform routes
+const invalidateQuestionDetailsCache = async (userId, questionId) => {
+  // Invalidate the ID-based details cache (pattern: question-details:user:...)
+  await invalidateCache(`question-details:user:${userId}:*/questions/${questionId}/details`);
+  // Also invalidate any platform-based cache (more broad, but short TTL anyway)
+  await invalidateCache(`question-details:platform:*`);
 };
 
 const getProgress = async (req, res, next) => {
@@ -173,6 +181,7 @@ const createOrUpdateProgress = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     const statusCode = newProgress.createdAt === newProgress.updatedAt ? 201 : 200;
@@ -227,6 +236,7 @@ const updateStatus = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Status updated successfully', { progress }));
@@ -253,6 +263,7 @@ const updateCode = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Code updated successfully', { progress }));
@@ -276,6 +287,7 @@ const updateNotes = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Notes updated successfully', { progress }));
@@ -344,6 +356,7 @@ const recordAttempt = async (req, res, next) => {
     }
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
@@ -373,6 +386,7 @@ const recordRevision = async (req, res, next) => {
     );
 
     await invalidateProgressCache(userId);
+    await invalidateQuestionDetailsCache(userId, questionId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Revision recorded successfully', { progress }));
@@ -389,6 +403,7 @@ const deleteProgress = async (req, res, next) => {
     if (!progress) throw new AppError('Progress record not found', 404);
 
     await invalidateProgressCache(req.user._id);
+    await invalidateQuestionDetailsCache(req.user._id, req.params.questionId);
     await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id);
 
     res.json(formatResponse('Progress deleted successfully'));

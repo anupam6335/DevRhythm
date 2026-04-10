@@ -82,9 +82,16 @@
   margin-right: auto;
 }
 
-/* The button container – we rely on Button's internal styles, but we can add margin if needed */
-.button {
+.buttonGroup {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
   margin-top: 0.5rem;
+}
+
+.button {
+  margin-top: 0;
 }
 
 /* For users who prefer reduced motion */

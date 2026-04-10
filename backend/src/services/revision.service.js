@@ -1,10 +1,10 @@
 const RevisionSchedule = require('../models/RevisionSchedule');
-const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
+const { getStartOfDay, getEndOfDay, isToday } = require('../utils/helpers/date');
 
 const calculateRevisionStats = async (userId) => {
   const todayStart = getStartOfDay();
   const todayEnd = getEndOfDay();
-  
+
   const stats = await RevisionSchedule.aggregate([
     {
       $match: { userId },
@@ -105,7 +105,7 @@ const calculateRevisionStats = async (userId) => {
       },
     },
   ]);
-  
+
   const result = stats[0];
   const totalActive = result.totalActive[0]?.count || 0;
   const totalCompleted = result.totalCompleted[0]?.count || 0;
@@ -114,16 +114,16 @@ const calculateRevisionStats = async (userId) => {
   const pendingWeek = result.pendingWeek[0]?.count || 0;
   const completionStats = result.completionStats[0];
   const overdueStats = result.overdueStats[0];
-  
+
   const byRevisionIndex = {};
   result.byRevisionIndex.forEach(item => {
     byRevisionIndex[item._id] = item.count;
   });
-  
+
   const completionRate = completionStats && completionStats.totalRevisions > 0
     ? Math.round((completionStats.totalCompleted / completionStats.totalRevisions) * 100)
     : 0;
-  
+
   return {
     totalActive,
     totalCompleted,
@@ -171,19 +171,71 @@ const calculateUpcomingStats = async (userId, startDate, endDate) => {
       $sort: { _id: 1 },
     },
   ]);
-  
+
   const byDay = {};
   let totalUpcoming = 0;
-  
+
   stats.forEach(stat => {
     byDay[stat._id] = stat.count;
     totalUpcoming += stat.count;
   });
-  
+
   return {
     totalUpcoming,
     byDay,
   };
+};
+
+/**
+ * Determine the status label for a specific revision schedule item
+ * @param {Object} revision - RevisionSchedule document
+ * @param {Number} index - Index in the schedule array (0-4)
+ * @param {String} mode - 'actionable' (respects progress order) or 'display' (independent date)
+ * @returns {String} - 'Pending', 'Overdue', 'Completed', 'Upcoming'
+ */
+const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => {
+  // If index not provided, use currentRevisionIndex
+  const idx = index !== null ? index : revision.currentRevisionIndex;
+  
+  // If revision is fully completed
+  if (revision.status === 'completed') {
+    return 'Completed';
+  }
+
+  // Check if the specific index is already completed
+  const isCompleted = revision.completedRevisions.some(cr => {
+    const crDate = new Date(cr.date);
+    const schDate = revision.schedule[idx];
+    return crDate.getTime() === schDate.getTime();
+  });
+
+  if (isCompleted) {
+    return 'Completed';
+  }
+
+  const dueDate = revision.schedule[idx];
+  const todayStart = getStartOfDay();
+
+  // For display mode, ignore progress order and just compare date to today
+  if (mode === 'display') {
+    if (dueDate < todayStart) return 'Overdue';
+    if (isToday(dueDate)) return 'Pending';
+    return 'Upcoming';
+  }
+
+  // Actionable mode (default) respects currentRevisionIndex
+  if (idx < revision.currentRevisionIndex) {
+    return 'Completed';
+  }
+
+  if (idx === revision.currentRevisionIndex) {
+    if (dueDate < todayStart) return 'Overdue';
+    if (isToday(dueDate)) return 'Pending';
+    return 'Upcoming';
+  }
+
+  // idx > currentRevisionIndex
+  return 'Upcoming';
 };
 
 const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null) => {
@@ -193,7 +245,7 @@ const createRevisionSchedule = async (userId, questionId, baseDate, customSchedu
     date.setHours(0, 0, 0, 0);
     return date;
   });
-  
+
   const revision = await RevisionSchedule.create({
     userId,
     questionId,
@@ -201,45 +253,45 @@ const createRevisionSchedule = async (userId, questionId, baseDate, customSchedu
     baseDate,
     status: 'active',
   });
-  
+
   return revision;
 };
 
 const markRevisionComplete = async (revisionId, completedAt = new Date(), status = 'completed') => {
   const revision = await RevisionSchedule.findById(revisionId);
-  
+
   if (!revision) {
     throw new Error('Revision schedule not found');
   }
-  
+
   if (revision.currentRevisionIndex >= revision.schedule.length) {
     throw new Error('All revisions already completed');
   }
-  
+
   const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-  
+
   revision.completedRevisions.push({
     date: scheduledDate,
     completedAt,
     status,
   });
-  
+
   revision.currentRevisionIndex += 1;
-  
+
   if (revision.currentRevisionIndex >= revision.schedule.length) {
     revision.status = 'completed';
   }
-  
+
   revision.updatedAt = new Date();
   await revision.save();
-  
+
   return revision;
 };
 
 const getPendingRevisionsForDate = async (userId, date) => {
   const dateStart = getStartOfDay(date);
   const dateEnd = getEndOfDay(date);
-  
+
   const pending = await RevisionSchedule.find({
     userId,
     schedule: { $elemMatch: { $gte: dateStart, $lte: dateEnd } },
@@ -248,13 +300,13 @@ const getPendingRevisionsForDate = async (userId, date) => {
       $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
     },
   }).populate('questionId');
-  
+
   return pending;
 };
 
 const updateOverdueRevisions = async () => {
   const today = getStartOfDay();
-  
+
   const result = await RevisionSchedule.updateMany(
     {
       status: 'active',
@@ -270,7 +322,7 @@ const updateOverdueRevisions = async () => {
       $set: { status: 'overdue', updatedAt: new Date() },
     }
   );
-  
+
   return result.modifiedCount;
 };
 
@@ -281,4 +333,5 @@ module.exports = {
   markRevisionComplete,
   getPendingRevisionsForDate,
   updateOverdueRevisions,
+  getRevisionStatusLabel,
 };

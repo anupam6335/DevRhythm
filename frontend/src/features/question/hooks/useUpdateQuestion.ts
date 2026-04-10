@@ -10,7 +10,6 @@ export function useUpdateQuestion(id: string) {
   return useMutation({
     mutationFn: (data: UpdateQuestionRequest) => questionService.updateQuestion(id, data),
     onSuccess: (updatedQuestion) => {
-      // Invalidate both list and detail
       queryClient.invalidateQueries({ queryKey: questionsKeys.lists() });
       queryClient.invalidateQueries({ queryKey: questionsKeys.detail(id) });
       toast.success('Question updated successfully');

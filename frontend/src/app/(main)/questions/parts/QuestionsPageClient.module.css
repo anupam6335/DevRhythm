@@ -1,0 +1,129 @@
+.page {
+  padding: 1.5rem 0;
+  min-height: 80vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pageTitle {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Desktop layout with sticky sidebar */
+.desktopLayout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.sidebarWrapper {
+  position: sticky;
+  top: 5rem;
+  align-self: start;
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.resultInfo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.mobileHeader {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sortRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sortSelect {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236C6C6C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+}
+
+.error {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 2rem auto;
+  max-width: 400px;
+}
+
+.error h2 {
+  margin-bottom: 0.5rem;
+  color: var(--error);
+}
+
+.error p {
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.paginationWrapper {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Override pagination list to wrap and center */
+.paginationWrapper :global(.pagination-list) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+@media (max-width: 480px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .headerActions {
+    justify-content: flex-end;
+  }
+  .pageTitle {
+    font-size: 1.5rem;
+  }
+  .paginationWrapper :global(.pagination-button) {
+    padding: 0.25rem 0.5rem;
+    min-width: 2rem;
+  }
+}

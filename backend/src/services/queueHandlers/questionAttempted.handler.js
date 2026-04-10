@@ -41,7 +41,7 @@ const handleQuestionAttempted = async (job) => {
       await invalidateCache(`user:${userId}:profile`);
     }
 
-    // --- Update heatmap ---
+    // --- Update heatmap – FIX: create if missing ---
     const year = attemptDate.getFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -51,7 +51,7 @@ const handleQuestionAttempted = async (job) => {
       const dayEntry = heatmap.dailyData.find(d => new Date(d.date).toDateString() === attemptDate.toDateString());
       if (dayEntry) {
         dayEntry.totalActivities += 1;
-        dayEntry.totalSubmissions += 1;               // track total submissions
+        dayEntry.totalSubmissions += 1;
         dayEntry.totalTimeSpent += timeSpent;
         dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }

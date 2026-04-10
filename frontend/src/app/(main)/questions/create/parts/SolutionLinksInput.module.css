@@ -1,0 +1,73 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.linkRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--bg-elevated);
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease;
+}
+
+.linkRow:hover {
+  border-color: var(--accent-moss);
+}
+
+.linkInputWrapper {
+  position: relative;
+  flex: 1;
+}
+
+.linkIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent-moss);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.linkInput {
+  padding-left: 2.5rem !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.linkInput:focus {
+  border-bottom-color: var(--accent-moss) !important;
+}
+
+.removeButton {
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.removeButton:hover {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(var(--error-rgb), 0.1);
+}
+
+.addButton {
+  align-self: flex-start;
+  background: var(--bg-surface);
+  border: 1px dashed var(--accent-moss);
+  color: var(--accent-moss);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}

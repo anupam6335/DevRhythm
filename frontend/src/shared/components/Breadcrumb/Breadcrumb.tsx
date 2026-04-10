@@ -44,7 +44,7 @@ export interface BreadcrumbProps extends React.HTMLAttributes<HTMLElement> {
  */
 export const Breadcrumb = React.memo(function Breadcrumb({
   items,
-  separator = '/',
+  separator = '//',
   className,
   'aria-label': ariaLabel = 'Breadcrumb',
   maxItems,

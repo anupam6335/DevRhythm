@@ -32,8 +32,13 @@ const fetchProblemDetails = async (url) => {
       question(titleSlug: $titleSlug) {
         title
         difficulty
+        content
         topicTags {
           name
+        }
+        codeSnippets {
+          lang
+          code
         }
       }
     }
@@ -46,15 +51,31 @@ const fetchProblemDetails = async (url) => {
     });
 
     const question = response.data?.data?.question;
-    if (!question) throw new Error('Problem not found on LeetCode');
+    if (!question) {
+      const error = new Error('Problem not found on LeetCode');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Convert codeSnippets array to a Map-friendly object
+    const codeSnippets = {};
+    if (question.codeSnippets && Array.isArray(question.codeSnippets)) {
+      for (const snippet of question.codeSnippets) {
+        codeSnippets[snippet.lang] = snippet.code;
+      }
+    }
 
     return {
       title: question.title,
       difficulty: question.difficulty,
       tags: question.topicTags.map(t => t.name),
       link: url,
+      description: question.content,
+      codeSnippets,  // new field
     };
   } catch (error) {
+    // If it's a 404 error we already threw, rethrow it as is
+    if (error.statusCode === 404) throw error;
     console.error('LeetCode fetch error:', error.message);
     throw new Error('Failed to fetch problem from LeetCode');
   }
@@ -144,4 +165,7 @@ const searchProblems = async (query, filterType = 'name') => {
   }
 };
 
-module.exports = { fetchProblemDetails, searchProblems };
+module.exports = {
+  fetchProblemDetails,
+  searchProblems,
+};

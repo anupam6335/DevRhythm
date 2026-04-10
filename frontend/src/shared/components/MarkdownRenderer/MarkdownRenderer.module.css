@@ -6,8 +6,7 @@
   word-wrap: break-word;
   background-color: var(--bg-surface);
   border-radius: 1.5rem;
-  padding: 2rem 2.5rem;
-  box-shadow: 0 4px 20px var(--shadow);
+  padding: 1rem 1.5rem;
   max-width: 800px;
   margin: 0 auto;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
@@ -103,7 +102,6 @@
   font-style: italic;
   font-family: var(--font-notes);
   border-radius: 1rem;
-  box-shadow: 0 2px 8px var(--shadow);
   border: none; /* Remove any border */
 }
 
@@ -130,7 +128,6 @@
   padding: 1.25rem;
   margin: 1.5rem 0;
   overflow-x: auto;
-  box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--border-input);
 }
 
@@ -194,6 +191,12 @@
 }
 
 /* Images – responsive, with a soft border */
+.imageWrapper {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
 .img {
   max-width: 100%;
   height: auto;

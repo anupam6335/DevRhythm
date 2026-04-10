@@ -45,6 +45,31 @@ const QuestionSchema = new mongoose.Schema({
   contentRef: {
     type: String,
   },
+  testCases: [{
+    stdin: { type: String, default: '' },
+    expected: { type: String, required: true },
+    isDefault: { type: Boolean, default: true } 
+  }],
+  starterCode: {
+    type: Map,
+    of: String,
+    default: {}
+  },
+  fullRunnerCode: {
+    type: Map,
+    of: String,
+    default: {}
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  source: {
+    type: String,
+    enum: ['manual', 'leetcode'],
+    default: 'manual'
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -59,6 +84,7 @@ QuestionSchema.index({ pattern: 1 });
 QuestionSchema.index({ tags: 1 });
 QuestionSchema.index({ title: "text", pattern: "text" });
 QuestionSchema.index({ platform: 1, difficulty: 1, pattern: 1 });
+QuestionSchema.index({ createdBy: 1 });
 
 QuestionSchema.pre('save', function(next) {
   if (this.pattern && !Array.isArray(this.pattern)) {

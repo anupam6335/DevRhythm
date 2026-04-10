@@ -324,6 +324,15 @@ export interface Question extends Timestamp {
   similarQuestions: ID[];
   contentRef?: string;
   isActive: boolean;
+  testCases?: Array<{
+    stdin: string;
+    expected: string;
+    isDefault?: boolean; // optional, backend may set it
+  }>;
+  createdBy?: ID;          // user ID who created the question (only for manual)
+  source?: 'manual' | 'leetcode'; // where the question came from
+  starterCode?: Record<string, string>;
+  fullRunnerCode?: Record<string, string>;
 }
 
 export interface UserQuestionProgress extends Timestamp {
@@ -346,7 +355,16 @@ export interface UserQuestionProgress extends Timestamp {
   lastRevisedAt?: ISODateString;
   revisionCount: number;
   totalTimeSpent: number;
+  lastFullCode?: string;
   confidenceLevel: number;
+  personalDifficulty?: Difficulty;
+  personalContentRef?: string;
+  customTestCases?: Array<{
+    stdin: string;
+    expected: string;
+    createdAt?: ISODateString;
+    updatedAt?: ISODateString;
+  }>;
 }
 
 export interface PublicProgressItem {
@@ -389,16 +407,21 @@ export interface RevisionSchedule extends Timestamp {
   _id: ID;
   userId: ID;
   questionId: ID;
-  schedule: ISODateString[]; // array of dates
+  schedule: ISODateString[];
   completedRevisions: Array<{
     date: ISODateString;
     completedAt: ISODateString;
     status: 'completed' | 'skipped';
   }>;
-  currentRevisionIndex: number; // 0-4
+  currentRevisionIndex: number;
   status: RevisionStatus;
   overdueCount: number;
   baseDate: ISODateString;
+  currentStatus?: string;
+  scheduleStatuses?: Array<{
+    date: ISODateString;
+    status: string;
+  }>;
 }
 
 export interface PatternMastery extends Timestamp {
@@ -490,7 +513,7 @@ export interface CreateQuestionRequest {
   platformQuestionId: string;
   difficulty: Difficulty;
   tags?: string[];
-  pattern?: string;
+  pattern?: string | string[];
   solutionLinks?: string[];
   similarQuestions?: ID[];
   contentRef?: string;

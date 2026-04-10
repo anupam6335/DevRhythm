@@ -19,14 +19,15 @@ export function normalizePattern(pattern: string | string[] | undefined): string
 }
 
 /**
- * Prepare question payload for create/update:
+ * Prepare question payload for CREATE:
  * - Convert comma-separated strings to arrays
  * - Normalize pattern to array
  * - Remove empty fields if needed
+ * Returns a valid CreateQuestionRequest.
  */
-export function prepareQuestionPayload(
+export function prepareCreateQuestionPayload(
   data: Record<string, any>
-): CreateQuestionRequest | UpdateQuestionRequest {
+): CreateQuestionRequest {
   const payload: any = { ...data };
 
   // Convert tags (if string) to array
@@ -51,6 +52,38 @@ export function prepareQuestionPayload(
   }
 
   // Remove empty strings/arrays if not needed
+  if (payload.tags && !payload.tags.length) delete payload.tags;
+  if (payload.solutionLinks && !payload.solutionLinks.length) delete payload.solutionLinks;
+  if (payload.similarQuestions && !payload.similarQuestions.length) delete payload.similarQuestions;
+
+  // Ensure required fields are present (they should be, thanks to form validation)
+  return payload as CreateQuestionRequest;
+}
+
+/**
+ * Prepare question payload for UPDATE (allows partial data)
+ */
+export function prepareUpdateQuestionPayload(
+  data: Record<string, any>
+): UpdateQuestionRequest {
+  const payload: any = { ...data };
+
+  // Same transformations but optional
+  if (typeof payload.tags === 'string') {
+    payload.tags = payload.tags
+      .split(',')
+      .map((t: string) => t.trim())
+      .filter(Boolean);
+  }
+  if (payload.pattern) {
+    payload.pattern = normalizePattern(payload.pattern);
+  }
+  if (typeof payload.solutionLinks === 'string') {
+    payload.solutionLinks = payload.solutionLinks
+      .split(',')
+      .map((l: string) => l.trim())
+      .filter(Boolean);
+  }
   if (payload.tags && !payload.tags.length) delete payload.tags;
   if (payload.solutionLinks && !payload.solutionLinks.length) delete payload.solutionLinks;
   if (payload.similarQuestions && !payload.similarQuestions.length) delete payload.similarQuestions;

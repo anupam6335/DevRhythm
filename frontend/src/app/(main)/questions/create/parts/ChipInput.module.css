@@ -1,0 +1,99 @@
+.container {
+  width: 100%;
+}
+
+.chipWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  transition: var(--transition);
+}
+
+.chipWrapper:focus-within {
+  border-color: var(--accent-moss);
+  box-shadow: var(--focus-ring);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--primary-text-on-action);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.removeBtn:hover {
+  opacity: 1;
+}
+
+.input {
+  flex: 1;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  padding: 0.25rem 0;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.suggestions {
+  margin-top: 0.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 10;
+  position: relative;
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.suggestion:hover {
+  background: var(--hover-surface);
+}

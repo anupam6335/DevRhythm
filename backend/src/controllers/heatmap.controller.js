@@ -13,27 +13,38 @@ const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
 
+/**
+ * Helper to generate fresh tooltip data from dailyData
+ */
+const generateTooltipData = (dailyData) => {
+  return dailyData.map(day => ({
+    date: day.date,
+    summary: `${day.totalActivities} activit${day.totalActivities !== 1 ? 'ies' : 'y'} on ${formatDate(day.date)}`,
+    details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Submissions: ${day.totalSubmissions}, Study: ${day.studyGroupActivity}, Time: ${day.totalTimeSpent}min`
+  }));
+};
+
 const getHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const includeCache = req.query.includeCache !== 'false';
-    
-    let heatmap = await HeatmapData.findOne({ 
-      userId: req.user._id, 
-      year 
+
+    let heatmap = await HeatmapData.findOne({
+      userId: req.user._id,
+      year
     }).lean();
-    
+
     if (!heatmap) {
       heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
     }
-    
+
     if (!heatmap) {
-      throw new AppError('Heatmap data not found', 404, { 
-        code: 'HEATMAP_NOT_FOUND', 
-        details: 'No heatmap data exists for the specified year' 
+      throw new AppError('Heatmap data not found', 404, {
+        code: 'HEATMAP_NOT_FOUND',
+        details: 'No heatmap data exists for the specified year'
       });
     }
-    
+
     const response = {
       year: heatmap.year,
       weekCount: heatmap.weekCount,
@@ -44,11 +55,27 @@ const getHeatmap = async (req, res, next) => {
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
     };
-    
+
+    // Always generate fresh tooltip data from current dailyData
+    const freshTooltipData = generateTooltipData(heatmap.dailyData);
+
     if (includeCache && heatmap.cachedRenderData) {
-      response.cachedRenderData = heatmap.cachedRenderData;
+      // Preserve other cached render data (color scale, month labels, etc.) but replace tooltipData
+      response.cachedRenderData = {
+        ...heatmap.cachedRenderData,
+        tooltipData: freshTooltipData
+      };
+    } else {
+      // If no cachedRenderData, still provide tooltips
+      response.cachedRenderData = {
+        tooltipData: freshTooltipData,
+        colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
+        monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+      };
     }
-    
+
     res.json(formatResponse('Heatmap data retrieved successfully', response, {
       year,
       lastUpdated: heatmap.lastUpdated
@@ -62,28 +89,28 @@ const getHeatmapByYear = async (req, res, next) => {
   try {
     const year = parseInt(req.params.year);
     const includeCache = req.query.includeCache !== 'false';
-    
+
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
     }
-    
-    let heatmap = await HeatmapData.findOne({ 
-      userId: req.user._id, 
-      year 
+
+    let heatmap = await HeatmapData.findOne({
+      userId: req.user._id,
+      year
     }).lean();
-    
+
     if (!heatmap) {
       heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
     }
-    
+
     if (!heatmap) {
-      throw new AppError('Heatmap data not found for year ' + year, 404, { 
+      throw new AppError('Heatmap data not found for year ' + year, 404, {
         code: 'HEATMAP_NOT_FOUND',
         details: 'No heatmap data exists for the specified year',
         suggestedAction: 'Refresh heatmap data'
       });
     }
-    
+
     const response = {
       year: heatmap.year,
       weekCount: heatmap.weekCount,
@@ -94,11 +121,25 @@ const getHeatmapByYear = async (req, res, next) => {
       consistency: heatmap.consistency,
       statsPanel: heatmap.statsPanel
     };
-    
+
+    // Always generate fresh tooltip data from current dailyData
+    const freshTooltipData = generateTooltipData(heatmap.dailyData);
+
     if (includeCache && heatmap.cachedRenderData) {
-      response.cachedRenderData = heatmap.cachedRenderData;
+      response.cachedRenderData = {
+        ...heatmap.cachedRenderData,
+        tooltipData: freshTooltipData
+      };
+    } else {
+      response.cachedRenderData = {
+        tooltipData: freshTooltipData,
+        colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
+        monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+      };
     }
-    
+
     res.json(formatResponse('Heatmap data retrieved successfully', response, {
       year,
       lastUpdated: heatmap.lastUpdated
@@ -112,21 +153,21 @@ const refreshHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const forceFullRefresh = req.body.forceFullRefresh === true;
-    
+
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
     }
-    
+
     const jobId = `heatmap_refresh_${req.user._id}_${year}_${Date.now()}`;
     const estimatedCompletion = new Date(Date.now() + 5 * 60 * 1000);
-    
+
     await invalidateCache(`heatmap:${req.user._id}:${year}:*`);
     await invalidateCache(`heatmap:stats:${req.user._id}:${year}`);
     await invalidateCache(`heatmap:filter:${req.user._id}:${year}:*`);
-    
+
     heatmapService.regenerateHeatmapData(req.user._id, year, forceFullRefresh)
       .catch(err => console.error('Heatmap regeneration failed:', err));
-    
+
     res.status(202).json(formatResponse('Heatmap recalculation started', {
       jobId,
       estimatedCompletion
@@ -142,25 +183,25 @@ const refreshHeatmap = async (req, res, next) => {
 const getHeatmapStats = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
-    
-    const heatmap = await HeatmapData.findOne({ 
-      userId: req.user._id, 
-      year 
+
+    const heatmap = await HeatmapData.findOne({
+      userId: req.user._id,
+      year
     }).lean();
-    
+
     if (!heatmap || !heatmap.statsPanel) {
       const generated = await heatmapService.generateHeatmapData(req.user._id, year);
       if (!generated) {
         throw new AppError('Heatmap data not found', 404);
       }
-      
+
       res.json(formatResponse('Heatmap statistics retrieved', generated.statsPanel, {
         year,
         calculatedAt: new Date()
       }));
       return;
     }
-    
+
     res.json(formatResponse('Heatmap statistics retrieved', heatmap.statsPanel, {
       year,
       calculatedAt: heatmap.lastUpdated
@@ -176,29 +217,29 @@ const getFilteredHeatmap = async (req, res, next) => {
     const viewType = req.query.viewType || 'all';
     const weekStart = parseInt(req.query.weekStart) || 1;
     const weekEnd = parseInt(req.query.weekEnd) || 53;
-    
+
     const validViewTypes = [
-      'all', 'new_problems', 'revisions', 'study_group', 
+      'all', 'new_problems', 'revisions', 'study_group',
       'leetcode', 'hackerrank', 'codeforces', 'easy', 'medium', 'hard'
     ];
-    
+
     if (!validViewTypes.includes(viewType)) {
       throw new AppError('Invalid view type', 400);
     }
-    
-    const heatmap = await HeatmapData.findOne({ 
-      userId: req.user._id, 
-      year 
+
+    const heatmap = await HeatmapData.findOne({
+      userId: req.user._id,
+      year
     }).lean();
-    
+
     if (!heatmap) {
       throw new AppError('Heatmap data not found', 404);
     }
-    
+
     let filteredData = [];
     let totalActivities = 0;
     let maxInDay = 0;
-    
+
     if (viewType === 'all') {
       filteredData = heatmap.dailyData;
     } else if (heatmap.filterViews && heatmap.filterViews[viewType]) {
@@ -210,15 +251,15 @@ const getFilteredHeatmap = async (req, res, next) => {
     } else {
       filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType);
     }
-    
+
     filteredData.forEach(day => {
       totalActivities += day.totalActivities;
       if (day.totalActivities > maxInDay) maxInDay = day.totalActivities;
     });
-    
+
     const consistencyScore = heatmap.consistency?.consistencyScore || 0;
     const averagePerDay = filteredData.length > 0 ? totalActivities / filteredData.length : 0;
-    
+
     res.json(formatResponse('Filtered heatmap data retrieved', {
       viewType,
       dailyData: filteredData,
@@ -243,19 +284,19 @@ const exportHeatmap = async (req, res, next) => {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const format = req.body.format || 'json';
     const includeDetails = req.body.includeDetails === true;
-    
-    const heatmap = await HeatmapData.findOne({ 
-      userId: req.user._id, 
-      year 
+
+    const heatmap = await HeatmapData.findOne({
+      userId: req.user._id,
+      year
     }).lean();
-    
+
     if (!heatmap) {
       throw new AppError('Heatmap data not found for export', 404);
     }
-    
+
     const exportId = `exp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    
+
     let exportData;
     if (format === 'csv') {
       exportData = heatmapService.convertToCSV(heatmap, includeDetails);
@@ -273,12 +314,12 @@ const exportHeatmap = async (req, res, next) => {
         consistency: heatmap.consistency
       };
     }
-    
+
     const size = Buffer.byteLength(JSON.stringify(exportData), 'utf8');
     const sizeKB = (size / 1024).toFixed(1);
-    
+
     const downloadUrl = `${config.backendUrl}/api/v1/heatmap/export/${exportId}?format=${format}`;
-    
+
     await redisClient.setEx(`export:${exportId}`, 24 * 60 * 60, JSON.stringify({
       userId: req.user._id.toString(),
       userDisplayName: req.user.displayName,
@@ -288,7 +329,7 @@ const exportHeatmap = async (req, res, next) => {
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString()
     }));
-    
+
     res.json(formatResponse('Heatmap export generated', {
       exportId,
       downloadUrl,
@@ -308,26 +349,26 @@ const downloadExport = async (req, res, next) => {
   try {
     const { exportId } = req.params;
     const format = req.query.format || 'json';
-    
+
     const exportKey = `export:${exportId}`;
     const exportData = await redisClient.get(exportKey);
-    
+
     if (!exportData) {
       throw new AppError('Export not found or expired', 404);
     }
-    
+
     const parsedExport = JSON.parse(exportData);
-    
+
     if (parsedExport.userId !== req.user._id.toString()) {
       throw new AppError('Unauthorized to access this export', 403);
     }
-    
+
     const safeDisplayName = (parsedExport.userDisplayName || req.user.displayName || 'User')
       .replace(/[^a-zA-Z0-9]/g, '_')
       .substring(0, 50);
-    
+
     const filename = `DevRhythm_${safeDisplayName}_${parsedExport.year}.${format}`;
-    
+
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -372,11 +413,23 @@ const getPublicUserHeatmap = async (req, res, next) => {
         consistency: heatmap.consistency,
         statsPanel: heatmap.statsPanel,
       };
+      // For public heatmap, also provide fresh tooltips
+      const freshTooltipData = generateTooltipData(heatmap.dailyData);
       if (includeCache && heatmap.cachedRenderData) {
-        response.cachedRenderData = heatmap.cachedRenderData;
+        response.cachedRenderData = {
+          ...heatmap.cachedRenderData,
+          tooltipData: freshTooltipData
+        };
+      } else {
+        response.cachedRenderData = {
+          tooltipData: freshTooltipData,
+          colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
+          monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+        };
       }
     }
-
     res.json(formatResponse('Public heatmap retrieved successfully', response, {
       userId,
       year: parsedYear,
@@ -386,7 +439,6 @@ const getPublicUserHeatmap = async (req, res, next) => {
     next(error);
   }
 };
-
 
 module.exports = {
   getHeatmap,

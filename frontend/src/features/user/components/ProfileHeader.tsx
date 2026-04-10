@@ -305,14 +305,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 {...control.register('weeklyGoal', { valueAsNumber: true })}
               />
             </div>
-            <div className={styles.formGroup}>
+            {/* <div className={styles.formGroup}>
               <label htmlFor="timezone">Timezone</label>
               <select {...control.register('timezone')}>
                 <option value="UTC">UTC</option>
                 <option value="UTC+5:30">Asia/Kolkata (UTC+5:30)</option>
                 <option value="UTC-5">America/New York (UTC-5)</option>
               </select>
-            </div>
+            </div> */}
             <fieldset className={styles.notifications}>
               <legend>Notifications</legend>
               <Controller

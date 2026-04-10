@@ -1,0 +1,355 @@
+.form {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  background-color: transparent; /* inherit from body (--bg-surface) */
+  font-family: var(--font-commissioner);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.title {
+  font-family: var(--font-outfit);
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Two‑column layout */
+.columns {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+}
+
+.leftPanel {
+  flex: 0 0 300px;
+  position: relative;
+}
+
+.rightPanel {
+  flex: 1;
+  min-width: 0; /* prevent overflow */
+}
+
+/* Source panel card */
+.sourceCard {
+  background-color: var(--bg-surface);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.panelTitle {
+  font-family: var(--font-outfit);
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.panelIcon {
+  color: var(--accent-moss);
+  font-size: 1.2rem;
+}
+
+.sourceSection {
+  margin-bottom: 2rem;
+}
+
+.sourceLabel {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.sourceHint {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  color: var(--accent-moss);
+  display: block;
+  margin-top: 0.25rem;
+  text-align: right;
+}
+
+.detailsScroll {
+  position: relative;
+  padding-left: 2rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  background-image: linear-gradient(to bottom, var(--accent-moss) 60%, transparent 40%);
+  background-size: 1px 10px;
+  background-repeat: repeat-y;
+  background-position: left top;
+}
+
+.detailsSection {
+  margin-bottom: 2.5rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-outfit);
+  font-size: 1.1rem;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sectionIcon {
+  color: var(--accent-moss);
+  font-size: 1rem;
+}
+
+.field {
+  margin-bottom: 1.25rem;
+}
+
+.label {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.required {
+  color: var(--accent-moss);
+  margin-left: 2px;
+  font-size: 0.8rem;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
+  font-family: var(--font-body);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Input overrides – only bottom border */
+.input {
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0.5rem 0 !important;
+  font-family: var(--font-commissioner) !important;
+  font-size: 0.9rem !important;
+  color: var(--text-primary) !important;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none !important;
+  border-bottom-color: var(--accent-moss) !important;
+  box-shadow: none !important;
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.select {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg-surface);
+  padding: 0.5rem 0;
+  font-family: var(--font-commissioner);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237C8B7A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  line-height: 1.5; /* better vertical spacing */
+}
+
+.select:focus {
+  outline: none;
+  border-bottom-color: var(--accent-moss);
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Style dropdown options – works in most modern browsers */
+.select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 0.5rem; /* adds space inside each option */
+}
+
+.radioGroup {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--font-commissioner);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.radio input[type="radio"] {
+  accent-color: var(--accent-moss);
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ChipInput wrapper – to remove borders */
+.chipInput {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.solutionLinks {
+  /* override if needed */
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .columns {
+    flex-direction: column;
+    gap: 2rem;
+  }
+  .leftPanel {
+    flex: auto;
+    width: 100%;
+  }
+  .rightPanel {
+    width: 100%;
+  }
+  .detailsScroll {
+    padding-left: 1rem;
+    max-height: none;
+  }
+  .title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .title {
+    font-size: 1.5rem;
+  }
+}
+.testCasesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.testCaseRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  background-color: var(--bg-elevated);
+}
+
+.testCaseField {
+  flex: 1;
+  min-width: 0;
+}
+
+.testCaseField label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.testCaseInput {
+  width: 100%;
+  padding: 0.25rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--bg-surface);
+}
+
+.inputHint {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.removeTestCase {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0.25rem;
+  margin-top: 1.5rem;
+}
+.removeTestCase:hover {
+  color: var(--error);
+}
+
+.addTestCase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px dashed var(--accent-moss);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--accent-moss);
+  transition: var(--transition);
+  margin-top: 0.5rem;
+}
+.addTestCase:hover {
+  background-color: var(--hover-surface);
+}

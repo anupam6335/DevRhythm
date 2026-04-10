@@ -29,9 +29,19 @@ export const progressService = {
     return response.data.progress;
   },
 
-  async getQuestionProgress(questionId: string) {
-    const response = await apiClient.get<{ progress: UserQuestionProgress }>(`/progress/question/${questionId}`);
-    return response.data.progress;
+  async getQuestionProgress(questionId: string): Promise<UserQuestionProgress | null> {
+    try {
+      const response = await apiClient.get<{ progress: UserQuestionProgress }>(`/progress/question/${questionId}`);
+      return response.data.progress;
+    } catch (error: any) {
+      // If no progress record exists (404), return null instead of throwing.
+      // This allows the UI to treat it as "Not Started".
+      if (error.response?.status === 404) {
+        return null;
+      }
+      // For any other error, rethrow to let React Query handle it.
+      throw error;
+    }
   },
 
   async createOrUpdateProgress(

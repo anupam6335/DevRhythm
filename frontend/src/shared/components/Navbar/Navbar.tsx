@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -35,7 +35,6 @@ export interface NavbarProps {
   pendingRevisionsCount?: number;
   dailyGoalProgress?: { completed: number; target: number };
   streakCount?: number;
-  onQuickAdd: () => void;
   className?: string;
 }
 
@@ -45,7 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingRevisionsCount = 0,
   dailyGoalProgress = { completed: 0, target: 3 },
   streakCount = 0,
-  onQuickAdd,
   className,
 }) => {
   const { user, logout } = useSession();
@@ -60,6 +58,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const groupsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Memoize the toggle function to avoid recreating it on each render
+  const toggleDropdown = useCallback((id: DropdownId) => {
+    setOpenDropdown((prev) => (prev === id ? null : id));
+  }, []);
+
+  // Close all dropdowns when clicking outside (handled by useClickOutside)
   useClickOutside(questionsRef, () => {
     if (openDropdown === 'questions') setOpenDropdown(null);
   });
@@ -73,17 +77,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (openDropdown === 'profile') setOpenDropdown(null);
   });
 
+  // Scroll effect for sticky navbar background
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const toggleDropdown = (id: DropdownId) => {
-    setOpenDropdown((prev) => (prev === id ? null : id));
-  };
-
-  const isActive = (href: string) => pathname === href;
+  // Helper to check active route
+  const isActive = useCallback((href: string) => pathname === href, [pathname]);
 
   // Build login URL with returnTo parameter (only if not already on login)
   const loginHref = pathname && !pathname.startsWith('/login')
@@ -260,7 +262,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-label="Close menu"
               leftIcon={<FiX />}
             />
-
             <div className={styles.drawerContent}>
               <div className={styles.drawerThemeToggle}>
                 <span>Theme</span>
@@ -379,9 +380,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </Link>
 
-          <button className={styles.quickAddButton} onClick={onQuickAdd} aria-label="Add solved question">
+          {/* Quick Add – now a Link to create question page */}
+          <Link
+            href={ROUTES.QUESTIONS.CREATE}
+            className={styles.quickAddButton}
+            aria-label="Add solved question"
+          >
             <FiPlus />
-          </button>
+          </Link>
 
           <Link
             href={ROUTES.GROUPS.ROOT}

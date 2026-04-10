@@ -1,9 +1,9 @@
-const ActivityLog = require("../../models/ActivityLog");
-const HeatmapData = require("../../models/HeatmapData");
-const heatmapService = require("../heatmap.service");
-const { updateUserActivity } = require("../user.service");
-const { invalidateCache } = require("../../middleware/cache");
-const { parseDate } = require("../../utils/helpers/date");
+const ActivityLog = require('../../models/ActivityLog');
+const HeatmapData = require('../../models/HeatmapData');
+const heatmapService = require('../heatmap.service');
+const { updateUserActivity } = require('../user.service');
+const { invalidateCache } = require('../../middleware/cache');
+const { parseDate } = require('../../utils/helpers/date');
 
 const handleGroupChallengeProgress = async (job) => {
   const {
@@ -27,15 +27,12 @@ const handleGroupChallengeProgress = async (job) => {
     }
     if (heatmap) {
       const dayEntry = heatmap.dailyData.find(
-        (d) => new Date(d.date).toDateString() === activityDate.toDateString(),
+        (d) => new Date(d.date).toDateString() === activityDate.toDateString()
       );
       if (dayEntry) {
         dayEntry.studyGroupActivity += 1;
         dayEntry.totalActivities += 1;
-        dayEntry.intensityLevel = Math.min(
-          4,
-          Math.floor(dayEntry.totalActivities / 3),
-        );
+        dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }
       heatmap.lastUpdated = new Date();
       await heatmap.save();
@@ -44,9 +41,9 @@ const handleGroupChallengeProgress = async (job) => {
 
     await ActivityLog.create({
       userId,
-      action: "group_challenge_progress",
+      action: 'group_challenge_progress',
       targetId: groupId,
-      targetModel: "StudyGroup",
+      targetModel: 'StudyGroup',
       metadata: {
         challengeId,
         delta,
@@ -58,7 +55,7 @@ const handleGroupChallengeProgress = async (job) => {
 
     console.log(`Group challenge progress processed for user ${userId}`);
   } catch (error) {
-    console.error("Error in groupChallengeProgress handler:", error);
+    console.error('Error in groupChallengeProgress handler:', error);
     throw error;
   }
 };
