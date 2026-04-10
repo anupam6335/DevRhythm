@@ -18,14 +18,13 @@ const calculateIntensityLevel = (activityCount) => {
 
 const generateDailyData = (year) => {
   const dailyData = [];
-  const startDate = new Date(year, 0, 1);
-  const endDate = new Date(year, 11, 31);
-  
+  const startDate = new Date(Date.UTC(year, 0, 1));
+  const endDate = new Date(Date.UTC(year, 11, 31));
   let currentDate = new Date(startDate);
   while (currentDate <= endDate) {
     dailyData.push({
       date: new Date(currentDate),
-      dayOfWeek: currentDate.getDay(),
+      dayOfWeek: currentDate.getUTCDay(),
       totalActivities: 0,
       newProblemsSolved: 0,
       revisionProblems: 0,
@@ -40,9 +39,8 @@ const generateDailyData = (year) => {
       intensityLevel: 0,
       streakCount: 0
     });
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
-  
   return dailyData;
 };
 

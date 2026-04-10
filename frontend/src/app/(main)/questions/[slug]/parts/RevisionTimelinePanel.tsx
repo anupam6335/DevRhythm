@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiCheck, FiLoader } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 import { useMarkRevision } from '@/features/revision/hooks/useMarkRevision';
 import Button from '@/shared/components/Button';
 import Tooltip from '@/shared/components/Tooltip';
 import type { RevisionSchedule } from '@/shared/types';
 import styles from './RevisionTimelinePanel.module.css';
 
-// Helper to format UTC date as "MMM dd, yyyy"
 function formatUTCDate(dateString: string): string {
   const date = new Date(dateString);
   const month = date.toLocaleString('default', { month: 'short', timeZone: 'UTC' });
@@ -35,35 +34,17 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
     setOptimisticIndex(null);
   }, [revision]);
 
-  if (!optimisticRevision) {
-    return <p className={styles.empty}>No revision schedule for this question.</p>;
-  }
-
-  const schedule = optimisticRevision.schedule || [];
-  const currentIndex = optimisticRevision.currentRevisionIndex || 0;
-  const completed = optimisticRevision.completedRevisions || [];
-
-  const getStatus = (idx: number, date: string) => {
-    const isCompleted = completed.some((c) => c.date === date);
-    if (isCompleted) return 'completed';
-    return idx === currentIndex ? 'current' : 'upcoming';
-  };
-
-  const isOverdue = (date: string) => {
-    const todayUTC = new Date();
-    todayUTC.setUTCHours(0, 0, 0, 0);
-    const dueDateUTC = new Date(date);
-    dueDateUTC.setUTCHours(0, 0, 0, 0);
-    return dueDateUTC <= todayUTC;
-  };
+  const scheduleStatuses = optimisticRevision?.scheduleStatuses || [];
+  const schedule = optimisticRevision?.schedule || [];
+  const currentIndex = optimisticRevision?.currentRevisionIndex ?? 0;
 
   const handleMarkRevised = useCallback(
     async (targetDate: string) => {
       const targetIndex = schedule.findIndex((d) => d === targetDate);
       if (targetIndex === -1) return;
 
-      const newCompleted: RevisionSchedule['completedRevisions'] = [
-        ...completed,
+      const newCompleted = [
+        ...(optimisticRevision?.completedRevisions || []),
         {
           date: targetDate,
           completedAt: new Date().toISOString(),
@@ -73,11 +54,23 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
       const newCurrentIndex = targetIndex === currentIndex ? currentIndex + 1 : currentIndex;
       const newStatus = newCurrentIndex >= schedule.length ? 'completed' : 'active';
 
+      // Update scheduleStatuses: mark target as Completed, and if next index exists, set its status to 'Pending'
+      const updatedStatuses = scheduleStatuses.map((item, idx) => {
+        if (idx === targetIndex) {
+          return { ...item, status: 'Completed' };
+        }
+        if (idx === newCurrentIndex && newStatus === 'active') {
+          return { ...item, status: 'Pending' };
+        }
+        return item;
+      });
+
       setOptimisticRevision({
-        ...optimisticRevision,
+        ...optimisticRevision!,
         completedRevisions: newCompleted,
         currentRevisionIndex: newCurrentIndex,
         status: newStatus,
+        scheduleStatuses: updatedStatuses,
       });
       setOptimisticIndex(targetIndex);
 
@@ -89,29 +82,29 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
         console.error('Failed to mark revision:', error);
       }
     },
-    [schedule, completed, currentIndex, optimisticRevision, revision, markMutation]
+    [schedule, currentIndex, optimisticRevision, revision, markMutation, scheduleStatuses]
   );
-
-  const showButtonForIndex = (idx: number, date: string) => {
-    if (optimisticIndex !== null) return false;
-    if (idx !== currentIndex) return false;
-    const isCompleted = completed.some((c) => c.date === date);
-    if (isCompleted) return false;
-    // Only show button if the revision is due (today or earlier)
-    return isOverdue(date);
-  };
 
   const getAnimationDelay = (idx: number) => `${idx * 0.08}s`;
 
+  if (!optimisticRevision) {
+    return (
+      <p className={styles.empty}>
+        No schedule yet. Solve to generate.
+      </p>
+    );
+  }
+
   return (
     <div className={styles.timeline}>
-      {schedule.map((date, idx) => {
-        const status = getStatus(idx, date);
-        const isCurrent = status === 'current';
-        const isCompleted = status === 'completed';
-        const showButton = showButtonForIndex(idx, date);
-        const overdue = isCurrent && isOverdue(date);
+      {scheduleStatuses.map((item, idx) => {
+        const { status, date } = item;
         const formattedDate = formatUTCDate(date);
+        const isCompleted = status === 'Completed';
+        const isPending = status === 'Pending';
+        const isOverdue = status === 'Overdue';
+        const showButton = status === 'Pending';
+        const overdue = isOverdue;
 
         return (
           <div
@@ -120,9 +113,9 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
             style={{ animationDelay: getAnimationDelay(idx) }}
           >
             <div
-              className={`${styles.marker} ${isCompleted ? styles.completed : styles.upcoming} ${
-                optimisticIndex === idx ? styles.pulse : ''
-              }`}
+              className={`${styles.marker} ${
+                isCompleted ? styles.completed : isPending ? styles.pending : styles.upcoming
+              } ${optimisticIndex === idx ? styles.pulse : ''}`}
             >
               {isCompleted && <FiCheck className={styles.checkIcon} />}
             </div>
@@ -131,10 +124,16 @@ export const RevisionTimelinePanel: React.FC<RevisionTimelinePanelProps> = ({
               <div className={styles.statusRow}>
                 <span
                   className={`${styles.status} ${
-                    isCompleted ? styles.statusCompleted : isCurrent ? styles.statusCurrent : styles.statusUpcoming
+                    isCompleted
+                      ? styles.statusCompleted
+                      : isPending
+                      ? styles.statusPending
+                      : isOverdue
+                      ? styles.statusOverdue
+                      : styles.statusUpcoming
                   } ${overdue ? styles.overdue : ''}`}
                 >
-                  {isCompleted ? 'Completed' : isCurrent ? (overdue ? 'Overdue' : 'Upcoming') : 'Upcoming'}
+                  {status}
                 </span>
                 {showButton && (
                   <Tooltip content="To mark as revised, spend at least 20 minutes or pass all test cases for this question.">

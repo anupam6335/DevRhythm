@@ -1,6 +1,6 @@
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
-const { getStartOfDay, getEndOfDay, formatDate } = require('../utils/helpers/date');
+const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('./queue.service');
 
@@ -46,14 +46,14 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   });
 
   if (!revision) {
-    // No pending revision for today
     return { completed: false, message: null };
   }
 
   // Additional safety: ensure the scheduled date for the current index is today
   const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-  if (scheduledDate < todayStart || scheduledDate > todayEnd) {
-    return { completed: false, message: null };
+  if (!isToday(scheduledDate)) {
+    // This should never happen due to query filter, but acts as a safeguard
+    return { completed: false, message: 'Revision cannot be completed on a date other than its scheduled due date.' };
   }
 
   // Check activity for today

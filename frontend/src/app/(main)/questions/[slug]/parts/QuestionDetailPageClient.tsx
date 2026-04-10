@@ -413,6 +413,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             isMarking={markRevisionMutation.isPending}
             onMarkSolved={handleMarkSolved}
             isMarkingSolved={updateStatusMutation.isPending}
+            questionId={initialQuestion._id}
           />
         </div>
       )}

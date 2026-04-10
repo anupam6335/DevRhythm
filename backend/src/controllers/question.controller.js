@@ -12,6 +12,7 @@ const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
 const { jobQueue } = require('../services/queue.service');
 const { generateFullRunner } = require('../services/codeRunnerGenerator.service');
+const revisionService = require('../services/revision.service');
 
 // generate a pattern name from tags
 const generatePatternFromTags = (tags) => {
@@ -128,7 +129,14 @@ const fetchQuestionDetails = async (userId, questionId) => {
   return {
     question,
     progress: progress || null,
-    revision: revision || null,
+    revision: revision ? {
+      ...revision,
+      currentStatus: revisionService.getRevisionStatusLabel(revision, null, 'actionable'),
+      scheduleStatuses: revision.schedule.map((date, idx) => ({
+        date,
+        status: revisionService.getRevisionStatusLabel(revision, idx, 'display')
+      }))
+    } : null,
     codeExecutionHistory: codeHistory || [],
     activityLogs: activityLogs || []
   };

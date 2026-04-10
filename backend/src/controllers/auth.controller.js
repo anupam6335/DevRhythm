@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const crypto = require('crypto');
 const { client: redisClient } = require('../config/redis');
@@ -6,6 +7,7 @@ const { invalidateUserCache } = require('../middleware/cache');
 const { formatResponse } = require('../utils/helpers/response');
 const config = require('../config');
 const AppError = require('../utils/errors/AppError'); // <-- ADD THIS LINE
+const User = require('../models/User');
 
 const initiateOAuth = (provider) => (req, res, next) => {
   const state = crypto.randomBytes(32).toString('hex');
@@ -88,15 +90,44 @@ const validateSession = async (req, res, next) => {
 
 const refreshToken = async (req, res, next) => {
   try {
-    const token = generateToken(req.user._id);
-    const refreshToken = generateRefreshToken(req.user._id);
-    
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      throw new AppError('Refresh token required', 400);
+    }
+
+    // Verify the refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, config.jwt.refreshSecret);
+    } catch (err) {
+      throw new AppError('Invalid or expired refresh token', 401);
+    }
+
+    // Find the user
+    const user = await User.findById(decoded.userId);
+    if (!user || !user.isActive) {
+      throw new AppError('User not found or inactive', 401);
+    }
+
+    // Optional: Check if this refresh token has been blacklisted (if you implement revocation)
+    const isBlacklisted = await redisClient.get(`blacklist:refresh:${refreshToken}`);
+    if (isBlacklisted) {
+      throw new AppError('Refresh token revoked', 401);
+    }
+
+    // Generate new tokens
+    const newAccessToken = generateToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    // (Optional) Blacklist the old refresh token – prevents reuse if stolen
+    // Set expiry equal to the token's remaining lifetime (or simply 30 days)
+    await redisClient.setEx(`blacklist:refresh:${refreshToken}`, 30 * 24 * 60 * 60, '1');
+
+    // Send the new pair
     res.json(formatResponse('Session refreshed successfully', {
-      session: {
-        token,
-        refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      }
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // access token expiry
     }));
   } catch (error) {
     next(error);

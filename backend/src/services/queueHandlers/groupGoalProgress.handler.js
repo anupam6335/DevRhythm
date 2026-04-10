@@ -32,17 +32,17 @@ const handleGroupGoalProgress = async (job) => {
     }
 
     await ActivityLog.create({
-    userId,
-    action: 'group_goal_progress',
-    targetId: groupId,                      
-    targetModel: 'StudyGroup',              
-    metadata: {
-        goalId,                              
+      userId,
+      action: 'group_goal_progress',
+      targetId: groupId,
+      targetModel: 'StudyGroup',
+      metadata: {
+        goalId,
         delta,
         newProgress,
         target
-    },
-    timestamp: activityDate,
+      },
+      timestamp: activityDate,
     });
 
     console.log(`Group goal progress processed for user ${userId}`);

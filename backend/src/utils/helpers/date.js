@@ -49,6 +49,19 @@ const isSameDay = (date1, date2) => {
   return formatDate(date1) === formatDate(date2);
 };
 
+/**
+ * Check if a given date is today (UTC-based comparison)
+ * @param {Date|string|number} date - Date to check
+ * @returns {boolean}
+ */
+const isToday = (date) => {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return false;
+  const todayStart = getStartOfDay();
+  const todayEnd = getEndOfDay();
+  return d >= todayStart && d <= todayEnd;
+};
+
 const getDaysBetween = (startDate, endDate) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -79,7 +92,6 @@ const parseDate = (input) => {
   throw new Error(`Invalid date input: ${input}`);
 };
 
-
 module.exports = {
   getStartOfDay,
   getEndOfDay,
@@ -89,6 +101,7 @@ module.exports = {
   getEndOfMonth,
   formatDate,
   isSameDay,
+  isToday,
   getDaysBetween,
   parseDate
 };

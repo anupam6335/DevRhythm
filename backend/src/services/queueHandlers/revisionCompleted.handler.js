@@ -10,7 +10,6 @@ const { parseDate } = require('../../utils/helpers/date');
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
 
-  // Parse the date robustly – handles numeric strings, timestamps, etc.
   const revisionDate = parseDate(completedAt);
 
   try {
@@ -52,7 +51,7 @@ const handleRevisionCompleted = async (job) => {
       await invalidateCache(`progress:*:user:${userId}:*`);
     }
 
-    // --- Update heatmap ---
+    // --- Update heatmap – FIX: create if missing ---
     const year = revisionDate.getFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMediaQuery } from '@/shared/hooks';
 import Divider from '@/shared/components/Divider';
@@ -10,7 +10,7 @@ import { useQuestions } from '@/features/question/hooks/useQuestions';
 import { useStatistics } from '@/features/question/hooks/useStatistics';
 import { usePatterns } from '@/features/question/hooks/usePatterns';
 import { useTags } from '@/features/question/hooks/useTags';
-import { QuestionList } from '@/app/(main)/questions/parts/QuestionList';
+import { LazyQuestionList } from './LazyQuestionList';
 import { QuestionFilterSidebar } from '@/app/(main)/questions/parts/QuestionFilterSidebar';
 import { QuestionFilterDrawer } from '@/app/(main)/questions/parts/QuestionFilterDrawer';
 import type { Filters } from '@/app/(main)/questions/parts/QuestionFilterControls';
@@ -44,8 +44,16 @@ const SORT_OPTIONS = [
 export const QuestionsPageClient: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isDesktop = useMediaQuery('(min-width: 940px)');
+
+  // Responsive breakpoints
+  const isMobile = useMediaQuery('(max-width: 480px)');
+  const isTablet = useMediaQuery('(max-width: 768px)') && !isMobile;
+  const isDesktop = !isMobile && !isTablet;
+
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const scrollRestored = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const initialPageRestored = useRef(false);
 
   // Parse URL params into filters (including sort)
   const filters = useMemo(() => {
@@ -64,7 +72,6 @@ export const QuestionsPageClient: React.FC = () => {
   // Update URL when filters change
   const updateFilters = (key: keyof Filters, value: any) => {
     const params = new URLSearchParams(searchParams.toString());
-    
     if (key === 'tags') {
       params.delete('tags');
       (value as string[]).forEach((tag) => params.append('tags', tag));
@@ -86,9 +93,35 @@ export const QuestionsPageClient: React.FC = () => {
     router.push('?page=1');
   };
 
-  // Pagination
+  // Pagination – read from URL
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 10;
+
+  // --- Persist page number in sessionStorage to restore on back navigation ---
+  useEffect(() => {
+    if (!isNaN(page) && page > 1) {
+      sessionStorage.setItem('questionsPage', page.toString());
+    } else if (page === 1) {
+      // Optionally clear or keep; we'll keep but later we'll decide to restore only if no page param.
+    }
+  }, [page]);
+
+  // Restore page number on initial mount if URL doesn't have a page param or page=1
+  useEffect(() => {
+    if (initialPageRestored.current) return;
+    const storedPage = sessionStorage.getItem('questionsPage');
+    if (storedPage) {
+      const storedPageNum = parseInt(storedPage, 10);
+      const currentPage = parseInt(searchParams.get('page') || '1', 10);
+      if (currentPage === 1 && storedPageNum > 1) {
+        initialPageRestored.current = true;
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('page', storedPageNum.toString());
+        router.replace(`?${params.toString()}`);
+      }
+    }
+    initialPageRestored.current = true;
+  }, [searchParams, router]);
 
   // Build params for useQuestions, including sort
   const queryParams = useMemo(() => {
@@ -98,14 +131,12 @@ export const QuestionsPageClient: React.FC = () => {
     if (filters.difficulty) params.difficulty = filters.difficulty;
     if (filters.pattern) params.pattern = filters.pattern;
     if (filters.tags.length) params.tags = filters.tags;
-
     // Add sort parameters
     const sortParams = sortParamMap[filters.sort];
     if (sortParams) {
       params.sortBy = sortParams.sortBy;
       params.sortOrder = sortParams.sortOrder;
     }
-
     return params;
   }, [page, limit, filters]);
 
@@ -143,6 +174,54 @@ export const QuestionsPageClient: React.FC = () => {
     return (tagsData ?? []).map((t) => ({ value: t, label: t }));
   }, [tagsData]);
 
+  // Responsive sibling count for pagination
+  const getSiblingCount = () => {
+    if (isDesktop) return 2;
+    if (isTablet) return 1;
+    return 0; // mobile
+  };
+  const siblingCount = getSiblingCount();
+
+  // Responsive pagination size
+  const getPaginationSize = () => {
+    if (isMobile) return 'sm';
+    return 'md';
+  };
+  const paginationSize = getPaginationSize();
+
+  // --- Scroll position persistence ---
+  // Save scroll position on scroll (debounced)
+  const handleScroll = useCallback(() => {
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    scrollTimeout.current = setTimeout(() => {
+      sessionStorage.setItem('questionsPageScrollY', window.scrollY.toString());
+    }, 100);
+  }, []);
+
+  // Restore scroll position after data loads
+  useEffect(() => {
+    if (!questionsLoading && !scrollRestored.current && questions.length > 0) {
+      const savedScrollY = sessionStorage.getItem('questionsPageScrollY');
+      if (savedScrollY !== null) {
+        const scrollY = parseInt(savedScrollY, 10);
+        if (!isNaN(scrollY) && scrollY > 0) {
+          window.scrollTo({ top: scrollY, behavior: 'instant' });
+        }
+        sessionStorage.removeItem('questionsPageScrollY');
+      }
+      scrollRestored.current = true;
+    }
+  }, [questionsLoading, questions.length]);
+
+  // Attach scroll listener
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    };
+  }, [handleScroll]);
+
   // Error state
   if (questionsError) {
     return (
@@ -178,32 +257,36 @@ export const QuestionsPageClient: React.FC = () => {
         </div>
       </div>
       <Divider />
-      {/* Desktop layout with sidebar */}
+
+      {/* Desktop layout with sticky sidebar */}
       {isDesktop ? (
         <div className={styles.desktopLayout}>
-          <QuestionFilterSidebar
-            filters={filters}
-            onFilterChange={updateFilters}
-            onClearFilters={clearFilters}
-            stats={statsData}
-            platformOptions={platformOptions}
-            difficultyOptions={difficultyOptions}
-            patternOptions={patternOptions}
-            tagOptions={tagOptions}
-            sortOptions={SORT_OPTIONS}
-          />
+          <div className={styles.sidebarWrapper}>
+            <QuestionFilterSidebar
+              filters={filters}
+              onFilterChange={updateFilters}
+              onClearFilters={clearFilters}
+              stats={statsData}
+              platformOptions={platformOptions}
+              difficultyOptions={difficultyOptions}
+              patternOptions={patternOptions}
+              tagOptions={tagOptions}
+              sortOptions={SORT_OPTIONS}
+            />
+          </div>
           <main className={styles.main}>
             <div className={styles.resultInfo}>
               <span>
                 Showing {start}–{end} of {total} questions
               </span>
             </div>
-            <QuestionList questions={questions} isLoading={questionsLoading} />
+            <LazyQuestionList questions={questions} isLoading={questionsLoading} />
             {pagination && pagination.pages > 1 && (
               <Pagination
                 currentPage={pagination.page}
                 totalPages={pagination.pages}
-                siblingCount={2}
+                siblingCount={siblingCount}
+                size={paginationSize}
                 onPageChange={(page) => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', page.toString());
@@ -236,13 +319,14 @@ export const QuestionsPageClient: React.FC = () => {
               </select>
             </div>
           </div>
-          <QuestionList questions={questions} isLoading={questionsLoading} />
+          <LazyQuestionList questions={questions} isLoading={questionsLoading} />
           {pagination && pagination.pages > 1 && (
             <div className={styles.paginationWrapper}>
               <Pagination
                 currentPage={pagination.page}
                 totalPages={pagination.pages}
-                siblingCount={2}
+                siblingCount={siblingCount}
+                size={paginationSize}
                 onPageChange={(page) => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', page.toString());

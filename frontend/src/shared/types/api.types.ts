@@ -407,16 +407,21 @@ export interface RevisionSchedule extends Timestamp {
   _id: ID;
   userId: ID;
   questionId: ID;
-  schedule: ISODateString[]; // array of dates
+  schedule: ISODateString[];
   completedRevisions: Array<{
     date: ISODateString;
     completedAt: ISODateString;
     status: 'completed' | 'skipped';
   }>;
-  currentRevisionIndex: number; // 0-4
+  currentRevisionIndex: number;
   status: RevisionStatus;
   overdueCount: number;
   baseDate: ISODateString;
+  currentStatus?: string;
+  scheduleStatuses?: Array<{
+    date: ISODateString;
+    status: string;
+  }>;
 }
 
 export interface PatternMastery extends Timestamp {

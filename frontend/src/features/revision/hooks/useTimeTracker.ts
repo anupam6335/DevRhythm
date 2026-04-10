@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { tokenStorage } from '@/features/auth/utils/tokenStorage';
 
 export function useTimeTracker(questionId: string | undefined, enabled: boolean) {
   const sentRef = useRef<boolean>(false);
 
-  const sendTime = () => {
+  const sendTime = useCallback(() => {
     if (!enabled || sentRef.current) return;
 
     const storedStart = sessionStorage.getItem(`time-tracker-start-${questionId}`);
@@ -32,12 +32,11 @@ export function useTimeTracker(questionId: string | undefined, enabled: boolean)
     }).finally(() => {
       sessionStorage.removeItem(`time-tracker-start-${questionId}`);
     });
-  };
+  }, [enabled, questionId]);
 
   useEffect(() => {
     if (!enabled || !questionId) return;
 
-    // Set start time only if not already stored
     const existingStart = sessionStorage.getItem(`time-tracker-start-${questionId}`);
     if (!existingStart) {
       sessionStorage.setItem(`time-tracker-start-${questionId}`, Date.now().toString());
@@ -46,9 +45,8 @@ export function useTimeTracker(questionId: string | undefined, enabled: boolean)
     const handleBeforeUnload = () => sendTime();
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // No cleanup send – the timer continues across refreshes
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [enabled, questionId]);
+  }, [enabled, questionId, sendTime]);
 }

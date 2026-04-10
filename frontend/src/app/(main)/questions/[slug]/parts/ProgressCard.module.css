@@ -213,6 +213,31 @@
   transform: translateY(0);
 }
 
+.rescheduleContainer {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.rescheduleButton {
+  width: 100%;
+}
+
+.inlinePicker {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pickerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
 /* Responsive */
 @media (max-width: 768px) {
   .content {

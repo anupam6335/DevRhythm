@@ -1,7 +1,7 @@
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Question = require('../models/Question');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
-const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate } = require("../utils/helpers");
+const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, formatDate, isToday } = require("../utils/helpers");
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
@@ -41,8 +41,20 @@ const getRevisions = async (req, res, next) => {
       RevisionSchedule.countDocuments(query),
     ]);
     
+    // Enhance revisions with status label for current pending revision
+    const enhancedRevisions = revisions.map(rev => {
+      const revObj = rev.toObject();
+      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev);
+      // Also provide status for each scheduled date if needed
+      revObj.scheduleStatuses = rev.schedule.map((date, idx) => ({
+        date,
+        status: revisionService.getRevisionStatusLabel(rev, idx)
+      }));
+      return revObj;
+    });
+    
     res.json(formatResponse('Revision schedules retrieved successfully', {
-      revisions,
+      revisions: enhancedRevisions,
     }, {
       pagination: paginate(total, page, limit),
     }));
@@ -70,14 +82,17 @@ const getTodayRevisions = async (req, res, next) => {
     
     const stats = await revisionService.calculateRevisionStats(req.user._id);
     
+    const enhancedRevisions = pendingRevisions.map(rev => ({
+      _id: rev._id,
+      questionId: rev.questionId,
+      scheduledDate: rev.schedule[rev.currentRevisionIndex],
+      revisionIndex: rev.currentRevisionIndex,
+      overdue: rev.schedule[rev.currentRevisionIndex] < todayStart,
+      status: revisionService.getRevisionStatusLabel(rev),
+    }));
+    
     res.json(formatResponse('Today\'s pending revisions retrieved', {
-      pendingRevisions: pendingRevisions.map(rev => ({
-        _id: rev._id,
-        questionId: rev.questionId,
-        scheduledDate: rev.schedule[rev.currentRevisionIndex],
-        revisionIndex: rev.currentRevisionIndex,
-        overdue: rev.schedule[rev.currentRevisionIndex] < todayStart,
-      })),
+      pendingRevisions: enhancedRevisions,
       stats,
     }));
   } catch (error) {
@@ -151,6 +166,14 @@ const getUpcomingRevisions = async (req, res, next) => {
     
     const stats = await revisionService.calculateUpcomingStats(req.user._id, startDate, endDate);
     
+    // For upcoming endpoint, we already have status implied (Upcoming) but we can add it
+    upcoming.forEach(group => {
+      group.questions = group.questions.map(q => ({
+        ...q,
+        status: 'Upcoming'
+      }));
+    });
+    
     res.json(formatResponse('Upcoming revisions retrieved', {
       upcomingRevisions: upcoming,
       stats,
@@ -170,9 +193,16 @@ const getQuestionRevision = async (req, res, next) => {
     if (!revision) {
       throw new AppError('Revision schedule not found', 404);
     }
+  
+    const revObj = revision.toObject();
+    revObj.currentStatus = revisionService.getRevisionStatusLabel(revision, null, 'actionable');
+    revObj.scheduleStatuses = revision.schedule.map((date, idx) => ({
+      date,
+      status: revisionService.getRevisionStatusLabel(revision, idx, 'display')
+    }));
     
     res.json(formatResponse('Revision schedule retrieved successfully', {
-      revision,
+      revision: revObj,
     }));
   } catch (error) {
     next(error);
@@ -192,7 +222,14 @@ const getQuestionRevisionByPlatform = async (req, res, next) => {
 
     if (!revision) throw new AppError('Revision schedule not found', 404);
 
-    res.json(formatResponse('Revision schedule retrieved successfully', { revision }));
+    const revObj = revision.toObject();
+    revObj.currentStatus = revisionService.getRevisionStatusLabel(revision, null, 'actionable');
+    revObj.scheduleStatuses = revision.schedule.map((date, idx) => ({
+      date,
+      status: revisionService.getRevisionStatusLabel(revision, idx, 'display')
+    }));
+
+    res.json(formatResponse('Revision schedule retrieved successfully', { revision: revObj }));
   } catch (error) {
     next(error);
   }
@@ -328,32 +365,31 @@ const recordTimeSpent = async (req, res, next) => {
     // 1. Record time in Redis
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    // 2. Update UserQuestionProgress
+    // 2. Update UserQuestionProgress – WITHOUT affecting attempt count
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
     });
 
     if (!progress) {
+      // Create new progress record – no attempt fields are set
       progress = new UserQuestionProgress({
         userId: req.user._id,
         questionId,
         totalTimeSpent: minutes,
-        status: 'Attempted',
-        attempts: { count: 1, lastAttemptAt: new Date(), firstAttemptAt: new Date() }
+        status: 'Not Started',   // will be updated below if minutes >= 20
+        // attempts object is left with default values (count: 0, no dates)
       });
     } else {
+      // Only add time – do not touch attempts
       progress.totalTimeSpent += minutes;
-      if (progress.status === 'Not Started') {
-        progress.status = 'Attempted';
-        if (!progress.attempts.firstAttemptAt) progress.attempts.firstAttemptAt = new Date();
-        progress.attempts.lastAttemptAt = new Date();
-        progress.attempts.count = (progress.attempts.count || 0) + 1;
-      } else {
-        progress.attempts.lastAttemptAt = new Date();
-        progress.attempts.count = (progress.attempts.count || 0) + 1;
-      }
     }
+
+    // If total time reaches 20 minutes and status is still 'Not Started', mark as 'Attempted'
+    if (progress.totalTimeSpent >= 20 && progress.status === 'Not Started') {
+      progress.status = 'Attempted';
+    }
+
     await progress.save();
 
     // 3. Create revision schedule if total time >= 20 AND no schedule exists
@@ -379,7 +415,7 @@ const recordTimeSpent = async (req, res, next) => {
       await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     }
 
-    // 4. Check if revision can be completed (existing)
+    // 4. Check if revision can be completed (existing logic)
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
@@ -414,10 +450,23 @@ const rescheduleRevision = async (req, res, next) => {
       throw new AppError('Revision schedule not found', 404);
     }
     
-    if (revisionIndex >= revision.schedule.length) {
-      throw new AppError('Invalid revision index', 400);
+    // --- NEW VALIDATION: Only allow rescheduling if the current pending due date is today ---
+    // If revision is completed, cannot reschedule
+    if (revision.status === 'completed') {
+      throw new AppError('Cannot reschedule a completed revision schedule.', 400);
     }
     
+    // Get the current due date (the one the user should be working on)
+    const currentDueDate = revision.schedule[revision.currentRevisionIndex];
+    
+    if (!isToday(currentDueDate)) {
+      throw new AppError('Revisions can only be rescheduled on their scheduled due date.', 400);
+    }
+    
+    // Optional: Prevent rescheduling past due dates that are already overdue
+    // Already handled above (if not today, cannot reschedule)
+    
+    // Proceed with rescheduling
     revision.schedule[revisionIndex] = new Date(newDate);
     revision.updatedAt = new Date();
     
@@ -515,8 +564,14 @@ const getOverdueRevisions = async (req, res, next) => {
       RevisionSchedule.countDocuments(query),
     ]);
     
+    const enhancedRevisions = revisions.map(rev => {
+      const revObj = rev.toObject();
+      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev); // Will be 'Overdue'
+      return revObj;
+    });
+    
     res.json(formatResponse('Overdue revisions retrieved', {
-      revisions,
+      revisions: enhancedRevisions,
     }, {
       pagination: paginate(total, page, limit),
     }));

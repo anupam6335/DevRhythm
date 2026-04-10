@@ -195,6 +195,7 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
   isOwnProfile,
 }) => {
   const questionId = item.questionId;
+  if(!questionId) return null;
   const status = item.status;
   const attempts = item.attempts;
   const revisionCount = item.revisionCount || 0;

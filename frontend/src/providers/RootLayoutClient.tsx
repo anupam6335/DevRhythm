@@ -35,7 +35,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         pendingRevisionsCount={pendingCount}
         dailyGoalProgress={progress}
         streakCount={user?.streak?.current || 0}
-        onQuickAdd={handleQuickAdd}
+        // onQuickAdd={handleQuickAdd}
       />
       <main
         className="devRhythmContainer"

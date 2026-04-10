@@ -10,10 +10,8 @@ const handleGroupJoined = async (job) => {
   const activityDate = parseDate(timestamp || new Date());
 
   try {
-    // 1. Update streak and active days
     await updateUserActivity(userId, activityDate);
 
-    // 2. Update heatmap (studyGroupActivity)
     const year = activityDate.getFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -33,7 +31,6 @@ const handleGroupJoined = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
-    // 3. Create activity log
     await ActivityLog.create({
       userId,
       action: 'joined_group',

@@ -184,3 +184,47 @@ code, pre {
   background-color: var(--accent-moss) !important;
   color: var(--primary-text-on-action) !important;
 }
+
+/* CodeMirror autocomplete tooltip theming – matches the website's dark/light mode */
+.dark .cm-tooltip {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.dark .cm-tooltip-autocomplete {
+  background-color: var(--bg-elevated);
+}
+.dark .cm-tooltip-autocomplete ul {
+  background-color: var(--bg-elevated);
+}
+.dark .cm-completionItem {
+  color: var(--text-primary);
+  padding: 0.25rem 0.5rem;
+}
+.dark .cm-completionItem[aria-selected="true"] {
+  background-color: var(--hover-surface);
+}
+.dark .cm-completionItem .cm-completionIcon {
+  color: var(--accent-moss);
+}
+.dark .cm-completionLabel {
+  color: var(--text-primary);
+}
+.dark .cm-completionDetail {
+  color: var(--text-secondary);
+}
+
+/* Light mode (optional, ensures consistency) */
+.light .cm-tooltip {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.light .cm-tooltip-autocomplete {
+  background-color: var(--bg-elevated);
+}
+.light .cm-completionItem[aria-selected="true"] {
+  background-color: var(--hover-surface);
+}

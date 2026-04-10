@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useMediaQuery } from '@/shared/hooks';
 import Button from '@/shared/components/Button';
 import Select from '@/shared/components/Select';
@@ -12,9 +12,12 @@ import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Extension } from '@codemirror/state';
-import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2, FiPlay, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2, FiPlay, FiCheckCircle, FiXCircle, FiClock, FiUpload, FiRotateCcw } from 'react-icons/fi';
 import { toast } from '@/shared/components/Toast';
 import styles from './CodeExecutionArea.module.css';
+import { SiCplusplus } from 'react-icons/si';
+import { FaJava, FaPython } from 'react-icons/fa';
+import { PartyPopper, PartyPopperRef } from '@/shared/components/PartyPopper';
 
 interface TestCase {
   stdin: string;
@@ -50,7 +53,6 @@ const languageMap: Record<string, string> = {
   cpp: 'C++',
 };
 
-// Custom theme with proper selection colors (no `theme="dark"` override)
 const createCustomTheme = (isDark: boolean): Extension => {
   const backgroundColor = isDark ? 'var(--code-bg)' : 'var(--code-bg)';
   const textColor = isDark ? 'var(--code-text)' : 'var(--code-text)';
@@ -73,13 +75,14 @@ const createCustomTheme = (isDark: boolean): Extension => {
       },
       '.cm-activeLine': { backgroundColor: 'rgba(124, 139, 122, 0.1)' },
       '.cm-activeLineGutter': { backgroundColor: 'rgba(124, 139, 122, 0.1)' },
-      // Selection styles – forced with !important to override defaults
       '.cm-selectionBackground': {
         backgroundColor: 'rgba(var(--accent-moss-rgb), 0.3) !important',
       },
       '.cm-focused .cm-selectionBackground': {
         backgroundColor: 'rgba(var(--accent-moss-rgb), 0.5) !important',
       },
+      '.cm-cursor': { borderLeftColor: textColor },
+      '.cm-cursor-primary': { borderLeftColor: textColor },
     }),
     syntaxHighlighting(
       HighlightStyle.define([
@@ -127,8 +130,11 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const [language, setLanguage] = useState(initialLanguage);
   const [customTestCases, setCustomTestCases] = useState<TestCase[]>(initialCustomTestCases);
   const [testCasesCollapsed, setTestCasesCollapsed] = useState(isMobile);
+  const [isCodeModified, setIsCodeModified] = useState(false);
   const skipStarterLoad = useRef(false);
   const autoSwitched = useRef(false);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const partyPopperRef = useRef<PartyPopperRef>(null);
 
   const getLanguageExtension = (lang: string) => {
     switch (lang) {
@@ -139,7 +145,23 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   };
 
-  // Load last executed code from history on mount
+  const getCurrentStarterCode = useCallback(() => {
+    if (!starterCodeByLanguage) return '';
+    const backendLang = languageMap[language];
+    return starterCodeByLanguage[backendLang] || `# Write your solution here for ${language}\n`;
+  }, [starterCodeByLanguage, language]);
+
+  const checkIfModified = useCallback((currentCode: string) => {
+    const starter = getCurrentStarterCode();
+    setIsCodeModified(currentCode !== starter);
+  }, [getCurrentStarterCode]);
+
+  useEffect(() => {
+    if (!skipStarterLoad.current) {
+      checkIfModified(code);
+    }
+  }, [code, checkIfModified]);
+
   useEffect(() => {
     if (initialHistory.length > 0) {
       const sorted = [...initialHistory].sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime());
@@ -163,24 +185,16 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
   useEffect(() => {
     if (skipStarterLoad.current) return;
-    if (starterCodeByLanguage) {
-      const backendLang = languageMap[language];
-      const starter = starterCodeByLanguage[backendLang];
-      if (starter) {
-        setCode(starter);
-        if (onCodeChange) onCodeChange(starter);
-      } else {
-        setCode(`# Write your solution here for ${language}\n`);
-        if (onCodeChange) onCodeChange(`# Write your solution here for ${language}\n`);
-      }
-    }
-  }, [language, starterCodeByLanguage, onCodeChange]);
+    const starter = getCurrentStarterCode();
+    setCode(starter);
+    if (onCodeChange) onCodeChange(starter);
+    setIsCodeModified(false);
+  }, [language, getCurrentStarterCode, onCodeChange]);
 
   useEffect(() => {
     if (onCodeChange) onCodeChange(code);
   }, [code, onCodeChange]);
 
-  // Auto‑switch to results tab when new results arrive, but only once per run
   useEffect(() => {
     if (results && results.length > 0 && !autoSwitched.current) {
       autoSwitched.current = true;
@@ -206,6 +220,13 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     onRun(code, language, combined);
   };
 
+  const handleReset = () => {
+    const starter = getCurrentStarterCode();
+    setCode(starter);
+    if (onCodeChange) onCodeChange(starter);
+    toast.success('Code reset');
+  };
+
   const languageOptions = [
     { value: 'python', label: 'Python' },
     { value: 'java', label: 'Java' },
@@ -223,8 +244,18 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const passedCount = results?.filter(r => r.passed).length || 0;
   const totalCount = results?.length || 0;
 
+  const resetButtonContent = isMobile ? <FiRotateCcw /> : <><FiRotateCcw /> Reset</>;
+
+  useEffect(() => {
+    if (results && results.length > 0 && results.every(r => r.passed)) {
+      partyPopperRef.current?.fire();
+    }
+  }, [results]);
+
   return (
     <div className={styles.container}>
+      <PartyPopper ref={partyPopperRef} />
+
       <div className={styles.topRow}>
         <div className={styles.languageRow}>
           <Select options={languageOptions} value={language} onChange={setLanguage} className={styles.select} />
@@ -241,9 +272,21 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
             </button>
           ))}
         </div>
-        <Button variant="primary" size="sm" onClick={handleRun} isLoading={isRunning} leftIcon={<FiPlay />} className={styles.runButton}>
-          Run Code
-        </Button>
+        <div className={styles.actionButtons}>
+          {isCodeModified && (
+            <button
+              className={styles.iconButton}
+              onClick={handleReset}
+              aria-label="Reset code"
+              title="Reset to starter code"
+            >
+              {resetButtonContent}
+            </button>
+          )}
+          <Button variant="primary" size="sm" onClick={handleRun} isLoading={isRunning} leftIcon={<FiPlay />} className={styles.runButton}>
+            Run Code
+          </Button>
+        </div>
       </div>
 
       {activeTab === 'code' && (
@@ -256,7 +299,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
             }}
             height={isMobile ? '300px' : '500px'}
             extensions={[getLanguageExtension(language), customTheme]}
-            // Removed `theme="dark"` to avoid overriding our custom theme
             basicSetup={{
               lineNumbers: true,
               highlightActiveLineGutter: true,
@@ -280,6 +322,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
               lintKeymap: true,
             }}
             className={styles.editor}
+            onCreateEditor={(view) => { editorViewRef.current = view; }}
           />
 
           <div className={styles.testCasesSection}>
@@ -337,45 +380,96 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
               </div>
             )}
           </div>
+
+          {/* Results removed from here – only in Results tab */}
         </>
       )}
 
       {activeTab === 'history' && (
         <div className={styles.historyPanel}>
           {initialHistory.length === 0 ? (
-            <div className={styles.historyEmpty}>No execution history yet.</div>
+            <div className={styles.historyEmpty}>
+              <div className={styles.historyEmptyIcon}>⌨️</div>
+              <p>No submissions yet</p>
+              <span>Run your code to see history</span>
+            </div>
           ) : (
-            <div className={styles.historyList}>
-              {initialHistory.map((entry: any) => (
-                <div key={entry._id} className={styles.historyItem}>
-                  <div className={styles.historyInfo}>
-                    <strong>{entry.language}</strong> · {new Date(entry.executedAt).toLocaleString()}
-                    <br />
-                    <small>{entry.summary.passedCount}/{entry.summary.totalCount} passed</small>
+            <div className={styles.historyTimeline}>
+              {initialHistory.map((entry: any, idx: number) => {
+                const passedCount = entry.summary.passedCount;
+                const totalCount = entry.summary.totalCount;
+                const allPassed = passedCount === totalCount;
+                const executedAt = new Date(entry.executedAt);
+                const now = new Date();
+                const diffMs = now.getTime() - executedAt.getTime();
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+                let timeAgo = '';
+                if (diffMins < 1) timeAgo = 'just now';
+                else if (diffMins < 60) timeAgo = `${diffMins}m ago`;
+                else if (diffHours < 24) timeAgo = `${diffHours}h ago`;
+                else timeAgo = `${diffDays}d ago`;
+
+                const isLast = idx === initialHistory.length - 1;
+
+                const getLanguageIcon = () => {
+                  switch (entry.language) {
+                    case 'python': return <FaPython size={14} />;
+                    case 'java': return <FaJava size={14} />;
+                    case 'cpp': return <SiCplusplus size={14} />;
+                    default: return null;
+                  }
+                };
+
+                return (
+                  <div key={entry._id} className={styles.historyEntry}>
+                    <div className={styles.historyEntryLine}>
+                      <div className={styles.historyEntryDot} />
+                      {!isLast && <div className={styles.historyEntryConnector} />}
+                    </div>
+                    <div className={styles.historyEntryContent}>
+                      <div className={styles.historyEntryHeader}>
+                        <div className={styles.historyEntryLanguage}>
+                          {getLanguageIcon()}
+                          <span>{entry.language}</span>
+                        </div>
+                        <div className={styles.historyEntryTime}>
+                          <FiClock size={12} />
+                          <span>{timeAgo}</span>
+                        </div>
+                      </div>
+                      <div className={styles.historyEntryFooter}>
+                        <span className={allPassed ? styles.historyEntrySuccess : styles.historyEntryFailure}>
+                          {allPassed ? '✓ All tests passed' : `${passedCount}/${totalCount} passed`}
+                        </span>
+                        <button
+                          className={styles.historyLoadButton}
+                          onClick={() => {
+                            const frontendLang = (() => {
+                              switch (entry.language) {
+                                case 'python': return 'python';
+                                case 'java': return 'java';
+                                case 'cpp': return 'cpp';
+                                default: return 'python';
+                              }
+                            })();
+                            skipStarterLoad.current = true;
+                            setLanguage(frontendLang);
+                            setCode(entry.code);
+                            if (onCodeChange) onCodeChange(entry.code);
+                            onTabChange('code');
+                            toast.success('Code loaded');
+                            setTimeout(() => { skipStarterLoad.current = false; }, 100);
+                          }}
+                        >
+                          <FiUpload size={12} /> Load code
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      let frontendLang = 'python';
-                      for (const [key, val] of Object.entries(languageMap)) {
-                        if (val.toLowerCase() === entry.language.toLowerCase()) {
-                          frontendLang = key;
-                          break;
-                        }
-                      }
-                      skipStarterLoad.current = true;
-                      setLanguage(frontendLang);
-                      setCode(entry.code);
-                      if (onCodeChange) onCodeChange(entry.code);
-                      onTabChange('code');
-                      toast.success('Code loaded into editor');
-                      setTimeout(() => { skipStarterLoad.current = false; }, 100);
-                    }}
-                  >
-                    Load
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

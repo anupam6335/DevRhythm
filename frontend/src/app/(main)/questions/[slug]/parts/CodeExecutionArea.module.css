@@ -34,7 +34,7 @@
   min-width: 120px;
 }
 
-/* Tabs Switch (Code/History) */
+/* Tabs Switch (Code/History/Results) */
 .tabsSwitch {
   display: flex;
   gap: 0.25rem;
@@ -68,6 +68,35 @@
 .activeTab:hover {
   background-color: var(--primary-action-hover);
   color: var(--primary-text-on-action);
+}
+
+/* Action Buttons (Reset + Run) */
+.actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  transition: var(--transition);
+  font-size: 0.85rem;
+}
+
+.iconButton:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
 }
 
 .runButton {
@@ -209,40 +238,173 @@
   color: var(--error);
 }
 
-/* ===== History Panel ===== */
+/* ===== History Panel – Minimal Timeline ===== */
 .historyPanel {
-  min-height: 300px;
-  max-height: 400px;
-  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.5rem;
   background-color: var(--bg-elevated);
+  padding: 1rem 0.5rem;
+  max-height: 600px;
+  overflow-y: auto;
 }
 
-.historyList {
+.historyEmpty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.historyEmptyIcon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.historyEmpty p {
+  margin: 0;
+  font-weight: 500;
+}
+
+.historyEmpty span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.historyTimeline {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.historyItem {
+.historyEntry {
+  display: flex;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.historyEntryLine {
+  position: relative;
+  width: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.historyEntryDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-moss);
+  margin-top: 0.5rem;
+  z-index: 1;
+  transition: box-shadow 0.2s ease;
+}
+
+.historyEntry:hover .historyEntryDot {
+  box-shadow: 0 0 0 3px rgba(var(--accent-moss-rgb), 0.3);
+}
+
+.historyEntryConnector {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: calc(100% + 0.5rem);
+  background-color: var(--border);
+}
+
+.historyEntry:last-child .historyEntryConnector {
+  display: none;
+}
+
+.historyEntryContent {
+  flex: 1;
+  background-color: var(--bg-surface);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  transition: var(--transition);
+  border: 1px solid transparent;
+}
+
+.historyEntryContent:hover {
+  border-color: var(--accent-moss);
+}
+
+.historyEntryHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--divider);
+  margin-bottom: 0.25rem;
 }
 
-.historyInfo {
-  flex: 1;
+.historyEntryLanguage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.historyEmpty {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 2rem;
+.historyEntryTime {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.historyEntryFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.historyEntrySuccess {
+  font-size: 0.75rem;
+  color: var(--toast-success);
+}
+
+.historyEntryFailure {
+  font-size: 0.75rem;
+  color: var(--toast-error);
+}
+
+.historyLoadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--accent-moss);
+  cursor: pointer;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius);
+  transition: var(--transition);
+  background-color: var(--bg-surface);
+}
+
+.historyLoadButton:hover {
+  background-color: var(--accent-moss);
+  border-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+}
+
+/* Responsive: mobile (≤480px) */
+@media (max-width: 480px) {
+  .historyEntryFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .historyLoadButton {
+    width: 100%;
+    justify-content: center;
+    padding: 0.4rem;
+  }
 }
 
 /* ===== Results Panel ===== */
@@ -251,7 +413,7 @@
   border-radius: var(--radius);
   background-color: var(--bg-elevated);
   padding: 0.5rem;
-  max-height: 400px;
+  max-height: 600px;
   overflow-y: auto;
 }
 
@@ -355,7 +517,6 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
 }
-
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .topRow {
@@ -365,8 +526,12 @@
   .tabsSwitch {
     justify-content: center;
   }
+  .actionButtons {
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+  }
   .runButton {
-    width: 100%;
+    width: auto;
   }
   .languageRow {
     justify-content: space-between;

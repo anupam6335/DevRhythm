@@ -2924,33 +2924,69 @@ public class Main {
 const convertToJsonArgs = (rawInput) => {
   if (!rawInput) return '{"args":[]}';
   const trimmed = rawInput.trim();
-  // If already a JSON object with "args", return as is
+  
+  // Already a JSON object with "args"
   if (trimmed.startsWith("{")) {
     try {
       const obj = JSON.parse(trimmed);
       if (obj.args !== undefined) return trimmed;
     } catch (e) {}
   }
-  // If it's a JSON array, wrap it as {"args": array}
+  
+  // Already a JSON array
   if (trimmed.startsWith("[")) {
     try {
       const arr = JSON.parse(trimmed);
       return JSON.stringify({ args: arr });
     } catch (e) {}
   }
-  // Otherwise, split by newline and parse each line
-  const lines = rawInput.split(/\r?\n/).filter((line) => line.trim() !== "");
+  
+  // Split by newlines first
+  const lines = rawInput.split(/\r?\n/).filter(line => line.trim() !== "");
   const args = [];
+  
   for (const line of lines) {
     const trimmedLine = line.trim();
+    
     // Try to parse as JSON (number, string, array, object)
     try {
       args.push(JSON.parse(trimmedLine));
+      continue;
     } catch (e) {
-      // If not valid JSON, keep as raw string
-      args.push(trimmedLine);
+      // Not valid JSON – attempt to parse key=value pairs
     }
+    
+    // Check if line looks like "key1 = value1, key2 = value2, ..."
+    if (trimmedLine.includes('=') && trimmedLine.includes(',')) {
+      const pairs = trimmedLine.split(',').map(p => p.trim());
+      let allNumbers = true;
+      const extracted = [];
+      for (const pair of pairs) {
+        const eqIndex = pair.indexOf('=');
+        if (eqIndex !== -1) {
+          const valueStr = pair.substring(eqIndex + 1).trim();
+          const num = Number(valueStr);
+          if (!isNaN(num)) {
+            extracted.push(num);
+          } else {
+            allNumbers = false;
+            break;
+          }
+        } else {
+          allNumbers = false;
+          break;
+        }
+      }
+      if (allNumbers && extracted.length > 0) {
+        args.push(...extracted);
+        continue;
+      }
+    }
+    
+    // Fallback: treat line as a single string
+    args.push(trimmedLine);
   }
+  
   return JSON.stringify({ args });
 };
 

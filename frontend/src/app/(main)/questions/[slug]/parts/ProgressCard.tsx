@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FaChevronUp, FaChevronDown, FaRedo, FaBook, FaCalendarAlt, FaCheck, FaCheckCircle } from 'react-icons/fa';
+import { FaChevronUp, FaChevronDown, FaRedo, FaBook, FaCalendarAlt, FaCheck, FaCheckCircle, FaCalendarPlus } from 'react-icons/fa';
 import ConfidenceStars from '@/shared/components/ConfidenceStars';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import Button from '@/shared/components/Button';
+import DatePicker from '@/shared/components/DatePicker';
+import { useRescheduleRevision } from '@/features/revision/hooks/useRescheduleRevision';
 import type { UserQuestionProgress, RevisionSchedule } from '@/shared/types';
 import styles from './ProgressCard.module.css';
 import Tooltip from '@/shared/components/Tooltip';
@@ -17,10 +19,9 @@ interface ProgressCardProps {
   isMarking?: boolean;
   onMarkSolved?: () => void;
   isMarkingSolved?: boolean;
+  questionId?: string;
 }
 
-
-// Helper to format UTC date as "MMM dd, yyyy"
 function formatUTCDate(dateString: string): string {
   const date = new Date(dateString);
   const month = date.toLocaleString('default', { month: 'short', timeZone: 'UTC' });
@@ -37,9 +38,14 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
   isMarking = false,
   onMarkSolved,
   isMarkingSolved = false,
+  questionId,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [autoCollapseTriggered, setAutoCollapseTriggered] = useState(false);
+  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const rescheduleMutation = useRescheduleRevision(questionId || '', revision?._id || '');
 
   useEffect(() => {
     if (!autoCollapseTriggered && !isCollapsed && !isLoading) {
@@ -61,18 +67,12 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
   const totalRevisions = schedule.length;
   const completedCount = completedRevisions.length;
 
-  const currentIndex = revision?.currentRevisionIndex ?? 0;
-  const nextRevisionDate = schedule[currentIndex] ? new Date(schedule[currentIndex]) : null;
-
-  // Check if the revision is due today or overdue (UTC date comparison)
-  const isRevisionDue = (() => {
-    if (!nextRevisionDate) return false;
-    const todayUTC = new Date();
-    todayUTC.setUTCHours(0, 0, 0, 0);
-    const dueDateUTC = new Date(nextRevisionDate);
-    dueDateUTC.setUTCHours(0, 0, 0, 0);
-    return dueDateUTC <= todayUTC;
-  })();
+  const scheduleStatuses = revision?.scheduleStatuses || [];
+  const pendingEntry = scheduleStatuses.find(item => item.status === 'Pending');
+  const upcomingEntry = scheduleStatuses.find(item => item.status === 'Upcoming');
+  const hasPendingRevision = !!pendingEntry;
+  const hasUpcomingRevision = !!upcomingEntry;
+  const hasActiveRevisions = hasPendingRevision || hasUpcomingRevision;
 
   const formatTime = (minutes: number) => {
     if (minutes < 60) {
@@ -85,8 +85,14 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
     }
     return { value: `${hours}.${Math.floor(mins / 6)}`, unit: 'hours' };
   };
-
   const timeDisplay = formatTime(timeSpent);
+
+  const handleReschedule = async () => {
+    if (!selectedDate) return;
+    await rescheduleMutation.mutateAsync(selectedDate);
+    setShowReschedulePicker(false);
+    setSelectedDate(null);
+  };
 
   if (isLoading) {
     return (
@@ -111,11 +117,9 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
           {isCollapsed ? <FaChevronDown /> : <FaChevronUp />}
         </button>
       </div>
-
       {!isCollapsed && (
         <div className={styles.content}>
           <div className={styles.leftColumn}>
-            {/* Show "Mark as Solved" only when status is Not Started */}
             {(!progress || progress?.status === 'Not Started') && onMarkSolved && (
               <Button
                 variant="primary"
@@ -143,24 +147,26 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
               <ConfidenceStars level={confidence} size={16} />
               <span className={styles.metricLabel}>confidence</span>
             </div>
-
             <div className={styles.metricRow}>
               <FaCalendarAlt className={styles.icon} />
-              {nextRevisionDate ? (
+              {hasPendingRevision ? (
                 <>
                   <span className={styles.metricValue}>
-                    {formatUTCDate(schedule[currentIndex])}
+                    {formatUTCDate(pendingEntry!.date)}
                   </span>
-                  <span className={styles.metricLabel}>
-                    next revision
-                    {isRevisionDue && <span className={styles.overdue}> (due today)</span>}
+                  <span className={styles.metricLabel}>due today</span>
+                </>
+              ) : hasUpcomingRevision ? (
+                <>
+                  <span className={styles.metricValue}>
+                    {formatUTCDate(upcomingEntry!.date)}
                   </span>
+                  <span className={styles.metricLabel}>next revision</span>
                 </>
               ) : (
                 <span className={styles.metricLabel}>no upcoming revisions</span>
               )}
             </div>
-
             {totalRevisions > 0 && (
               <div className={styles.progressIndicator}>
                 <span className={styles.progressText}>
@@ -174,8 +180,7 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
                 </div>
               </div>
             )}
-
-            {isRevisionDue && (
+            {hasPendingRevision && (
               <Tooltip content="You need to spend at least 20 minutes or pass all test cases to complete this revision.">
                 <Button
                   variant="outline"
@@ -189,15 +194,52 @@ export const ProgressCard: React.FC<ProgressCardProps> = ({
                 </Button>
               </Tooltip>
             )}
+            {!hasActiveRevisions && totalRevisions > 0 && revision?._id && (
+              <div className={styles.rescheduleContainer}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowReschedulePicker(!showReschedulePicker)}
+                  leftIcon={<FaCalendarPlus />}
+                  className={styles.rescheduleButton}
+                >
+                  Reschedule
+                </Button>
+                {showReschedulePicker && (
+                  <div className={styles.inlinePicker}>
+                    <DatePicker
+                      selected={selectedDate}
+                      onChange={setSelectedDate}
+                      minDate={new Date()}
+                      placeholder="Select new start date"
+                      size="sm"
+                      fullWidth
+                    />
+                    <div className={styles.pickerActions}>
+                      <Button size="sm" variant="outline" onClick={() => setShowReschedulePicker(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={handleReschedule}
+                        isLoading={rescheduleMutation.isPending}
+                        disabled={!selectedDate}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-
           <div className={styles.rightColumn}>
             <div className={styles.timeBlock}>
               <div className={styles.timeNumber}>{timeDisplay.value}</div>
               <div className={styles.timeLabel}>{timeDisplay.unit}</div>
               <div className={styles.timeSub}>total time spent</div>
             </div>
-
             {totalRevisions > 0 && (
               <div className={styles.revisionProgress}>
                 <div className={styles.revisionCircles}>

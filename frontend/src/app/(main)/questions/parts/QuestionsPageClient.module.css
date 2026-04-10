@@ -25,13 +25,24 @@
   flex-wrap: wrap;
 }
 
+/* Desktop layout with sticky sidebar */
 .desktopLayout {
   display: flex;
   gap: 2rem;
+  align-items: flex-start;
+}
+
+.sidebarWrapper {
+  position: sticky;
+  top: 5rem;
+  align-self: start;
+  width: 280px;
+  flex-shrink: 0;
 }
 
 .main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -89,6 +100,15 @@
 
 .paginationWrapper {
   margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Override pagination list to wrap and center */
+.paginationWrapper :global(.pagination-list) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 @media (max-width: 480px) {
@@ -101,5 +121,9 @@
   }
   .pageTitle {
     font-size: 1.5rem;
+  }
+  .paginationWrapper :global(.pagination-button) {
+    padding: 0.25rem 0.5rem;
+    min-width: 2rem;
   }
 }
