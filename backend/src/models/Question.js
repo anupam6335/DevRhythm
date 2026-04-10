@@ -74,9 +74,38 @@ const QuestionSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-}, {
-  timestamps: true,
-});
+  methodName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  className: {
+    type: String,
+    default: 'Solution',
+    trim: true
+  },
+  paramTypes: [{
+    type: String,
+    trim: true
+  }],
+  returnType: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  isInteractive: {
+    type: Boolean,
+    default: false
+  },
+  isOrderIrrelevant: {
+    type: Boolean,
+    default: false
+  },
+  testCasesStructured: [{
+    args: [mongoose.Schema.Types.Mixed],
+    expected: mongoose.Schema.Types.Mixed
+  }],
+}, { timestamps: true });
 
 QuestionSchema.index({ platform: 1, platformQuestionId: 1 }, { unique: true });
 QuestionSchema.index({ difficulty: 1 });

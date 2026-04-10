@@ -44,4 +44,22 @@ router.get('/history', auth, async (req, res, next) => {
   }
 });
 
+// Health check for code execution pipeline
+router.get('/health', async (req, res) => {
+    const runnerGenerator = require('../../services/codeExecution/runnerGenerator.service');
+    try {
+        const testCode = runnerGenerator.generateRunner('python', 'class Solution:\n    def test(self):\n        return 42', {
+            methodName: 'test',
+            className: 'Solution',
+            isInteractive: false,
+            paramTypes: [],
+            returnType: 'int'
+        });
+        res.json({ status: 'ok', runnerGenerated: true });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+
 module.exports = router;

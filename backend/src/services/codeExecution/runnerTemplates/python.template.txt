@@ -1,0 +1,488 @@
+import json
+import sys
+from typing import List, Optional, Any, Dict, Union
+from collections import deque, defaultdict
+
+# ========== Data Structures ==========
+class ListNode:
+    __slots__ = ('val', 'next')
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+class TreeNode:
+    __slots__ = ('val', 'left', 'right')
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+class Node:
+    __slots__ = ('val', 'next', 'random', 'neighbors')
+    def __init__(self, val=0, next=None, random=None, neighbors=None):
+        self.val = val
+        self.next = next
+        self.random = random
+        self.neighbors = neighbors if neighbors is not None else []
+
+class NestedInteger:
+    def __init__(self, value=None):
+        self._value = value
+        self._list = []
+        if value is not None and not isinstance(value, int):
+            self._list = value
+
+    def isInteger(self) -> bool:
+        return self._value is not None
+
+    def getInteger(self) -> int:
+        return self._value
+
+    def setInteger(self, value: int) -> None:
+        self._value = value
+        self._list = []
+
+    def add(self, elem: 'NestedInteger') -> None:
+        if self._value is not None:
+            self._list = [NestedInteger(self._value)]
+            self._value = None
+        self._list.append(elem)
+
+    def getList(self) -> List['NestedInteger']:
+        return self._list
+
+# Additional LeetCode structures
+class TrieNode:
+    __slots__ = ('children', 'is_end')
+    def __init__(self):
+        self.children = {}
+        self.is_end = False
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word: str) -> None:
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                node.children[ch] = TrieNode()
+            node = node.children[ch]
+        node.is_end = True
+
+    def search(self, word: str) -> bool:
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        return node.is_end
+
+    def startsWith(self, prefix: str) -> bool:
+        node = self.root
+        for ch in prefix:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        return True
+
+class Interval:
+    __slots__ = ('start', 'end')
+    def __init__(self, start=0, end=0):
+        self.start = start
+        self.end = end
+
+class Point:
+    __slots__ = ('x', 'y')
+    def __init__(self, x=0, y=0):
+        self.x = x
+        self.y = y
+
+class Employee:
+    __slots__ = ('id', 'importance', 'subordinates')
+    def __init__(self, id: int, importance: int, subordinates: List[int]):
+        self.id = id
+        self.importance = importance
+        self.subordinates = subordinates
+
+# ========== Serialization / Deserialization Helpers ==========
+def _deserialize_list_node(data):
+    if not data:
+        return None
+    dummy = ListNode(0)
+    cur = dummy
+    for v in data:
+        cur.next = ListNode(v)
+        cur = cur.next
+    return dummy.next
+
+def _serialize_list_node(head):
+    res = []
+    while head:
+        res.append(head.val)
+        head = head.next
+    return res
+
+def _deserialize_tree_node(data):
+    if not data:
+        return None
+    nodes = [TreeNode(v) if v is not None else None for v in data]
+    kids = nodes[::-1]
+    root = kids.pop()
+    for node in nodes:
+        if node:
+            if kids:
+                node.left = kids.pop()
+            if kids:
+                node.right = kids.pop()
+    return root
+
+def _serialize_tree_node(root):
+    if not root:
+        return []
+    q = deque([root])
+    res = []
+    while q:
+        node = q.popleft()  # FIXED: was popleft (typo)
+        if node:
+            res.append(node.val)
+            q.append(node.left)
+            q.append(node.right)
+        else:
+            res.append(None)
+    while res and res[-1] is None:
+        res.pop()
+    return res
+
+def _deserialize_graph_node(data):
+    if not data:
+        return None
+    nodes = {i+1: Node(i+1) for i in range(len(data))}
+    for i, neighbors in enumerate(data, 1):
+        for nb in neighbors:
+            nodes[i].neighbors.append(nodes[nb])
+    return nodes[1] if nodes else None
+
+def _serialize_graph_node(node):
+    if not node:
+        return []
+    visited = set()
+    nodes = []
+    q = deque([node])
+    while q:
+        cur = q.popleft()
+        if cur.val in visited:
+            continue
+        visited.add(cur.val)
+        nodes.append(cur)
+        for nb in cur.neighbors:
+            if nb.val not in visited:
+                q.append(nb)
+    nodes.sort(key=lambda n: n.val)
+    idx = {n.val: i+1 for i, n in enumerate(nodes)}
+    res = []
+    for n in nodes:
+        res.append([idx[nb.val] for nb in n.neighbors])
+    return res
+
+def _deserialize_nested_integer(data):
+    if isinstance(data, int):
+        return NestedInteger(data)
+    if isinstance(data, list):
+        ni = NestedInteger()
+        for item in data:
+            ni.add(_deserialize_nested_integer(item))
+        return ni
+    return NestedInteger()
+
+def _serialize_nested_integer(ni):
+    if ni.isInteger():
+        return ni.getInteger()
+    return [_serialize_nested_integer(x) for x in ni.getList()]
+
+def _deserialize_random_list(data):
+    if not data:
+        return None
+    nodes = [Node(pair[0]) for pair in data]
+    for i in range(len(nodes)-1):
+        nodes[i].next = nodes[i+1]
+    for i, pair in enumerate(data):
+        if pair[1] is not None:
+            nodes[i].random = nodes[pair[1]]
+    return nodes[0] if nodes else None
+
+def _serialize_random_list(head):
+    if not head:
+        return []
+    index = {}
+    cur = head
+    idx = 0
+    while cur:
+        index[cur] = idx
+        cur = cur.next
+        idx += 1
+    res = []
+    cur = head
+    while cur:
+        random_index = index.get(cur.random) if cur.random else None
+        res.append([cur.val, random_index])
+        cur = cur.next
+    return res
+
+def _deserialize_interval(data):
+    if not isinstance(data, list) or len(data) < 2:
+        return None
+    return Interval(data[0], data[1])
+
+def _serialize_interval(interval):
+    return [interval.start, interval.end]
+
+def _deserialize_point(data):
+    if not isinstance(data, list) or len(data) < 2:
+        return None
+    return Point(data[0], data[1])
+
+def _serialize_point(point):
+    return [point.x, point.y]
+
+def _deserialize_employee(data):
+    if not isinstance(data, dict):
+        return None
+    return Employee(
+        id=data.get('id', 0),
+        importance=data.get('importance', 0),
+        subordinates=data.get('subordinates', [])
+    )
+
+def _serialize_employee(emp):
+    return {
+        'id': emp.id,
+        'importance': emp.importance,
+        'subordinates': emp.subordinates
+    }
+
+def _deserialize_trie(data):
+    # Trie is constructed via method calls; just return an empty instance
+    return Trie()
+
+def _serialize_trie(trie):
+    return None  # Not standardized
+
+# ========== Type‑Based Deserializer / Serializer ==========
+def _deserialize_by_type(data, type_hint: str):
+    """Convert JSON data into the required Python type."""
+    if data is None:
+        return None
+    type_hint = type_hint.strip()
+    # Primitives
+    if type_hint in ('int', 'float', 'str', 'bool', 'char'):
+        if type_hint == 'int':
+            return int(data)
+        if type_hint == 'float':
+            return float(data)
+        if type_hint == 'str':
+            return str(data)
+        if type_hint == 'bool':
+            return bool(data)
+        if type_hint == 'char':
+            return str(data)[0] if data else ''
+    # List / Array
+    if type_hint.startswith('List[') or type_hint.startswith('list['):
+        inner = type_hint[type_hint.find('[')+1 : -1]
+        if not isinstance(data, list):
+            data = [data]
+        return [_deserialize_by_type(item, inner) for item in data]
+    # Optional
+    if type_hint.startswith('Optional['):
+        inner = type_hint[9:-1]
+        if data is None:
+            return None
+        return _deserialize_by_type(data, inner)
+    # Explicit LeetCode types
+    if type_hint == 'ListNode':
+        return _deserialize_list_node(data)
+    if type_hint == 'TreeNode':
+        return _deserialize_tree_node(data)
+    if type_hint == 'GraphNode':
+        return _deserialize_graph_node(data)
+    if type_hint == 'RandomListNode':
+        return _deserialize_random_list(data)
+    if type_hint == 'NestedInteger':
+        return _deserialize_nested_integer(data)
+    if type_hint == 'Interval':
+        return _deserialize_interval(data)
+    if type_hint == 'Point':
+        return _deserialize_point(data)
+    if type_hint == 'Employee':
+        return _deserialize_employee(data)
+    if type_hint == 'Trie':
+        return _deserialize_trie(data)
+    # Ambiguous Node (backward compatibility)
+    if type_hint == 'Node':
+        if isinstance(data, list) and len(data) > 0:
+            if isinstance(data[0], list) and len(data[0]) == 2:
+                return _deserialize_random_list(data)
+            else:
+                return _deserialize_graph_node(data)
+        return None
+    # Unknown type – return as is
+    return data
+
+def _serialize_by_type(obj, type_hint: str):
+    """Convert Python object back to JSON‑serializable form."""
+    if obj is None:
+        return None
+    type_hint = type_hint.strip()
+    if type_hint in ('int', 'float', 'str', 'bool', 'char'):
+        return obj
+    if type_hint.startswith('List[') or type_hint.startswith('list['):
+        inner = type_hint[type_hint.find('[')+1 : -1]
+        if not isinstance(obj, list):
+            obj = [obj]
+        return [_serialize_by_type(item, inner) for item in obj]
+    if type_hint.startswith('Optional['):
+        inner = type_hint[9:-1]
+        return _serialize_by_type(obj, inner)
+    if type_hint == 'ListNode':
+        return _serialize_list_node(obj)
+    if type_hint == 'TreeNode':
+        return _serialize_tree_node(obj)
+    if type_hint == 'GraphNode':
+        return _serialize_graph_node(obj)
+    if type_hint == 'RandomListNode':
+        return _serialize_random_list(obj)
+    if type_hint == 'NestedInteger':
+        return _serialize_nested_integer(obj)
+    if type_hint == 'Interval':
+        return _serialize_interval(obj)
+    if type_hint == 'Point':
+        return _serialize_point(obj)
+    if type_hint == 'Employee':
+        return _serialize_employee(obj)
+    if type_hint == 'Trie':
+        return _serialize_trie(obj)
+    if type_hint == 'Node':
+        if hasattr(obj, 'neighbors') and obj.neighbors:
+            return _serialize_graph_node(obj)
+        elif hasattr(obj, 'random') or hasattr(obj, 'next'):
+            return _serialize_random_list(obj)
+        else:
+            return obj.val if hasattr(obj, 'val') else None
+    if type_hint == 'void':
+        return None
+    # Fallback
+    return obj
+
+# ========== User Code ==========
+{{USER_CODE}}
+
+# ========== Main Runner ==========
+def main():
+    data = sys.stdin.read().strip()
+    if not data:
+        return
+    try:
+        input_obj = json.loads(data)
+    except:
+        input_obj = data
+
+    is_interactive = {{IS_INTERACTIVE}}
+    method_name = "{{METHOD_NAME}}"
+    class_name = "{{CLASS_NAME}}"
+    param_types = {{PARAM_TYPES}}   # can be list of strings, list of lists, or dict
+    return_type = "{{RETURN_TYPE}}"
+
+    # Helper to get parameter types for a specific call/method
+    def get_param_types_for_call(call_idx, meth):
+        if isinstance(param_types, list):
+            if not param_types:
+                return []
+            # If first element is a list -> per-call array of types
+            if isinstance(param_types[0], list):
+                if call_idx < len(param_types):
+                    return param_types[call_idx]
+                return []
+            else:
+                # Legacy: same types for all calls
+                return param_types
+        elif isinstance(param_types, dict):
+            return param_types.get(meth, [])
+        return []
+
+    if is_interactive:
+        if not isinstance(input_obj, list):
+            raise ValueError("Interactive input must be an array")
+        results = []
+        obj = None
+        for call_idx, call in enumerate(input_obj):
+            meth = call.get("method")
+            args_data = call.get("args", [])
+            types_for_call = get_param_types_for_call(call_idx, meth)
+
+            if meth == class_name:
+                # Constructor
+                deserialized_args = []
+                for i, arg in enumerate(args_data):
+                    hint = types_for_call[i] if i < len(types_for_call) else "any"
+                    deserialized_args.append(_deserialize_by_type(arg, hint))
+                # Instantiate class from global namespace
+                cls = globals().get(class_name)
+                if cls is None:
+                    raise NameError(f"Class {class_name} not found")
+                obj = cls(*deserialized_args)
+                results.append(None)
+            elif obj and hasattr(obj, meth):
+                deserialized_args = []
+                for i, arg in enumerate(args_data):
+                    hint = types_for_call[i] if i < len(types_for_call) else "any"
+                    deserialized_args.append(_deserialize_by_type(arg, hint))
+                res = getattr(obj, meth)(*deserialized_args)
+                serialized = _serialize_by_type(res, return_type)
+                if return_type == 'void':
+                    results.append(None)
+                else:
+                    results.append(serialized)
+            else:
+                results.append(None)
+        # Print results as JSON
+        print(json.dumps(results, default=str))
+    else:
+        # Non-interactive: single method call
+        if isinstance(input_obj, dict) and "args" in input_obj:
+            args_data = input_obj["args"]
+        elif isinstance(input_obj, list):
+            args_data = input_obj
+        else:
+            args_data = [input_obj]
+
+        # For non-interactive, param_types should be a list of strings
+        if isinstance(param_types, list) and param_types and isinstance(param_types[0], list):
+            # If it's nested, flatten? But non-interactive should have flat list
+            param_types_flat = param_types[0] if param_types else []
+        else:
+            param_types_flat = param_types if isinstance(param_types, list) else []
+
+        deserialized_args = []
+        for i, arg in enumerate(args_data):
+            hint = param_types_flat[i] if i < len(param_types_flat) else "any"
+            deserialized_args.append(_deserialize_by_type(arg, hint))
+
+        # Instantiate solution class and call method
+        cls = globals().get(class_name)
+        if cls is None:
+            raise NameError(f"Class {class_name} not found")
+        solution = cls()
+        result = getattr(solution, method_name)(*deserialized_args)
+        serialized = _serialize_by_type(result, return_type)
+
+        if return_type == 'void':
+            print("null")
+        elif serialized is None:
+            print("null")
+        elif isinstance(serialized, bool):
+            print("true" if serialized else "false")
+        else:
+            print(json.dumps(serialized, default=str))
+
+if __name__ == "__main__":
+    main()

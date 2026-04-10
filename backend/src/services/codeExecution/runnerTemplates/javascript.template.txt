@@ -1,0 +1,480 @@
+// ========== Data Structures ==========
+class ListNode {
+    constructor(val, next = null) {
+        this.val = (val === undefined ? 0 : val);
+        this.next = next;
+    }
+}
+
+class TreeNode {
+    constructor(val, left = null, right = null) {
+        this.val = (val === undefined ? 0 : val);
+        this.left = left;
+        this.right = right;
+    }
+}
+
+// Base Node class (used for both Graph and Random List)
+class Node {
+    constructor(val, next = null, random = null, neighbors = []) {
+        this.val = val;
+        this.next = next;
+        this.random = random;
+        this.neighbors = neighbors;
+    }
+}
+
+// Trie and TrieNode (LeetCode 208, 211, 648, etc.)
+class TrieNode {
+    constructor() {
+        this.children = {};
+        this.isEnd = false;
+    }
+}
+class Trie {
+    constructor() {
+        this.root = new TrieNode();
+    }
+    insert(word) {
+        let node = this.root;
+        for (let ch of word) {
+            if (!node.children[ch]) node.children[ch] = new TrieNode();
+            node = node.children[ch];
+        }
+        node.isEnd = true;
+    }
+    search(word) {
+        let node = this.root;
+        for (let ch of word) {
+            if (!node.children[ch]) return false;
+            node = node.children[ch];
+        }
+        return node.isEnd;
+    }
+    startsWith(prefix) {
+        let node = this.root;
+        for (let ch of prefix) {
+            if (!node.children[ch]) return false;
+            node = node.children[ch];
+        }
+        return true;
+    }
+}
+
+// Interval (LeetCode 56, 252, 253, etc.)
+class Interval {
+    constructor(start, end) {
+        this.start = start;
+        this.end = end;
+    }
+}
+
+// Point (LeetCode 149, 587, etc.)
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+// Employee (LeetCode 690)
+class Employee {
+    constructor(id, importance, subordinates) {
+        this.id = id;
+        this.importance = importance;
+        this.subordinates = subordinates;
+    }
+}
+
+// NestedInteger – fully LeetCode compatible
+class NestedInteger {
+    constructor(value = null) {
+        this._value = value;
+        this._list = [];
+        if (value !== null && typeof value !== 'number') {
+            this._list = value;
+        }
+    }
+    isInteger() { return this._value !== null; }
+    getInteger() { return this._value; }
+    setInteger(value) { this._value = value; this._list = []; }
+    add(elem) {
+        if (this._value !== null) {
+            this._list = [new NestedInteger(this._value)];
+            this._value = null;
+        }
+        this._list.push(elem);
+    }
+    getList() { return this._list; }
+}
+
+// ========== Serialization / Deserialization Helpers ==========
+function deserializeListNode(data) {
+    if (!Array.isArray(data)) return null;
+    let dummy = new ListNode(0);
+    let cur = dummy;
+    for (let v of data) {
+        cur.next = new ListNode(v);
+        cur = cur.next;
+    }
+    return dummy.next;
+}
+
+function serializeListNode(head) {
+    let res = [];
+    while (head) {
+        res.push(head.val);
+        head = head.next;
+    }
+    return res;
+}
+
+function deserializeTreeNode(data) {
+    if (!Array.isArray(data)) return null;
+    if (data.length === 0) return null;
+    let nodes = data.map(v => v === null ? null : new TreeNode(v));
+    let kids = nodes.slice().reverse();
+    let root = kids.pop();
+    for (let node of nodes) {
+        if (node) {
+            if (kids.length) node.left = kids.pop();
+            if (kids.length) node.right = kids.pop();
+        }
+    }
+    return root;
+}
+
+function serializeTreeNode(root) {
+    if (!root) return [];
+    let q = [root];
+    let res = [];
+    while (q.length) {
+        let node = q.shift();
+        if (node) {
+            res.push(node.val);
+            q.push(node.left);
+            q.push(node.right);
+        } else {
+            res.push(null);
+        }
+    }
+    while (res.length && res[res.length-1] === null) res.pop();
+    return res;
+}
+
+function deserializeGraphNode(data) {
+    if (!Array.isArray(data)) return null;
+    let nodes = {};
+    for (let i = 0; i < data.length; i++) {
+        nodes[i+1] = new Node(i+1);
+    }
+    for (let i = 0; i < data.length; i++) {
+        let node = nodes[i+1];
+        for (let nb of data[i]) {
+            node.neighbors.push(nodes[nb]);
+        }
+    }
+    return nodes[1] || null;
+}
+
+function serializeGraphNode(node) {
+    if (!node) return [];
+    let visited = new Set();
+    let nodes = [];
+    let q = [node];
+    while (q.length) {
+        let cur = q.shift();
+        if (visited.has(cur.val)) continue;
+        visited.add(cur.val);
+        nodes.push(cur);
+        for (let nb of cur.neighbors) {
+            if (!visited.has(nb.val)) q.push(nb);
+        }
+    }
+    nodes.sort((a,b) => a.val - b.val);
+    let idx = {};
+    nodes.forEach((n,i) => idx[n.val] = i+1);
+    let res = [];
+    for (let n of nodes) {
+        let neighbors = n.neighbors.map(nb => idx[nb.val]);
+        res.push(neighbors);
+    }
+    return res;
+}
+
+function deserializeRandomList(data) {
+    if (!Array.isArray(data)) return null;
+    if (data.length === 0) return null;
+    let nodes = data.map(pair => new Node(pair[0]));
+    for (let i = 0; i < nodes.length-1; i++) nodes[i].next = nodes[i+1];
+    for (let i = 0; i < data.length; i++) {
+        let rand = data[i][1];
+        if (rand !== null && rand !== undefined) nodes[i].random = nodes[rand];
+    }
+    return nodes[0];
+}
+
+function serializeRandomList(head) {
+    if (!head) return [];
+    let index = new Map();
+    let cur = head;
+    let idx = 0;
+    while (cur) {
+        index.set(cur, idx++);
+        cur = cur.next;
+    }
+    let res = [];
+    cur = head;
+    while (cur) {
+        let randomIndex = cur.random ? index.get(cur.random) : null;
+        res.push([cur.val, randomIndex]);
+        cur = cur.next;
+    }
+    return res;
+}
+
+function deserializeNestedInteger(data) {
+    if (typeof data === 'number') return new NestedInteger(data);
+    if (Array.isArray(data)) {
+        let ni = new NestedInteger();
+        for (let item of data) {
+            ni.add(deserializeNestedInteger(item));
+        }
+        return ni;
+    }
+    return new NestedInteger();
+}
+
+function serializeNestedInteger(ni) {
+    if (ni.isInteger()) return ni.getInteger();
+    return ni.getList().map(x => serializeNestedInteger(x));
+}
+
+function deserializeInterval(data) {
+    if (!Array.isArray(data) || data.length !== 2) return null;
+    return new Interval(data[0], data[1]);
+}
+
+function serializeInterval(interval) {
+    return [interval.start, interval.end];
+}
+
+function deserializePoint(data) {
+    if (!Array.isArray(data) || data.length !== 2) return null;
+    return new Point(data[0], data[1]);
+}
+
+function serializePoint(point) {
+    return [point.x, point.y];
+}
+
+function deserializeEmployee(data) {
+    if (!data || typeof data !== 'object') return null;
+    return new Employee(data.id, data.importance, data.subordinates);
+}
+
+function serializeEmployee(emp) {
+    return { id: emp.id, importance: emp.importance, subordinates: emp.subordinates };
+}
+
+function deserializeTrie(data) {
+    // Usually Trie is constructed via method calls, not deserialized from input.
+    return new Trie();
+}
+
+function serializeTrie(trie) {
+    // Not standardized – return null for now.
+    return null;
+}
+
+// ========== Type‑Based Deserializer / Serializer ==========
+function deserializeByType(data, typeHint) {
+    if (data === null || data === undefined) return null;
+    typeHint = (typeHint || '').trim();
+    if (typeHint === 'int' || typeHint === 'number') return Number(data);
+    if (typeHint === 'float' || typeHint === 'double') return Number(data);
+    if (typeHint === 'string') return String(data);
+    if (typeHint === 'bool' || typeHint === 'boolean') return Boolean(data);
+    if (typeHint === 'char') return String(data).charAt(0);
+    if (typeHint.startsWith('Array<') || typeHint.startsWith('List<')) {
+        let inner = typeHint.slice(typeHint.indexOf('<')+1, -1).trim();
+        if (!Array.isArray(data)) data = [data];
+        return data.map(item => deserializeByType(item, inner));
+    }
+    if (typeHint.startsWith('Optional<')) {
+        let inner = typeHint.slice(9, -1).trim();
+        if (data === null || data === undefined) return null;
+        return deserializeByType(data, inner);
+    }
+    // LeetCode‑specific type names
+    if (typeHint === 'ListNode') return deserializeListNode(data);
+    if (typeHint === 'TreeNode') return deserializeTreeNode(data);
+    if (typeHint === 'GraphNode') return deserializeGraphNode(data);
+    if (typeHint === 'RandomListNode') return deserializeRandomList(data);
+    if (typeHint === 'NestedInteger') return deserializeNestedInteger(data);
+    if (typeHint === 'Interval') return deserializeInterval(data);
+    if (typeHint === 'Point') return deserializePoint(data);
+    if (typeHint === 'Employee') return deserializeEmployee(data);
+    if (typeHint === 'Trie') return deserializeTrie(data);
+    // Fallback for ambiguous 'Node' (backward compatibility)
+    if (typeHint === 'Node') {
+        // Heuristic: if data is array of [val, randomIndex] pairs -> RandomListNode, else GraphNode
+        if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0]) && data[0].length === 2) {
+            return deserializeRandomList(data);
+        }
+        return deserializeGraphNode(data);
+    }
+    // Unknown type – return as‑is (primitive)
+    return data;
+}
+
+function serializeByType(obj, typeHint) {
+    if (obj === null || obj === undefined) return null;
+    typeHint = (typeHint || '').trim();
+    if (typeHint === 'int' || typeHint === 'number' || typeHint === 'float' ||
+        typeHint === 'double' || typeHint === 'string' || typeHint === 'bool' ||
+        typeHint === 'boolean' || typeHint === 'char') {
+        return obj;
+    }
+    if (typeHint.startsWith('Array<') || typeHint.startsWith('List<')) {
+        let inner = typeHint.slice(typeHint.indexOf('<')+1, -1).trim();
+        if (!Array.isArray(obj)) obj = [obj];
+        return obj.map(item => serializeByType(item, inner));
+    }
+    if (typeHint.startsWith('Optional<')) {
+        let inner = typeHint.slice(9, -1).trim();
+        return serializeByType(obj, inner);
+    }
+    if (typeHint === 'ListNode') return serializeListNode(obj);
+    if (typeHint === 'TreeNode') return serializeTreeNode(obj);
+    if (typeHint === 'GraphNode') return serializeGraphNode(obj);
+    if (typeHint === 'RandomListNode') return serializeRandomList(obj);
+    if (typeHint === 'NestedInteger') return serializeNestedInteger(obj);
+    if (typeHint === 'Interval') return serializeInterval(obj);
+    if (typeHint === 'Point') return serializePoint(obj);
+    if (typeHint === 'Employee') return serializeEmployee(obj);
+    if (typeHint === 'Trie') return serializeTrie(obj);
+    if (typeHint === 'Node') {
+        if (obj.neighbors && obj.neighbors.length > 0) return serializeGraphNode(obj);
+        return serializeRandomList(obj);
+    }
+    // Void / unknown return type
+    if (typeHint === 'void') return null;
+    return obj;
+}
+
+// ========== User Code (captured in an IIFE) ==========
+let __userExports = {};
+(function() {
+    {{USER_CODE}}
+    // Capture all global declarations that might be the solution
+    if (typeof {{CLASS_NAME}} !== 'undefined') __userExports.SolutionClass = {{CLASS_NAME}};
+    if (typeof {{METHOD_NAME}} !== 'undefined') __userExports.SolutionFunction = {{METHOD_NAME}};
+})();
+
+// ========== Main Runner ==========
+const fs = require('fs');
+const input = fs.readFileSync(0, 'utf-8').trim();
+let inputObj;
+try {
+    inputObj = JSON.parse(input);
+} catch {
+    inputObj = input;
+}
+
+const isInteractive = {{IS_INTERACTIVE}};
+const methodName = "{{METHOD_NAME}}";
+const className = "{{CLASS_NAME}}";
+// paramTypes can be:
+// - a single array of strings for non-interactive mode
+// - an array of arrays of strings, indexed by call order, for interactive mode
+// - an object mapping method names to arrays of strings for interactive mode
+const paramTypes = {{PARAM_TYPES}};
+const returnType = "{{RETURN_TYPE}}";
+
+// Helper to get parameter types for a given method/index
+function getParamTypesForCall(callIndex, method) {
+    if (Array.isArray(paramTypes)) {
+        if (paramTypes.length === 0) return [];
+        // If first element is an array -> per-call array
+        if (Array.isArray(paramTypes[0])) {
+            return paramTypes[callIndex] || [];
+        }
+        // Otherwise same types for all calls (legacy)
+        return paramTypes;
+    }
+    if (paramTypes && typeof paramTypes === 'object') {
+        return paramTypes[method] || [];
+    }
+    return [];
+}
+
+if (isInteractive) {
+    if (!Array.isArray(inputObj)) {
+        console.error("Interactive input must be an array");
+        process.exit(1);
+    }
+    let results = [];
+    let obj = null;
+    for (let callIndex = 0; callIndex < inputObj.length; callIndex++) {
+        let call = inputObj[callIndex];
+        let meth = call.method;
+        let argsData = call.args || [];
+        let typesForCall = getParamTypesForCall(callIndex, meth);
+        if (className && meth === className) {
+            let deserialized = argsData.map((arg, i) => deserializeByType(arg, typesForCall[i] || 'any'));
+            const SolutionClass = __userExports.SolutionClass;
+            if (!SolutionClass) {
+                console.error(`Class ${className} not found`);
+                process.exit(1);
+            }
+            obj = new SolutionClass(...deserialized);
+            results.push(null);
+        } else if (obj && typeof obj[meth] === 'function') {
+            let deserialized = argsData.map((arg, i) => deserializeByType(arg, typesForCall[i] || 'any'));
+            let result = obj[meth](...deserialized);
+            let serialized = serializeByType(result, returnType);
+            // Handle void returns (LeetCode expects null or nothing)
+            if (returnType === 'void') {
+                results.push(null);
+            } else {
+                results.push(serialized);
+            }
+        } else {
+            results.push(null);
+        }
+    }
+    console.log(JSON.stringify(results));
+} else {
+    let argsData = Array.isArray(inputObj) ? inputObj : (inputObj.args || [inputObj]);
+    let typesForCall = Array.isArray(paramTypes) ? paramTypes : [];
+    let deserialized = argsData.map((arg, i) => deserializeByType(arg, typesForCall[i] || 'any'));
+    let result;
+    // Determine entry point: class or function
+    if (className && className !== 'null' && __userExports.SolutionClass) {
+        const SolutionClass = __userExports.SolutionClass;
+        const solution = new SolutionClass();
+        if (methodName && typeof solution[methodName] === 'function') {
+            result = solution[methodName](...deserialized);
+        } else {
+            // Assume constructor does everything
+            result = null;
+        }
+    } else if (typeof __userExports.SolutionFunction === 'function') {
+        result = __userExports.SolutionFunction(...deserialized);
+    } else {
+        console.error(`No suitable entry point found (class ${className} or function ${methodName})`);
+        process.exit(1);
+    }
+    const serialized = serializeByType(result, returnType);
+    if (returnType === 'void') {
+        // Output nothing or null
+        console.log("null");
+    } else if (serialized === null) {
+        console.log("null");
+    } else if (typeof serialized === 'boolean') {
+        console.log(serialized ? "true" : "false");
+    } else {
+        console.log(JSON.stringify(serialized));
+    }
+}

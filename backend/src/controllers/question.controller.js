@@ -13,6 +13,8 @@ const { fetchProblemDetails, searchProblems } = require('../services/leetcode.se
 const { jobQueue } = require('../services/queue.service');
 const { generateFullRunner } = require('../services/codeRunnerGenerator.service');
 const revisionService = require('../services/revision.service');
+const metadataExtractor = require('../services/metadataExtractor.service');
+const testCaseParser = require('../services/testCaseParser.service');
 
 // generate a pattern name from tags
 const generatePatternFromTags = (tags) => {
@@ -102,7 +104,7 @@ const fetchQuestionDetails = async (userId, questionId) => {
     activityLogs
   ] = await Promise.all([
     Question.findById(questionId)
-      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks similarQuestions contentRef testCases starterCode fullRunnerCode source createdBy isActive')
+      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks similarQuestions contentRef testCases starterCode fullRunnerCode source createdBy isActive methodName className paramTypes returnType isInteractive isOrderIrrelevant testCasesStructured')
       .lean(),
     UserQuestionProgress.findOne({ userId, questionId })
       .select('-__v')
@@ -255,6 +257,44 @@ const createQuestion = async (req, res, next) => {
       }
     }
 
+    // --- Phase 1: Extract metadata and convert test cases ---
+    if (question.starterCode && typeof question.starterCode === 'object') {
+      const metadataByLang = {};
+      for (const [lang, code] of Object.entries(question.starterCode)) {
+        const meta = metadataExtractor.extractMetadata(lang, code);
+        if (meta) {
+          metadataByLang[lang] = meta;
+          // Use the first language's metadata for the question (assuming consistency across languages)
+          if (!question.methodName && meta.methodName) {
+            question.methodName = meta.methodName;
+            question.className = meta.className;
+            question.paramTypes = meta.paramTypes;
+            question.returnType = meta.returnType;
+            question.isInteractive = meta.isInteractive;
+          }
+        }
+      }
+      await question.save();
+    }
+
+    // Detect order irrelevance from contentRef
+    if (question.contentRef && !question.isOrderIrrelevant) {
+      question.isOrderIrrelevant = metadataExtractor.detectOrderIrrelevant(question.contentRef);
+      await question.save();
+    }
+
+    // Convert test cases to structured format if not already present
+    if (question.testCases && question.testCases.length > 0 && (!question.testCasesStructured || question.testCasesStructured.length === 0)) {
+      const metadata = {
+        paramTypes: question.paramTypes || [],
+        returnType: question.returnType || 'any'
+      };
+      const structured = testCaseParser.convertToStructuredTestCases(question.testCases, metadata);
+      question.testCasesStructured = structured;
+      await question.save();
+    }
+    // --- End Phase 1 ---
+
     // 🔁 Extract test cases if contentRef exists and there are no test cases yet
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
       await jobQueue.add({
@@ -333,6 +373,37 @@ const updateQuestion = async (req, res, next) => {
         pattern = pattern ? [pattern] : [];
       }
       allowedUpdates.pattern = pattern;
+    }
+
+    // Re-extract metadata and test cases if starterCode or contentRef changed ---
+    let metadataChanged = false;
+    if (allowedUpdates.starterCode) {
+      for (const [lang, code] of Object.entries(allowedUpdates.starterCode)) {
+        const meta = metadataExtractor.extractMetadata(lang, code);
+        if (meta && (!question.methodName || req.body.updateMetadata)) {
+          // Only update if not already set or force flag
+          allowedUpdates.methodName = meta.methodName;
+          allowedUpdates.className = meta.className;
+          allowedUpdates.paramTypes = meta.paramTypes;
+          allowedUpdates.returnType = meta.returnType;
+          allowedUpdates.isInteractive = meta.isInteractive;
+          metadataChanged = true;
+        }
+      }
+    }
+
+    if (allowedUpdates.contentRef) {
+      allowedUpdates.isOrderIrrelevant = metadataExtractor.detectOrderIrrelevant(allowedUpdates.contentRef);
+      metadataChanged = true;
+    }
+
+    if (allowedUpdates.testCases && (!question.testCasesStructured || allowedUpdates.testCases.length > 0)) {
+      const metadata = {
+        paramTypes: question.paramTypes || allowedUpdates.paramTypes || [],
+        returnType: question.returnType || allowedUpdates.returnType || 'any'
+      };
+      allowedUpdates.testCasesStructured = testCaseParser.convertToStructuredTestCases(allowedUpdates.testCases, metadata);
+      metadataChanged = true;
     }
 
     const updatedQuestion = await Question.findByIdAndUpdate(

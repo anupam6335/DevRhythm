@@ -1,0 +1,718 @@
+import java.util.*;
+import java.io.*;
+import java.lang.reflect.*;
+import java.math.*;
+
+// ========== Data Structures ==========
+class ListNode {
+    int val;
+    ListNode next;
+    ListNode() {}
+    ListNode(int val) { this.val = val; }
+    ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+}
+
+class TreeNode {
+    int val;
+    TreeNode left;
+    TreeNode right;
+    TreeNode() {}
+    TreeNode(int val) { this.val = val; }
+    TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; }
+}
+
+class Node {
+    int val;
+    List<Node> neighbors;
+    Node random;
+    Node next;
+    Node() { neighbors = new ArrayList<>(); }
+    Node(int val) { this.val = val; neighbors = new ArrayList<>(); }
+    Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }
+}
+
+class NestedInteger {
+    private Integer value;
+    private List<NestedInteger> list;
+    public NestedInteger() { list = new ArrayList<>(); }
+    public NestedInteger(int value) { this.value = value; list = null; }
+    public boolean isInteger() { return value != null; }
+    public Integer getInteger() { return value; }
+    public void setInteger(int value) { this.value = value; list = null; }
+    public void add(NestedInteger ni) {
+        if (list == null) list = new ArrayList<>();
+        list.add(ni);
+    }
+    public List<NestedInteger> getList() { return list == null ? new ArrayList<>() : list; }
+}
+
+class TrieNode {
+    Map<Character, TrieNode> children = new HashMap<>();
+    boolean isEnd = false;
+}
+
+class Trie {
+    TrieNode root;
+    public Trie() { root = new TrieNode(); }
+    public void insert(String word) {
+        TrieNode node = root;
+        for (char ch : word.toCharArray()) {
+            node.children.putIfAbsent(ch, new TrieNode());
+            node = node.children.get(ch);
+        }
+        node.isEnd = true;
+    }
+    public boolean search(String word) {
+        TrieNode node = root;
+        for (char ch : word.toCharArray()) {
+            if (!node.children.containsKey(ch)) return false;
+            node = node.children.get(ch);
+        }
+        return node.isEnd;
+    }
+    public boolean startsWith(String prefix) {
+        TrieNode node = root;
+        for (char ch : prefix.toCharArray()) {
+            if (!node.children.containsKey(ch)) return false;
+            node = node.children.get(ch);
+        }
+        return true;
+    }
+}
+
+class Interval {
+    int start, end;
+    Interval() { start = 0; end = 0; }
+    Interval(int s, int e) { start = s; end = e; }
+}
+
+class Point {
+    int x, y;
+    Point() { x = 0; y = 0; }
+    Point(int a, int b) { x = a; y = b; }
+}
+
+class Employee {
+    public int id;
+    public int importance;
+    public List<Integer> subordinates;
+    public Employee() {}
+    public Employee(int id, int importance, List<Integer> subordinates) {
+        this.id = id;
+        this.importance = importance;
+        this.subordinates = subordinates;
+    }
+}
+
+// ========== JSON Parser ==========
+class JSON {
+    private String json;
+    private int pos;
+    JSON(String s) { json = s; pos = 0; }
+    Object parse() {
+        skipWhitespace();
+        return parseValue();
+    }
+    private void skipWhitespace() {
+        while (pos < json.length() && Character.isWhitespace(json.charAt(pos))) pos++;
+    }
+    private Object parseValue() {
+        skipWhitespace();
+        if (pos >= json.length()) throw new RuntimeException("Unexpected end of input");
+        char c = json.charAt(pos);
+        if (c == '{') return parseObject();
+        if (c == '[') return parseArray();
+        if (c == '"') return parseString();
+        if (c == 't' || c == 'f') return parseBoolean();
+        if (c == 'n') { pos += 4; return null; }
+        return parseNumber();
+    }
+    private Map<String, Object> parseObject() {
+        Map<String, Object> obj = new LinkedHashMap<>();
+        pos++;
+        skipWhitespace();
+        if (pos < json.length() && json.charAt(pos) == '}') { pos++; return obj; }
+        while (true) {
+            skipWhitespace();
+            String key = parseString();
+            skipWhitespace();
+            if (pos >= json.length() || json.charAt(pos) != ':') throw new RuntimeException("Expected ':'");
+            pos++;
+            Object value = parseValue();
+            obj.put(key, value);
+            skipWhitespace();
+            if (pos >= json.length()) break;
+            char next = json.charAt(pos);
+            if (next == '}') { pos++; break; }
+            if (next != ',') throw new RuntimeException("Expected ',' or '}'");
+            pos++;
+        }
+        return obj;
+    }
+    private List<Object> parseArray() {
+        List<Object> arr = new ArrayList<>();
+        pos++;
+        skipWhitespace();
+        if (pos < json.length() && json.charAt(pos) == ']') { pos++; return arr; }
+        while (true) {
+            arr.add(parseValue());
+            skipWhitespace();
+            if (pos >= json.length()) break;
+            char next = json.charAt(pos);
+            if (next == ']') { pos++; break; }
+            if (next != ',') throw new RuntimeException("Expected ',' or ']'");
+            pos++;
+        }
+        return arr;
+    }
+    private String parseString() {
+        pos++;
+        StringBuilder sb = new StringBuilder();
+        while (pos < json.length() && json.charAt(pos) != '"') {
+            char c = json.charAt(pos);
+            if (c == '\\') {
+                pos++;
+                if (pos >= json.length()) break;
+                c = json.charAt(pos);
+                switch (c) {
+                    case '"': sb.append('"'); break;
+                    case '\\': sb.append('\\'); break;
+                    case '/': sb.append('/'); break;
+                    case 'b': sb.append('\b'); break;
+                    case 'f': sb.append('\f'); break;
+                    case 'n': sb.append('\n'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 't': sb.append('\t'); break;
+                    case 'u':
+                        sb.append("\\u");
+                        for (int i = 0; i < 4 && pos + i + 1 < json.length(); i++)
+                            sb.append(json.charAt(pos + i + 1));
+                        pos += 4;
+                        break;
+                    default: sb.append(c);
+                }
+            } else {
+                sb.append(c);
+            }
+            pos++;
+        }
+        if (pos >= json.length()) throw new RuntimeException("Unterminated string");
+        pos++;
+        return sb.toString();
+    }
+    private Boolean parseBoolean() {
+        if (json.startsWith("true", pos)) { pos += 4; return true; }
+        if (json.startsWith("false", pos)) { pos += 5; return false; }
+        throw new RuntimeException("Invalid boolean");
+    }
+    private Number parseNumber() {
+        int start = pos;
+        while (pos < json.length() && (Character.isDigit(json.charAt(pos)) || json.charAt(pos) == '.' || json.charAt(pos) == '-' || json.charAt(pos) == 'e' || json.charAt(pos) == 'E' || json.charAt(pos) == '+')) pos++;
+        String numStr = json.substring(start, pos);
+        try {
+            if (numStr.contains(".") || numStr.contains("e") || numStr.contains("E"))
+                return Double.parseDouble(numStr);
+            else {
+                try { return Long.parseLong(numStr); } catch (NumberFormatException e) {
+                    return new BigInteger(numStr);
+                }
+            }
+        } catch (NumberFormatException e) { throw new RuntimeException("Invalid number: " + numStr); }
+    }
+}
+
+// ========== Serialization / Deserialization Helpers ==========
+class Helpers {
+    static ListNode deserializeListNode(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> list = (List<?>) obj;
+        ListNode dummy = new ListNode(0);
+        ListNode cur = dummy;
+        for (Object v : list) {
+            cur.next = new ListNode(((Number) v).intValue());
+            cur = cur.next;
+        }
+        return dummy.next;
+    }
+    static Object serializeListNode(ListNode head) {
+        List<Integer> res = new ArrayList<>();
+        while (head != null) {
+            res.add(head.val);
+            head = head.next;
+        }
+        return res;
+    }
+    static TreeNode deserializeTreeNode(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> list = (List<?>) obj;
+        if (list.isEmpty()) return null;
+        TreeNode root = new TreeNode(((Number) list.get(0)).intValue());
+        Queue<TreeNode> q = new LinkedList<>();
+        q.offer(root);
+        int i = 1;
+        while (!q.isEmpty() && i < list.size()) {
+            TreeNode node = q.poll();
+            Object leftVal = i < list.size() ? list.get(i++) : null;
+            if (leftVal != null) {
+                node.left = new TreeNode(((Number) leftVal).intValue());
+                q.offer(node.left);
+            }
+            Object rightVal = i < list.size() ? list.get(i++) : null;
+            if (rightVal != null) {
+                node.right = new TreeNode(((Number) rightVal).intValue());
+                q.offer(node.right);
+            }
+        }
+        return root;
+    }
+    static Object serializeTreeNode(TreeNode root) {
+        if (root == null) return new ArrayList<>();
+        List<Object> res = new ArrayList<>();
+        Queue<TreeNode> q = new LinkedList<>();
+        q.offer(root);
+        while (!q.isEmpty()) {
+            TreeNode node = q.poll();
+            if (node != null) {
+                res.add(node.val);
+                q.offer(node.left);
+                q.offer(node.right);
+            } else {
+                res.add(null);
+            }
+        }
+        while (!res.isEmpty() && res.get(res.size()-1) == null) res.remove(res.size()-1);
+        return res;
+    }
+    static Node deserializeGraphNode(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> adj = (List<?>) obj;
+        if (adj.isEmpty()) return null;
+        Node[] nodes = new Node[adj.size()+1];
+        for (int i = 1; i <= adj.size(); i++) nodes[i] = new Node(i);
+        for (int i = 1; i <= adj.size(); i++) {
+            List<?> neighbors = (List<?>) adj.get(i-1);
+            for (Object nb : neighbors) {
+                int nbVal = ((Number) nb).intValue();
+                nodes[i].neighbors.add(nodes[nbVal]);
+            }
+        }
+        return nodes[1];
+    }
+    static Object serializeGraphNode(Node node) {
+        if (node == null) return new ArrayList<>();
+        Map<Node, Integer> idx = new HashMap<>();
+        List<Node> nodes = new ArrayList<>();
+        Queue<Node> q = new LinkedList<>();
+        q.offer(node);
+        while (!q.isEmpty()) {
+            Node cur = q.poll();
+            if (!idx.containsKey(cur)) {
+                idx.put(cur, idx.size()+1);
+                nodes.add(cur);
+                for (Node nb : cur.neighbors) q.offer(nb);
+            }
+        }
+        nodes.sort((a,b) -> Integer.compare(a.val, b.val));
+        List<List<Integer>> res = new ArrayList<>();
+        for (Node n : nodes) {
+            List<Integer> neighbors = new ArrayList<>();
+            for (Node nb : n.neighbors) neighbors.add(idx.get(nb));
+            res.add(neighbors);
+        }
+        return res;
+    }
+    static NestedInteger deserializeNestedInteger(Object obj) {
+        if (obj instanceof Number) return new NestedInteger(((Number) obj).intValue());
+        if (obj instanceof List) {
+            NestedInteger ni = new NestedInteger();
+            for (Object item : (List<?>) obj) ni.add(deserializeNestedInteger(item));
+            return ni;
+        }
+        return new NestedInteger();
+    }
+    static Object serializeNestedInteger(NestedInteger ni) {
+        if (ni.isInteger()) return ni.getInteger();
+        List<Object> res = new ArrayList<>();
+        for (NestedInteger child : ni.getList()) res.add(serializeNestedInteger(child));
+        return res;
+    }
+    static Node deserializeRandomList(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> list = (List<?>) obj;
+        if (list.isEmpty()) return null;
+        Node[] nodes = new Node[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            List<?> pair = (List<?>) list.get(i);
+            nodes[i] = new Node(((Number) pair.get(0)).intValue());
+        }
+        for (int i = 0; i < nodes.length-1; i++) nodes[i].next = nodes[i+1];
+        for (int i = 0; i < list.size(); i++) {
+            List<?> pair = (List<?>) list.get(i);
+            Object rand = pair.get(1);
+            if (rand != null) nodes[i].random = nodes[((Number) rand).intValue()];
+        }
+        return nodes[0];
+    }
+    static Object serializeRandomList(Node head) {
+        if (head == null) return new ArrayList<>();
+        Map<Node, Integer> idx = new HashMap<>();
+        Node cur = head;
+        int i = 0;
+        while (cur != null) { idx.put(cur, i++); cur = cur.next; }
+        List<List<Object>> res = new ArrayList<>();
+        cur = head;
+        while (cur != null) {
+            List<Object> pair = new ArrayList<>();
+            pair.add(cur.val);
+            pair.add(cur.random == null ? null : idx.get(cur.random));
+            res.add(pair);
+            cur = cur.next;
+        }
+        return res;
+    }
+    static Interval deserializeInterval(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> list = (List<?>) obj;
+        if (list.size() < 2) return null;
+        return new Interval(((Number) list.get(0)).intValue(), ((Number) list.get(1)).intValue());
+    }
+    static Object serializeInterval(Interval interval) {
+        List<Integer> res = new ArrayList<>();
+        res.add(interval.start);
+        res.add(interval.end);
+        return res;
+    }
+    static Point deserializePoint(Object obj) {
+        if (!(obj instanceof List)) return null;
+        List<?> list = (List<?>) obj;
+        if (list.size() < 2) return null;
+        return new Point(((Number) list.get(0)).intValue(), ((Number) list.get(1)).intValue());
+    }
+    static Object serializePoint(Point point) {
+        List<Integer> res = new ArrayList<>();
+        res.add(point.x);
+        res.add(point.y);
+        return res;
+    }
+    static Employee deserializeEmployee(Object obj) {
+        if (!(obj instanceof Map)) return null;
+        Map<?,?> map = (Map<?,?>) obj;
+        int id = ((Number) map.get("id")).intValue();
+        int importance = ((Number) map.get("importance")).intValue();
+        List<Integer> subordinates = new ArrayList<>();
+        Object subObj = map.get("subordinates");
+        if (subObj instanceof List) {
+            for (Object s : (List<?>) subObj) subordinates.add(((Number) s).intValue());
+        }
+        return new Employee(id, importance, subordinates);
+    }
+    static Object serializeEmployee(Employee emp) {
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("id", emp.id);
+        res.put("importance", emp.importance);
+        res.put("subordinates", emp.subordinates);
+        return res;
+    }
+    static Trie deserializeTrie(Object obj) {
+        return new Trie();
+    }
+    static Object serializeTrie(Trie trie) {
+        return null;
+    }
+
+    static Object deserializeByType(Object data, String typeHint) {
+        if (data == null) return null;
+        typeHint = typeHint.trim();
+        if (typeHint.equals("int") || typeHint.equals("long") || typeHint.equals("short") || typeHint.equals("byte")) {
+            if (data instanceof Number) return ((Number) data).longValue();
+            return Long.parseLong(data.toString());
+        }
+        if (typeHint.equals("float") || typeHint.equals("double")) {
+            if (data instanceof Number) return ((Number) data).doubleValue();
+            return Double.parseDouble(data.toString());
+        }
+        if (typeHint.equals("boolean")) {
+            if (data instanceof Boolean) return data;
+            return Boolean.parseBoolean(data.toString());
+        }
+        if (typeHint.equals("char")) {
+            String s = data.toString();
+            return s.isEmpty() ? '\0' : s.charAt(0);
+        }
+        if (typeHint.equals("String")) return data.toString();
+        if (typeHint.startsWith("List<") || typeHint.startsWith("ArrayList<")) {
+            String inner = typeHint.substring(typeHint.indexOf('<')+1, typeHint.lastIndexOf('>')).trim();
+            if (!(data instanceof List)) return data;
+            List<Object> result = new ArrayList<>();
+            for (Object item : (List<?>) data) result.add(deserializeByType(item, inner));
+            return result;
+        }
+        if (typeHint.startsWith("Optional<")) {
+            String inner = typeHint.substring(9, typeHint.length()-1).trim();
+            if (data == null) return null;
+            return deserializeByType(data, inner);
+        }
+        if (typeHint.equals("ListNode")) return deserializeListNode(data);
+        if (typeHint.equals("TreeNode")) return deserializeTreeNode(data);
+        if (typeHint.equals("GraphNode")) return deserializeGraphNode(data);
+        if (typeHint.equals("RandomListNode")) return deserializeRandomList(data);
+        if (typeHint.equals("NestedInteger")) return deserializeNestedInteger(data);
+        if (typeHint.equals("Interval")) return deserializeInterval(data);
+        if (typeHint.equals("Point")) return deserializePoint(data);
+        if (typeHint.equals("Employee")) return deserializeEmployee(data);
+        if (typeHint.equals("Trie")) return deserializeTrie(data);
+        if (typeHint.equals("Node")) {
+            if (data instanceof List && !((List<?>) data).isEmpty()) {
+                Object first = ((List<?>) data).get(0);
+                if (first instanceof List && ((List<?>) first).size() == 2)
+                    return deserializeRandomList(data);
+                else
+                    return deserializeGraphNode(data);
+            }
+        }
+        return data;
+    }
+
+    static Object serializeByType(Object obj, String typeHint) {
+        if (obj == null) return null;
+        typeHint = typeHint.trim();
+        if (typeHint.equals("int") || typeHint.equals("long") || typeHint.equals("short") || typeHint.equals("byte") ||
+            typeHint.equals("float") || typeHint.equals("double") || typeHint.equals("boolean") ||
+            typeHint.equals("char") || typeHint.equals("String")) {
+            return obj;
+        }
+        if (typeHint.startsWith("List<") || typeHint.startsWith("ArrayList<")) {
+            String inner = typeHint.substring(typeHint.indexOf('<')+1, typeHint.lastIndexOf('>')).trim();
+            if (!(obj instanceof List)) return obj;
+            List<Object> result = new ArrayList<>();
+            for (Object item : (List<?>) obj) result.add(serializeByType(item, inner));
+            return result;
+        }
+        if (typeHint.startsWith("Optional<")) {
+            String inner = typeHint.substring(9, typeHint.length()-1).trim();
+            return serializeByType(obj, inner);
+        }
+        if (typeHint.equals("ListNode")) return serializeListNode((ListNode) obj);
+        if (typeHint.equals("TreeNode")) return serializeTreeNode((TreeNode) obj);
+        if (typeHint.equals("GraphNode")) return serializeGraphNode((Node) obj);
+        if (typeHint.equals("RandomListNode")) return serializeRandomList((Node) obj);
+        if (typeHint.equals("NestedInteger")) return serializeNestedInteger((NestedInteger) obj);
+        if (typeHint.equals("Interval")) return serializeInterval((Interval) obj);
+        if (typeHint.equals("Point")) return serializePoint((Point) obj);
+        if (typeHint.equals("Employee")) return serializeEmployee((Employee) obj);
+        if (typeHint.equals("Trie")) return serializeTrie((Trie) obj);
+        if (typeHint.equals("Node")) {
+            Node node = (Node) obj;
+            if (node.neighbors != null && !node.neighbors.isEmpty())
+                return serializeGraphNode(node);
+            else
+                return serializeRandomList(node);
+        }
+        if (typeHint.equals("void")) return null;
+        return obj;
+    }
+}
+
+// ========== User Code ==========
+{{USER_CODE}}
+
+// ========== Main Class ==========
+public class Main {
+    public static void main(String[] args) throws Exception {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) sb.append(line);
+        String input = sb.toString().trim();
+        if (input.isEmpty()) return;
+
+        Object inputObj;
+        try {
+            inputObj = new JSON(input).parse();
+        } catch (Exception e) {
+            inputObj = input;
+        }
+
+        boolean isInteractive = {{IS_INTERACTIVE}};
+        String methodName = "{{METHOD_NAME}}";
+        String className = "{{CLASS_NAME}}";
+        Object paramTypesRaw = {{PARAM_TYPES}};
+        String returnType = "{{RETURN_TYPE}}";
+
+        if (isInteractive) {
+            if (!(inputObj instanceof List)) {
+                System.err.println("Interactive input must be an array");
+                System.exit(1);
+            }
+            List<?> calls = (List<?>) inputObj;
+            List<Object> results = new ArrayList<>();
+            Object obj = null;
+
+            for (int callIdx = 0; callIdx < calls.size(); callIdx++) {
+                Object callObj = calls.get(callIdx);
+                if (!(callObj instanceof Map)) { results.add(null); continue; }
+                Map<?,?> call = (Map<?,?>) callObj;
+                String meth = (String) call.get("method");
+                List<?> argsData = (List<?>) call.getOrDefault("args", new ArrayList<>());
+
+                List<String> typesForCall = getParamTypesForCall(paramTypesRaw, callIdx, meth);
+
+                if (meth.equals(className)) {
+                    List<Object> deserialized = new ArrayList<>();
+                    for (int i = 0; i < argsData.size(); i++) {
+                        String hint = i < typesForCall.size() ? typesForCall.get(i) : "any";
+                        deserialized.add(Helpers.deserializeByType(argsData.get(i), hint));
+                    }
+                    Class<?> clazz = Class.forName(className);
+                    Constructor<?> ctor = clazz.getConstructor(getParamClasses(deserialized));
+                    obj = ctor.newInstance(deserialized.toArray());
+                    results.add(null);
+                } else if (obj != null) {
+                    List<Object> deserialized = new ArrayList<>();
+                    for (int i = 0; i < argsData.size(); i++) {
+                        String hint = i < typesForCall.size() ? typesForCall.get(i) : "any";
+                        deserialized.add(Helpers.deserializeByType(argsData.get(i), hint));
+                    }
+                    Method method = obj.getClass().getMethod(meth, getParamClasses(deserialized));
+                    Object result = method.invoke(obj, deserialized.toArray());
+                    if (returnType.equals("void")) {
+                        results.add(null);
+                    } else {
+                        results.add(Helpers.serializeByType(result, returnType));
+                    }
+                } else {
+                    results.add(null);
+                }
+            }
+            System.out.println(serialize(results));
+        } else {
+            List<?> argsData;
+            if (inputObj instanceof Map && ((Map<?,?>) inputObj).containsKey("args")) {
+                argsData = (List<?>) ((Map<?,?>) inputObj).get("args");
+            } else if (inputObj instanceof List) {
+                argsData = (List<?>) inputObj;
+            } else {
+                argsData = Collections.singletonList(inputObj);
+            }
+
+            List<String> typesForCall;
+            if (paramTypesRaw instanceof List) {
+                typesForCall = (List<String>) paramTypesRaw;
+            } else {
+                typesForCall = new ArrayList<>();
+            }
+
+            List<Object> deserialized = new ArrayList<>();
+            for (int i = 0; i < argsData.size(); i++) {
+                String hint = i < typesForCall.size() ? typesForCall.get(i) : "any";
+                deserialized.add(Helpers.deserializeByType(argsData.get(i), hint));
+            }
+
+            Object result;
+            Class<?> clazz = Class.forName(className);
+            Object solution = clazz.getDeclaredConstructor().newInstance();
+            Method method = clazz.getMethod(methodName, getParamClasses(deserialized));
+            result = method.invoke(solution, deserialized.toArray());
+
+            Object serialized = Helpers.serializeByType(result, returnType);
+            if (returnType.equals("void")) {
+                System.out.println("null");
+            } else if (serialized == null) {
+                System.out.println("null");
+            } else if (serialized instanceof Boolean) {
+                System.out.println((Boolean) serialized ? "true" : "false");
+            } else {
+                System.out.println(serialize(serialized));
+            }
+        }
+    }
+
+    private static List<String> getParamTypesForCall(Object paramTypesRaw, int callIdx, String methodName) {
+        List<String> types = new ArrayList<>();
+        if (paramTypesRaw instanceof List) {
+            List<?> list = (List<?>) paramTypesRaw;
+            if (!list.isEmpty()) {
+                if (list.get(0) instanceof List) {
+                    if (callIdx < list.size()) {
+                        for (Object o : (List<?>) list.get(callIdx)) {
+                            types.add(o.toString());
+                        }
+                    }
+                } else {
+                    for (Object o : list) types.add(o.toString());
+                }
+            }
+        } else if (paramTypesRaw instanceof Map) {
+            Map<?,?> map = (Map<?,?>) paramTypesRaw;
+            Object methodTypes = map.get(methodName);
+            if (methodTypes instanceof List) {
+                for (Object o : (List<?>) methodTypes) types.add(o.toString());
+            }
+        }
+        return types;
+    }
+
+    private static Class<?>[] getParamClasses(List<Object> params) {
+        Class<?>[] classes = new Class[params.size()];
+        for (int i = 0; i < params.size(); i++) {
+            Object p = params.get(i);
+            if (p == null) classes[i] = Object.class;
+            else if (p instanceof Integer) classes[i] = int.class;
+            else if (p instanceof Long) classes[i] = long.class;
+            else if (p instanceof Double) classes[i] = double.class;
+            else if (p instanceof Float) classes[i] = float.class;
+            else if (p instanceof Boolean) classes[i] = boolean.class;
+            else if (p instanceof Character) classes[i] = char.class;
+            else if (p instanceof String) classes[i] = String.class;
+            else if (p instanceof ListNode) classes[i] = ListNode.class;
+            else if (p instanceof TreeNode) classes[i] = TreeNode.class;
+            else if (p instanceof Node) classes[i] = Node.class;
+            else if (p instanceof NestedInteger) classes[i] = NestedInteger.class;
+            else if (p instanceof Interval) classes[i] = Interval.class;
+            else if (p instanceof Point) classes[i] = Point.class;
+            else if (p instanceof Employee) classes[i] = Employee.class;
+            else if (p instanceof Trie) classes[i] = Trie.class;
+            else if (p instanceof List) classes[i] = List.class;
+            else classes[i] = p.getClass();
+        }
+        return classes;
+    }
+
+    private static String serialize(Object obj) {
+        if (obj == null) return "null";
+        if (obj instanceof String) return "\"" + escape((String) obj) + "\"";
+        if (obj instanceof Number || obj instanceof Boolean) return obj.toString();
+        if (obj instanceof Character) return "\"" + obj + "\"";
+        if (obj instanceof List) {
+            StringBuilder sb = new StringBuilder("[");
+            List<?> list = (List<?>) obj;
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(serialize(list.get(i)));
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+        if (obj instanceof Map) {
+            StringBuilder sb = new StringBuilder("{");
+            Map<?,?> map = (Map<?,?>) obj;
+            boolean first = true;
+            for (Map.Entry<?,?> e : map.entrySet()) {
+                if (!first) sb.append(",");
+                first = false;
+                sb.append("\"").append(e.getKey()).append("\":").append(serialize(e.getValue()));
+            }
+            sb.append("}");
+            return sb.toString();
+        }
+        return "\"" + escape(obj.toString()) + "\"";
+    }
+
+    private static String escape(String s) {
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+}

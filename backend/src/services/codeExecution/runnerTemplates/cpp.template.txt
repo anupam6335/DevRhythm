@@ -1,0 +1,724 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+// ========== Data Structures ==========
+struct ListNode {
+    int val;
+    ListNode *next;
+    ListNode() : val(0), next(nullptr) {}
+    ListNode(int x) : val(x), next(nullptr) {}
+    ListNode(int x, ListNode *next) : val(x), next(next) {}
+};
+
+struct TreeNode {
+    int val;
+    TreeNode *left;
+    TreeNode *right;
+    TreeNode() : val(0), left(nullptr), right(nullptr) {}
+    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
+    TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
+};
+
+class Node {
+public:
+    int val;
+    vector<Node*> neighbors;
+    Node* random;
+    Node* next;
+    Node() : val(0), random(nullptr), next(nullptr) {}
+    Node(int _val) : val(_val), random(nullptr), next(nullptr) {}
+    Node(int _val, vector<Node*> _neighbors) : val(_val), neighbors(_neighbors), random(nullptr), next(nullptr) {}
+};
+
+class NestedInteger {
+private:
+    int value;
+    vector<NestedInteger> list;
+    bool isInt;
+public:
+    NestedInteger() : isInt(false) {}
+    NestedInteger(int val) : value(val), isInt(true) {}
+    bool isInteger() const { return isInt; }
+    int getInteger() const { return value; }
+    void setInteger(int val) { value = val; isInt = true; list.clear(); }
+    void add(const NestedInteger& ni) { list.push_back(ni); }
+    const vector<NestedInteger>& getList() const { return list; }
+};
+
+class TrieNode {
+public:
+    unordered_map<char, TrieNode*> children;
+    bool isEnd;
+    TrieNode() : isEnd(false) {}
+};
+
+class Trie {
+public:
+    TrieNode* root;
+    Trie() { root = new TrieNode(); }
+    void insert(string word) {
+        TrieNode* node = root;
+        for (char ch : word) {
+            if (!node->children.count(ch))
+                node->children[ch] = new TrieNode();
+            node = node->children[ch];
+        }
+        node->isEnd = true;
+    }
+    bool search(string word) {
+        TrieNode* node = root;
+        for (char ch : word) {
+            if (!node->children.count(ch)) return false;
+            node = node->children[ch];
+        }
+        return node->isEnd;
+    }
+    bool startsWith(string prefix) {
+        TrieNode* node = root;
+        for (char ch : prefix) {
+            if (!node->children.count(ch)) return false;
+            node = node->children[ch];
+        }
+        return true;
+    }
+};
+
+struct Interval {
+    int start, end;
+    Interval() : start(0), end(0) {}
+    Interval(int s, int e) : start(s), end(e) {}
+};
+
+struct Point {
+    int x, y;
+    Point() : x(0), y(0) {}
+    Point(int a, int b) : x(a), y(b) {}
+};
+
+class Employee {
+public:
+    int id;
+    int importance;
+    vector<int> subordinates;
+    Employee() {}
+    Employee(int _id, int _importance, vector<int> _subordinates)
+        : id(_id), importance(_importance), subordinates(_subordinates) {}
+};
+
+// ========== JSON Parser ==========
+class JsonValue {
+public:
+    enum Type { JSON_NULL, JSON_BOOL, JSON_NUMBER, JSON_STRING, JSON_ARRAY, JSON_OBJECT };
+    Type type;
+    bool bool_val;
+    double number_val;
+    string string_val;
+    vector<JsonValue> array_val;
+    map<string, JsonValue> object_val;
+
+    JsonValue() : type(JSON_NULL), bool_val(false) {}
+    JsonValue(bool b) : type(JSON_BOOL), bool_val(b) {}
+    JsonValue(double n) : type(JSON_NUMBER), number_val(n) {}
+    JsonValue(const string& s) : type(JSON_STRING), string_val(s) {}
+    JsonValue(const vector<JsonValue>& arr) : type(JSON_ARRAY), array_val(arr) {}
+    JsonValue(const map<string, JsonValue>& obj) : type(JSON_OBJECT), object_val(obj) {}
+
+    bool isNull() const { return type == JSON_NULL; }
+    bool isBool() const { return type == JSON_BOOL; }
+    bool isNumber() const { return type == JSON_NUMBER; }
+    bool isString() const { return type == JSON_STRING; }
+    bool isArray() const { return type == JSON_ARRAY; }
+    bool isObject() const { return type == JSON_OBJECT; }
+    bool asBool() const { return bool_val; }
+    double asNumber() const { return number_val; }
+    string asString() const { return string_val; }
+    vector<JsonValue> asArray() const { return array_val; }
+    map<string, JsonValue> asObject() const { return object_val; }
+};
+
+class JsonParser {
+    string json;
+    size_t pos;
+public:
+    JsonParser(const string& s) : json(s), pos(0) {}
+    JsonValue parse() { skipWhitespace(); return parseValue(); }
+private:
+    void skipWhitespace() { while (pos < json.size() && isspace(json[pos])) ++pos; }
+    JsonValue parseValue() {
+        skipWhitespace();
+        if (pos >= json.size()) throw runtime_error("Unexpected EOF");
+        char c = json[pos];
+        if (c == '{') return parseObject();
+        if (c == '[') return parseArray();
+        if (c == '"') return parseString();
+        if (c == 't' || c == 'f') return parseBool();
+        if (c == 'n') { pos += 4; return JsonValue(); }
+        return parseNumber();
+    }
+    JsonValue parseObject() {
+        map<string, JsonValue> obj;
+        ++pos;
+        skipWhitespace();
+        if (json[pos] == '}') { ++pos; return obj; }
+        while (true) {
+            skipWhitespace();
+            string key = parseString().asString();
+            skipWhitespace();
+            if (json[pos] != ':') throw runtime_error("Expected ':'");
+            ++pos;
+            JsonValue val = parseValue();
+            obj[key] = val;
+            skipWhitespace();
+            if (json[pos] == '}') { ++pos; break; }
+            if (json[pos] != ',') throw runtime_error("Expected ',' or '}'");
+            ++pos;
+        }
+        return obj;
+    }
+    JsonValue parseArray() {
+        vector<JsonValue> arr;
+        ++pos;
+        skipWhitespace();
+        if (json[pos] == ']') { ++pos; return arr; }
+        while (true) {
+            arr.push_back(parseValue());
+            skipWhitespace();
+            if (json[pos] == ']') { ++pos; break; }
+            if (json[pos] != ',') throw runtime_error("Expected ',' or ']'");
+            ++pos;
+        }
+        return arr;
+    }
+    JsonValue parseString() {
+        ++pos;
+        string str;
+        while (pos < json.size() && json[pos] != '"') {
+            if (json[pos] == '\\') {
+                ++pos;
+                if (pos >= json.size()) throw runtime_error("Unterminated escape");
+                switch (json[pos]) {
+                    case '"': str += '"'; break;
+                    case '\\': str += '\\'; break;
+                    case '/': str += '/'; break;
+                    case 'b': str += '\b'; break;
+                    case 'f': str += '\f'; break;
+                    case 'n': str += '\n'; break;
+                    case 'r': str += '\r'; break;
+                    case 't': str += '\t'; break;
+                    case 'u':
+                        str += "\\u";
+                        for (int i = 0; i < 4 && pos + i + 1 < json.size(); ++i)
+                            str += json[pos + i + 1];
+                        pos += 4;
+                        break;
+                    default: str += json[pos];
+                }
+            } else {
+                str += json[pos];
+            }
+            ++pos;
+        }
+        if (pos >= json.size() || json[pos] != '"') throw runtime_error("Unterminated string");
+        ++pos;
+        return JsonValue(str);
+    }
+    JsonValue parseBool() {
+        if (json.compare(pos, 4, "true") == 0) { pos += 4; return JsonValue(true); }
+        if (json.compare(pos, 5, "false") == 0) { pos += 5; return JsonValue(false); }
+        throw runtime_error("Invalid boolean");
+    }
+    JsonValue parseNumber() {
+        size_t start = pos;
+        while (pos < json.size() && (isdigit(json[pos]) || json[pos] == '.' || json[pos] == '-' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+')) ++pos;
+        string numStr = json.substr(start, pos - start);
+        char* end;
+        double num = strtod(numStr.c_str(), &end);
+        if (end == numStr.c_str()) throw runtime_error("Invalid number");
+        return JsonValue(num);
+    }
+};
+
+string jsonToString(const JsonValue& val) {
+    if (val.isNull()) return "null";
+    if (val.isBool()) return val.asBool() ? "true" : "false";
+    if (val.isNumber()) {
+        double num = val.asNumber();
+        if (num == floor(num)) return to_string((long long)num);
+        else return to_string(num);
+    }
+    if (val.isString()) return "\"" + val.asString() + "\"";
+    if (val.isArray()) {
+        string res = "[";
+        for (size_t i = 0; i < val.asArray().size(); ++i) {
+            if (i > 0) res += ",";
+            res += jsonToString(val.asArray()[i]);
+        }
+        res += "]";
+        return res;
+    }
+    if (val.isObject()) {
+        string res = "{";
+        bool first = true;
+        for (const auto& p : val.asObject()) {
+            if (!first) res += ",";
+            first = false;
+            res += "\"" + p.first + "\":" + jsonToString(p.second);
+        }
+        res += "}";
+        return res;
+    }
+    return "null";
+}
+
+// ========== Serialization / Deserialization Helpers ==========
+ListNode* deserializeListNode(const JsonValue& val) {
+    if (!val.isArray()) return nullptr;
+    ListNode dummy(0);
+    ListNode* cur = &dummy;
+    for (const auto& elem : val.asArray()) {
+        cur->next = new ListNode((int)elem.asNumber());
+        cur = cur->next;
+    }
+    return dummy.next;
+}
+JsonValue serializeListNode(ListNode* head) {
+    vector<JsonValue> res;
+    while (head) {
+        res.push_back(JsonValue((double)head->val));
+        head = head->next;
+    }
+    return JsonValue(res);
+}
+
+TreeNode* deserializeTreeNode(const JsonValue& val) {
+    if (!val.isArray()) return nullptr;
+    auto arr = val.asArray();
+    if (arr.empty()) return nullptr;
+    vector<TreeNode*> nodes;
+    for (const auto& elem : arr) {
+        if (elem.isNull()) nodes.push_back(nullptr);
+        else nodes.push_back(new TreeNode((int)elem.asNumber()));
+    }
+    int i = 0, j = 1;
+    while (j < nodes.size()) {
+        if (nodes[i]) {
+            nodes[i]->left = nodes[j++];
+            if (j < nodes.size()) nodes[i]->right = nodes[j++];
+        }
+        i++;
+    }
+    return nodes[0];
+}
+JsonValue serializeTreeNode(TreeNode* root) {
+    vector<JsonValue> res;
+    queue<TreeNode*> q;
+    q.push(root);
+    while (!q.empty()) {
+        TreeNode* node = q.front(); q.pop();
+        if (node) {
+            res.push_back(JsonValue((double)node->val));
+            q.push(node->left);
+            q.push(node->right);
+        } else {
+            res.push_back(JsonValue());
+        }
+    }
+    while (!res.empty() && res.back().isNull()) res.pop_back();
+    return JsonValue(res);
+}
+
+Node* deserializeGraphNode(const JsonValue& val) {
+    if (!val.isArray()) return nullptr;
+    auto adj = val.asArray();
+    if (adj.empty()) return nullptr;
+    map<int, Node*> nodes;
+    for (size_t i = 0; i < adj.size(); ++i) {
+        int nodeVal = i + 1;
+        if (!nodes.count(nodeVal)) nodes[nodeVal] = new Node(nodeVal);
+        auto neighbors = adj[i].asArray();
+        for (const auto& nb : neighbors) {
+            int nbVal = (int)nb.asNumber();
+            if (!nodes.count(nbVal)) nodes[nbVal] = new Node(nbVal);
+            nodes[nodeVal]->neighbors.push_back(nodes[nbVal]);
+        }
+    }
+    return nodes[1];
+}
+JsonValue serializeGraphNode(Node* node) {
+    if (!node) return JsonValue(vector<JsonValue>());
+    map<Node*, int> idx;
+    vector<Node*> order;
+    queue<Node*> q;
+    q.push(node);
+    while (!q.empty()) {
+        Node* cur = q.front(); q.pop();
+        if (idx.count(cur)) continue;
+        idx[cur] = order.size();
+        order.push_back(cur);
+        for (Node* nb : cur->neighbors) q.push(nb);
+    }
+    sort(order.begin(), order.end(), [](Node* a, Node* b) { return a->val < b->val; });
+    vector<vector<int>> res;
+    for (Node* n : order) {
+        vector<int> nbVals;
+        for (Node* nb : n->neighbors) nbVals.push_back(idx[nb] + 1);
+        res.push_back(nbVals);
+    }
+    vector<JsonValue> arr;
+    for (auto& row : res) {
+        vector<JsonValue> rowArr;
+        for (int v : row) rowArr.push_back(JsonValue((double)v));
+        arr.push_back(JsonValue(rowArr));
+    }
+    return JsonValue(arr);
+}
+
+NestedInteger deserializeNestedInteger(const JsonValue& val) {
+    if (val.isNumber()) return NestedInteger((int)val.asNumber());
+    if (val.isArray()) {
+        NestedInteger ni;
+        for (const auto& elem : val.asArray()) ni.add(deserializeNestedInteger(elem));
+        return ni;
+    }
+    return NestedInteger();
+}
+JsonValue serializeNestedInteger(const NestedInteger& ni) {
+    if (ni.isInteger()) return JsonValue((double)ni.getInteger());
+    vector<JsonValue> arr;
+    for (const auto& child : ni.getList()) arr.push_back(serializeNestedInteger(child));
+    return JsonValue(arr);
+}
+
+Node* deserializeRandomList(const JsonValue& val) {
+    if (!val.isArray()) return nullptr;
+    auto arr = val.asArray();
+    if (arr.empty()) return nullptr;
+    vector<Node*> nodes;
+    for (const auto& elem : arr) {
+        auto pair = elem.asArray();
+        nodes.push_back(new Node((int)pair[0].asNumber()));
+    }
+    for (size_t i = 0; i < nodes.size() - 1; ++i) nodes[i]->next = nodes[i+1];
+    for (size_t i = 0; i < arr.size(); ++i) {
+        auto pair = arr[i].asArray();
+        if (pair.size() > 1 && !pair[1].isNull()) {
+            int randIdx = (int)pair[1].asNumber();
+            nodes[i]->random = nodes[randIdx];
+        }
+    }
+    return nodes[0];
+}
+JsonValue serializeRandomList(Node* head) {
+    if (!head) return JsonValue(vector<JsonValue>());
+    map<Node*, int> idx;
+    Node* cur = head;
+    int i = 0;
+    while (cur) { idx[cur] = i++; cur = cur->next; }
+    vector<JsonValue> res;
+    cur = head;
+    while (cur) {
+        vector<JsonValue> pair;
+        pair.push_back(JsonValue((double)cur->val));
+        if (cur->random) pair.push_back(JsonValue((double)idx[cur->random]));
+        else pair.push_back(JsonValue());
+        res.push_back(JsonValue(pair));
+        cur = cur->next;
+    }
+    return JsonValue(res);
+}
+
+Interval deserializeInterval(const JsonValue& val) {
+    if (!val.isArray()) return Interval();
+    auto arr = val.asArray();
+    if (arr.size() < 2) return Interval();
+    return Interval((int)arr[0].asNumber(), (int)arr[1].asNumber());
+}
+JsonValue serializeInterval(const Interval& interval) {
+    vector<JsonValue> res;
+    res.push_back(JsonValue((double)interval.start));
+    res.push_back(JsonValue((double)interval.end));
+    return JsonValue(res);
+}
+
+Point deserializePoint(const JsonValue& val) {
+    if (!val.isArray()) return Point();
+    auto arr = val.asArray();
+    if (arr.size() < 2) return Point();
+    return Point((int)arr[0].asNumber(), (int)arr[1].asNumber());
+}
+JsonValue serializePoint(const Point& point) {
+    vector<JsonValue> res;
+    res.push_back(JsonValue((double)point.x));
+    res.push_back(JsonValue((double)point.y));
+    return JsonValue(res);
+}
+
+Employee deserializeEmployee(const JsonValue& val) {
+    if (!val.isObject()) return Employee();
+    auto obj = val.asObject();
+    int id = (int)obj.at("id").asNumber();
+    int importance = (int)obj.at("importance").asNumber();
+    vector<int> subordinates;
+    if (obj.count("subordinates") && obj.at("subordinates").isArray()) {
+        for (const auto& v : obj.at("subordinates").asArray())
+            subordinates.push_back((int)v.asNumber());
+    }
+    return Employee(id, importance, subordinates);
+}
+JsonValue serializeEmployee(const Employee& emp) {
+    map<string, JsonValue> obj;
+    obj["id"] = JsonValue((double)emp.id);
+    obj["importance"] = JsonValue((double)emp.importance);
+    vector<JsonValue> subs;
+    for (int v : emp.subordinates) subs.push_back(JsonValue((double)v));
+    obj["subordinates"] = JsonValue(subs);
+    return JsonValue(obj);
+}
+
+Trie* deserializeTrie(const JsonValue& val) {
+    return new Trie();
+}
+JsonValue serializeTrie(Trie* trie) {
+    return JsonValue();
+}
+
+// ========== Type‑Safe Deserialization Variant ==========
+class Any {
+public:
+    enum Type { NONE, INT, LONG, DOUBLE, BOOL, CHAR, STRING,
+                LISTNODE_PTR, TREENODE_PTR, NODE_PTR, NESTEDINTEGER,
+                INTERVAL, POINT, EMPLOYEE, TRIE_PTR, VECTOR_ANY };
+    Type type;
+    union {
+        int int_val;
+        long long_val;
+        double double_val;
+        bool bool_val;
+        char char_val;
+        void* ptr_val;
+    };
+    string string_val;
+    NestedInteger nested_val;
+    Interval interval_val;
+    Point point_val;
+    Employee employee_val;
+    vector<Any> vector_val;
+
+    Any() : type(NONE) {}
+    Any(int v) : type(INT), int_val(v) {}
+    Any(long v) : type(LONG), long_val(v) {}
+    Any(double v) : type(DOUBLE), double_val(v) {}
+    Any(bool v) : type(BOOL), bool_val(v) {}
+    Any(char v) : type(CHAR), char_val(v) {}
+    Any(const string& v) : type(STRING), string_val(v) {}
+    Any(ListNode* v) : type(LISTNODE_PTR), ptr_val(v) {}
+    Any(TreeNode* v) : type(TREENODE_PTR), ptr_val(v) {}
+    Any(Node* v) : type(NODE_PTR), ptr_val(v) {}
+    Any(const NestedInteger& v) : type(NESTEDINTEGER), nested_val(v) {}
+    Any(const Interval& v) : type(INTERVAL), interval_val(v) {}
+    Any(const Point& v) : type(POINT), point_val(v) {}
+    Any(const Employee& v) : type(EMPLOYEE), employee_val(v) {}
+    Any(Trie* v) : type(TRIE_PTR), ptr_val(v) {}
+    Any(const vector<Any>& v) : type(VECTOR_ANY), vector_val(v) {}
+
+    int asInt() const { return int_val; }
+    long asLong() const { return long_val; }
+    double asDouble() const { return double_val; }
+    bool asBool() const { return bool_val; }
+    char asChar() const { return char_val; }
+    string asString() const { return string_val; }
+    ListNode* asListNode() const { return (ListNode*)ptr_val; }
+    TreeNode* asTreeNode() const { return (TreeNode*)ptr_val; }
+    Node* asNode() const { return (Node*)ptr_val; }
+    NestedInteger asNestedInteger() const { return nested_val; }
+    Interval asInterval() const { return interval_val; }
+    Point asPoint() const { return point_val; }
+    Employee asEmployee() const { return employee_val; }
+    Trie* asTrie() const { return (Trie*)ptr_val; }
+    vector<Any> asVector() const { return vector_val; }
+};
+
+Any deserializeAny(const JsonValue& val, const string& typeHint) {
+    if (val.isNull()) return Any();
+    if (typeHint == "int") return Any((int)val.asNumber());
+    if (typeHint == "long") return Any((long)val.asNumber());
+    if (typeHint == "float" || typeHint == "double") return Any(val.asNumber());
+    if (typeHint == "bool") return Any(val.asBool());
+    if (typeHint == "char") return Any(val.asString().empty() ? '\0' : val.asString()[0]);
+    if (typeHint == "string") return Any(val.asString());
+    if (typeHint.find("vector<") == 0 || typeHint.find("List<") == 0) {
+        string inner = typeHint.substr(typeHint.find('<') + 1, typeHint.rfind('>') - typeHint.find('<') - 1);
+        vector<Any> vec;
+        if (val.isArray()) {
+            for (const auto& item : val.asArray())
+                vec.push_back(deserializeAny(item, inner));
+        }
+        return Any(vec);
+    }
+    if (typeHint == "ListNode") return Any(deserializeListNode(val));
+    if (typeHint == "TreeNode") return Any(deserializeTreeNode(val));
+    if (typeHint == "GraphNode") return Any(deserializeGraphNode(val));
+    if (typeHint == "RandomListNode") return Any(deserializeRandomList(val));
+    if (typeHint == "NestedInteger") return Any(deserializeNestedInteger(val));
+    if (typeHint == "Interval") return Any(deserializeInterval(val));
+    if (typeHint == "Point") return Any(deserializePoint(val));
+    if (typeHint == "Employee") return Any(deserializeEmployee(val));
+    if (typeHint == "Trie") return Any(deserializeTrie(val));
+    if (typeHint == "Node") {
+        if (val.isArray() && !val.asArray().empty() && val.asArray()[0].isArray() && val.asArray()[0].asArray().size() == 2)
+            return Any(deserializeRandomList(val));
+        else
+            return Any(deserializeGraphNode(val));
+    }
+    return Any((int)val.asNumber());
+}
+
+JsonValue serializeAny(const Any& obj, const string& typeHint) {
+    if (typeHint == "int") return JsonValue((double)obj.asInt());
+    if (typeHint == "long") return JsonValue((double)obj.asLong());
+    if (typeHint == "float" || typeHint == "double") return JsonValue(obj.asDouble());
+    if (typeHint == "bool") return JsonValue(obj.asBool());
+    if (typeHint == "char") return JsonValue(string(1, obj.asChar()));
+    if (typeHint == "string") return JsonValue(obj.asString());
+    if (typeHint.find("vector<") == 0 || typeHint.find("List<") == 0) {
+        string inner = typeHint.substr(typeHint.find('<') + 1, typeHint.rfind('>') - typeHint.find('<') - 1);
+        vector<JsonValue> arr;
+        for (const auto& item : obj.asVector())
+            arr.push_back(serializeAny(item, inner));
+        return JsonValue(arr);
+    }
+    if (typeHint == "ListNode") return serializeListNode(obj.asListNode());
+    if (typeHint == "TreeNode") return serializeTreeNode(obj.asTreeNode());
+    if (typeHint == "GraphNode") return serializeGraphNode(obj.asNode());
+    if (typeHint == "RandomListNode") return serializeRandomList(obj.asNode());
+    if (typeHint == "NestedInteger") return serializeNestedInteger(obj.asNestedInteger());
+    if (typeHint == "Interval") return serializeInterval(obj.asInterval());
+    if (typeHint == "Point") return serializePoint(obj.asPoint());
+    if (typeHint == "Employee") return serializeEmployee(obj.asEmployee());
+    if (typeHint == "Trie") return serializeTrie(obj.asTrie());
+    if (typeHint == "Node") {
+        Node* node = obj.asNode();
+        if (node->neighbors.empty())
+            return serializeRandomList(node);
+        else
+            return serializeGraphNode(node);
+    }
+    if (typeHint == "void") return JsonValue();
+    return JsonValue(obj.asDouble());
+}
+
+// ========== User Code ==========
+{{USER_CODE}}
+
+// ========== Main Runner (Macro‑Based Dispatch) ==========
+int main() {
+    string line;
+    getline(cin, line);
+    JsonParser parser(line);
+    JsonValue root = parser.parse();
+
+    bool isInteractive = {{IS_INTERACTIVE}};
+    string methodName = "{{METHOD_NAME}}";
+    string className = "{{CLASS_NAME}}";
+    string paramTypesStr = R"({{PARAM_TYPES}})";
+    string returnType = "{{RETURN_TYPE}}";
+
+    JsonParser ptParser(paramTypesStr);
+    JsonValue paramTypesJson = ptParser.parse();
+
+    if (isInteractive) {
+        if (!root.isArray()) { cerr << "Interactive input must be an array" << endl; return 1; }
+        vector<JsonValue> results;
+        void* objPtr = nullptr;
+
+        // Interactive dispatch: backend must define DISPATCH_INTERACTIVE_* macros
+        // Example: -DDISPATCH_INTERACTIVE_CALL(meth, args, objPtr, results) ...
+        // The macro expands to the appropriate method call.
+        for (const auto& call : root.asArray()) {
+            if (!call.isObject()) { results.push_back(JsonValue()); continue; }
+            auto meth = call.asObject().at("method").asString();
+            auto args = call.asObject().at("args").asArray();
+
+            // Get param types for this call
+            vector<string> typesForCall;
+            if (paramTypesJson.isArray()) {
+                if (!paramTypesJson.asArray().empty() && paramTypesJson.asArray()[0].isArray()) {
+                    // per-call types
+                    size_t idx = &call - &root.asArray()[0];
+                    if (idx < paramTypesJson.asArray().size()) {
+                        for (const auto& t : paramTypesJson.asArray()[idx].asArray())
+                            typesForCall.push_back(t.asString());
+                    }
+                } else {
+                    for (const auto& t : paramTypesJson.asArray())
+                        typesForCall.push_back(t.asString());
+                }
+            }
+
+            // Deserialize arguments
+            vector<Any> deserializedArgs;
+            for (size_t i = 0; i < args.size(); ++i) {
+                string hint = i < typesForCall.size() ? typesForCall[i] : "any";
+                deserializedArgs.push_back(deserializeAny(args[i], hint));
+            }
+
+            // Call appropriate method using backend-defined macro
+            if (meth == className) {
+                // Constructor
+                #ifdef DISPATCH_INTERACTIVE_CTOR
+                DISPATCH_INTERACTIVE_CTOR(className, deserializedArgs, objPtr);
+                #else
+                #error "DISPATCH_INTERACTIVE_CTOR macro not defined"
+                #endif
+                results.push_back(JsonValue());
+            } else {
+                // Method call
+                #ifdef DISPATCH_INTERACTIVE_METHOD
+                Any ret = DISPATCH_INTERACTIVE_METHOD(className, meth, objPtr, deserializedArgs);
+                #else
+                #error "DISPATCH_INTERACTIVE_METHOD macro not defined"
+                #endif
+                if (returnType == "void")
+                    results.push_back(JsonValue());
+                else
+                    results.push_back(serializeAny(ret, returnType));
+            }
+        }
+        cout << jsonToString(JsonValue(results)) << endl;
+    } else {
+        // Non‑interactive: single call
+        vector<JsonValue> argsData;
+        if (root.isObject() && root.asObject().count("args")) {
+            argsData = root.asObject().at("args").asArray();
+        } else if (root.isArray()) {
+            argsData = root.asArray();
+        } else {
+            argsData = {root};
+        }
+
+        vector<string> paramTypes;
+        if (paramTypesJson.isArray()) {
+            for (const auto& v : paramTypesJson.asArray())
+                paramTypes.push_back(v.asString());
+        }
+
+        vector<Any> deserializedArgs;
+        for (size_t i = 0; i < argsData.size(); ++i) {
+            string hint = i < paramTypes.size() ? paramTypes[i] : "any";
+            deserializedArgs.push_back(deserializeAny(argsData[i], hint));
+        }
+
+        #ifdef DISPATCH_NON_INTERACTIVE
+        Any result = DISPATCH_NON_INTERACTIVE(className, methodName, deserializedArgs);
+        #else
+        #error "DISPATCH_NON_INTERACTIVE macro not defined"
+        #endif
+
+        JsonValue serialized = serializeAny(result, returnType);
+        if (returnType == "void")
+            cout << "null" << endl;
+        else
+            cout << jsonToString(serialized) << endl;
+    }
+    return 0;
+}
