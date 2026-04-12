@@ -333,6 +333,8 @@ export interface Question extends Timestamp {
   source?: 'manual' | 'leetcode'; // where the question came from
   starterCode?: Record<string, string>;
   fullRunnerCode?: Record<string, string>;
+  isSolved?: boolean;
+  userStatus?: QuestionStatus;
 }
 
 export interface UserQuestionProgress extends Timestamp {

@@ -17,11 +17,18 @@
 .chip:hover:not(:disabled) {
   background-color: var(--hover-surface);
   border-color: var(--primary-action);
+  color: var(--text-primary);
 }
 
 .chip.selected {
   background-color: var(--primary-action);
   border-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+}
+
+.chip.selected:hover:not(:disabled) {
+  background-color: var(--primary-action-hover);
+  border-color: var(--primary-action-hover);
   color: var(--primary-text-on-action);
 }
 
@@ -55,6 +62,7 @@
   text-align: center;
   transition: var(--transition);
 }
+
 .chip.selected .count {
   background-color: var(--primary-text-on-action);
   color: var(--primary-action);

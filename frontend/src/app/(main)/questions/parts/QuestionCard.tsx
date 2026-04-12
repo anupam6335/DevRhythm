@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
+import { FaCheckCircle } from 'react-icons/fa';
 import Card from '@/shared/components/Card';
 import PlatformIcon from '@/shared/components/PlatformIcon';
 import Tooltip from '@/shared/components/Tooltip';
@@ -17,12 +18,10 @@ interface QuestionCardProps {
 export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
   const lastUpdated = formatDistanceToNow(new Date(question.updatedAt), { addSuffix: true });
 
-  // Tags handling
   const displayedTags = question.tags.slice(0, 3);
   const remainingTags = question.tags.slice(3);
   const hasMoreTags = remainingTags.length > 0;
 
-  // Pattern handling
   const displayedPattern = question.pattern && question.pattern.length > 0 ? question.pattern[0] : null;
   const remainingPatterns = question.pattern && question.pattern.length > 1 ? question.pattern.slice(1) : [];
 
@@ -41,7 +40,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
           <span>{question.platform}</span>
         </div>
 
-        {/* Tags section – always takes fixed height */}
         <div className={styles.tagsSection}>
           {question.tags.length > 0 && (
             <div className={styles.tagsRow}>
@@ -57,7 +55,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
           )}
         </div>
 
-        {/* Pattern section – always takes fixed height */}
         <div className={styles.patternSection}>
           {displayedPattern && (
             <div className={styles.pattern}>
@@ -75,6 +72,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
         <div className={styles.footer}>
           <span className={styles.lastUpdated}>{lastUpdated}</span>
         </div>
+
+        {/* Solved indicator – bottom‑right corner */}
+        {question.isSolved && (
+          <div className={styles.solvedBadge}>
+            <FaCheckCircle className={styles.solvedIcon} />
+          </div>
+        )}
       </Card>
     </Link>
   );

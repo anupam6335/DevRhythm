@@ -9,7 +9,8 @@ const getQuestions = Joi.object({
   tags: Joi.array().items(Joi.string().trim()).single(),
   search: Joi.string().trim().min(1).max(100),
   sortBy: Joi.string().valid('createdAt', 'updatedAt', 'title', 'difficulty', 'platform').default('createdAt'),
-  sortOrder: Joi.string().valid('asc', 'desc').default('desc')
+  sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
+  status: Joi.string().valid('solved')
 });
 
 const getQuestionById = Joi.object({

@@ -24,6 +24,7 @@ const DEFAULT_FILTERS: Filters = {
   pattern: '',
   tags: [],
   sort: 'newest',
+  status: '',
 };
 
 // Map frontend sort value to backend parameters
@@ -66,6 +67,7 @@ export const QuestionsPageClient: React.FC = () => {
       pattern: params.get('pattern') || DEFAULT_FILTERS.pattern,
       tags: params.getAll('tags'),
       sort,
+      status: params.get('status') || DEFAULT_FILTERS.status,
     };
   }, [searchParams]);
 
@@ -77,6 +79,12 @@ export const QuestionsPageClient: React.FC = () => {
       (value as string[]).forEach((tag) => params.append('tags', tag));
     } else if (key === 'sort') {
       params.set('sort', value);
+    } else if (key === 'status') {
+      if (value && value !== '') {
+        params.set('status', value);
+      } else {
+        params.delete('status');
+      }
     } else {
       if (value && value !== '') {
         params.set(key, value);
@@ -84,7 +92,6 @@ export const QuestionsPageClient: React.FC = () => {
         params.delete(key);
       }
     }
-    // Reset page when filters change
     params.set('page', '1');
     router.push(`?${params.toString()}`);
   };
@@ -131,7 +138,7 @@ export const QuestionsPageClient: React.FC = () => {
     if (filters.difficulty) params.difficulty = filters.difficulty;
     if (filters.pattern) params.pattern = filters.pattern;
     if (filters.tags.length) params.tags = filters.tags;
-    // Add sort parameters
+    if (filters.status) params.status = filters.status;
     const sortParams = sortParamMap[filters.sort];
     if (sortParams) {
       params.sortBy = sortParams.sortBy;

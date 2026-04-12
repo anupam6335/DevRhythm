@@ -11,7 +11,6 @@ const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handl
 const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
 const { handleRevisionSchedule } = require('./revisionSchedule.hanlder');
 const { handleQuestionExtractTestCases } = require('./questionExtractTestCases.hanlder');
-const { handleQuestionGenerateRunner } = require('./questionGenerateRunner.handler');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -57,8 +56,6 @@ const processJob = async (job) => {
     case 'question.extract_testcases':
       await handleQuestionExtractTestCases(job);
       break;
-    case 'question.generate_runner':
-      await handleQuestionGenerateRunner(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);
