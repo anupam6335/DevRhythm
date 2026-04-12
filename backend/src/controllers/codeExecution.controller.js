@@ -3019,14 +3019,19 @@ const runCode = async (req, res, next) => {
       isOrderIrrelevant = /any order/i.test(question.contentRef);
     }
 
+    // Normalization helper for test case comparison
+    const normalizeForCompare = (str) => (str || "").replace(/\s+/g, " ").trim();
+
+    // 1. Extract default test cases from the question
     let defaultTestCases = [];
     if (question.testCases && Array.isArray(question.testCases)) {
       defaultTestCases = question.testCases.map((tc) => ({
-        stdin: tc.stdin || tc.input, // fallback to 'input' if 'stdin' missing
-        expected: tc.expected || tc.expectedOutput, // fallback to 'expectedOutput'
+        stdin: tc.stdin || tc.input,
+        expected: tc.expected || tc.expectedOutput,
       }));
     }
 
+    // 2. Extract existing custom test cases from user progress (already stored)
     let userCustomTestCases = [];
     if (
       userProgress &&
@@ -3039,22 +3044,27 @@ const runCode = async (req, res, next) => {
       }));
     }
 
-    let finalTestCases = [];
-    if (testCases && Array.isArray(testCases)) {
-      finalTestCases = [
-        ...defaultTestCases,
-        ...userCustomTestCases,
-        ...testCases,
-      ];
-    } else if (stdin !== undefined) {
-      finalTestCases = [
-        ...defaultTestCases,
-        ...userCustomTestCases,
-        { stdin: stdin || "", expected: expected || "" },
-      ];
-    } else {
-      finalTestCases = [...defaultTestCases, ...userCustomTestCases];
+    // 3. Build the set of test cases to run (deduplicated)
+    const allTestCases = [
+      ...defaultTestCases,
+      ...userCustomTestCases,
+      ...(testCases && Array.isArray(testCases) ? testCases : []),
+    ];
+
+    // Add single test case from stdin/expected if provided
+    if (stdin !== undefined && !testCases) {
+      allTestCases.push({ stdin: stdin || "", expected: expected || "" });
     }
+
+    // Deduplicate using a Map keyed by normalized stdin|expected
+    const uniqueMap = new Map();
+    for (const tc of allTestCases) {
+      const key = `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, tc);
+      }
+    }
+    const finalTestCases = Array.from(uniqueMap.values());
 
     if (finalTestCases.length === 0) {
       throw new AppError("No test cases available for this question", 400);
@@ -3155,13 +3165,30 @@ const runCode = async (req, res, next) => {
     const totalCount = finalTestCases.length;
     const allPassed = passedCount === totalCount;
 
-    // Save custom test cases
+    // ========== SAVE CUSTOM TEST CASES (only those that are NOT default) ==========
     let customToSave = [];
     if (testCases && Array.isArray(testCases)) {
       customToSave = testCases;
     } else if (stdin !== undefined) {
       customToSave = [{ stdin: stdin || "", expected: expected || "" }];
     }
+
+    // Filter out any custom test case that matches a default test case
+    if (customToSave.length > 0 && defaultTestCases.length > 0) {
+      const defaultSet = new Set(
+        defaultTestCases.map((tc) =>
+          `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`
+        )
+      );
+
+      const uniqueCustom = customToSave.filter((tc) => {
+        const key = `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`;
+        return !defaultSet.has(key);
+      });
+
+      customToSave = uniqueCustom;
+    }
+
     if (customToSave.length > 0) {
       await UserQuestionProgress.findOneAndUpdate(
         { userId: req.user._id, questionId },
@@ -3174,64 +3201,68 @@ const runCode = async (req, res, next) => {
             })),
           },
         },
-        { upsert: true, new: true },
+        { upsert: true, new: true }
+      );
+    } else if (testCases || stdin !== undefined) {
+      // If custom test cases were provided but all were duplicates, clear stored ones
+      await UserQuestionProgress.findOneAndUpdate(
+        { userId: req.user._id, questionId },
+        { $set: { customTestCases: [] } },
+        { upsert: true }
       );
     }
+    // ======================================================================
 
     // --- Save execution history with original user code ---
     await CodeExecutionHistory.create({
-    userId: req.user._id,
-    questionId,
-    language,
-    code: code,                     // store original user code, not finalCode
-    testCases: results.map((r) => ({
+      userId: req.user._id,
+      questionId,
+      language,
+      code: code,
+      testCases: results.map((r) => ({
         stdin: r.input,
         expected: r.expected,
         output: r.output,
         error: r.error,
         exitCode: r.exitCode,
         passed: r.passed,
-    })),
-    summary: {
+      })),
+      summary: {
         passedCount,
         totalCount,
         allPassed,
         defaultTestCasesCount: defaultTestCases.length,
         userCustomTestCasesCount: userCustomTestCases.length,
         customTestCasesCount: customToSave.length,
-    },
+      },
     });
 
     // --- Per‑language cleanup: keep 1 all‑passed + 2 latest (any outcome) ---
     const cleanupExecutionHistory = async (userId, questionId, language) => {
-    const records = await CodeExecutionHistory.find({
+      const records = await CodeExecutionHistory.find({
         userId,
         questionId,
         language,
-    }).sort({ executedAt: -1 });
+      }).sort({ executedAt: -1 });
 
-    const passedRecords = records.filter((r) => r.summary?.allPassed === true);
-    const nonPassedRecords = records.filter((r) => r.summary?.allPassed !== true);
+      const passedRecords = records.filter((r) => r.summary?.allPassed === true);
+      const nonPassedRecords = records.filter((r) => r.summary?.allPassed !== true);
 
-    const toDelete = [];
+      const toDelete = [];
 
-    // Keep only the most recent passed record
-    if (passedRecords.length > 1) {
-        const keepPassed = passedRecords[0]; // most recent
+      if (passedRecords.length > 1) {
         const extraPassed = passedRecords.slice(1);
         toDelete.push(...extraPassed.map((r) => r._id));
-    }
+      }
 
-    // Keep only the 2 most recent non‑passed records
-    if (nonPassedRecords.length > 2) {
-        const keepNonPassed = nonPassedRecords.slice(0, 2);
+      if (nonPassedRecords.length > 2) {
         const extraNonPassed = nonPassedRecords.slice(2);
         toDelete.push(...extraNonPassed.map((r) => r._id));
-    }
+      }
 
-    if (toDelete.length > 0) {
+      if (toDelete.length > 0) {
         await CodeExecutionHistory.deleteMany({ _id: { $in: toDelete } });
-    }
+      }
     };
 
     await cleanupExecutionHistory(req.user._id, questionId, language);
@@ -3249,63 +3280,59 @@ const runCode = async (req, res, next) => {
 
     // ----- Create revision schedule on first submission (any result) -----
     const existingRevision = await RevisionSchedule.findOne({
-        userId: req.user._id,
-        questionId
+      userId: req.user._id,
+      questionId
     });
-        if (!existingRevision) {
-        const baseDate = new Date();
-        const schedule = [1, 3, 7, 14, 30].map(days => {
-            const d = new Date(baseDate);
-            d.setDate(d.getDate() + days);
-            d.setHours(0, 0, 0, 0);
-            return d;
-        });
-        await RevisionSchedule.create({
-            userId: req.user._id,
-            questionId,
-            schedule,
-            baseDate,
-            status: 'active'
-        });
-        await invalidateCache(`revisions:*:user:${req.user._id}:*`);
+    if (!existingRevision) {
+      const baseDate = new Date();
+      const schedule = [1, 3, 7, 14, 30].map(days => {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + days);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      });
+      await RevisionSchedule.create({
+        userId: req.user._id,
+        questionId,
+        schedule,
+        baseDate,
+        status: 'active'
+      });
+      await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     }
-
 
     // ----- If all tests passed, mark question as Solved (if not already) -----
     if (allPassed) {
-    // Update progress to Solved
-    let progress = await UserQuestionProgress.findOne({ userId: req.user._id, questionId });
-    if (!progress) {
+      let progress = await UserQuestionProgress.findOne({ userId: req.user._id, questionId });
+      if (!progress) {
         progress = new UserQuestionProgress({
-        userId: req.user._id,
-        questionId,
-        status: 'Solved',
-        attempts: { count: 1, solvedAt: new Date(), lastAttemptAt: new Date(), firstAttemptAt: new Date() },
-        totalTimeSpent: 0 // optionally pass actual time from execution
+          userId: req.user._id,
+          questionId,
+          status: 'Solved',
+          attempts: { count: 1, solvedAt: new Date(), lastAttemptAt: new Date(), firstAttemptAt: new Date() },
+          totalTimeSpent: 0
         });
-    } else if (progress.status !== 'Solved') {
+      } else if (progress.status !== 'Solved') {
         progress.status = 'Solved';
         progress.attempts.solvedAt = new Date();
         progress.attempts.lastAttemptAt = new Date();
         progress.attempts.count = (progress.attempts.count || 0) + 1;
-    }
-    await progress.save();
-    await invalidateProgressCache(req.user._id);
+      }
+      await progress.save();
+      await invalidateProgressCache(req.user._id);
 
-    // Record code submission for revision activity
-    await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
+      await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
 
-    // Check if this submission also completes a pending revision
-    const revisionResult = await revisionActivityService.checkAndCompleteRevision(
+      const revisionResult = await revisionActivityService.checkAndCompleteRevision(
         req.user._id,
         questionId,
         new Date(),
         'auto'
-    );
-    if (revisionResult.completed) {
+      );
+      if (revisionResult.completed) {
         responseData.revisionCompleted = true;
         responseData.revisionMessage = revisionResult.message;
-    }
+      }
     }
 
     return res.json(formatResponse("Code executed successfully", responseData));
