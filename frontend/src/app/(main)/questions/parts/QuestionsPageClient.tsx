@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useMediaQuery } from '@/shared/hooks';
 import Divider from '@/shared/components/Divider';
 import Button from '@/shared/components/Button';
@@ -27,7 +27,6 @@ const DEFAULT_FILTERS: Filters = {
   status: '',
 };
 
-// Map frontend sort value to backend parameters
 const sortParamMap: Record<string, { sortBy: string; sortOrder: 'asc' | 'desc' }> = {
   newest: { sortBy: 'createdAt', sortOrder: 'desc' },
   oldest: { sortBy: 'createdAt', sortOrder: 'asc' },
@@ -44,7 +43,23 @@ const SORT_OPTIONS = [
 
 export const QuestionsPageClient: React.FC = () => {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // --- Restore last list URL on mount if current URL is bare ---
+  useEffect(() => {
+    const storedUrl = sessionStorage.getItem('lastQuestionsListUrl');
+    if (storedUrl) {
+      const currentUrl = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+      // Only restore if current URL is the base path without any params
+      // This avoids interfering with direct navigation that already has params
+      if (currentUrl === pathname || currentUrl === '/questions') {
+        sessionStorage.removeItem('lastQuestionsListUrl');
+        router.replace(storedUrl);
+        return;
+      }
+    }
+  }, [pathname, searchParams, router]);
 
   // Responsive breakpoints
   const isMobile = useMediaQuery('(max-width: 480px)');
@@ -104,27 +119,30 @@ export const QuestionsPageClient: React.FC = () => {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = 10;
 
-  // --- Persist page number in sessionStorage to restore on back navigation ---
+  // --- Store current page in sessionStorage whenever it changes (including page 1) ---
   useEffect(() => {
-    if (!isNaN(page) && page > 1) {
+    if (!isNaN(page)) {
       sessionStorage.setItem('questionsPage', page.toString());
-    } else if (page === 1) {
-      // Optionally clear or keep; we'll keep but later we'll decide to restore only if no page param.
     }
   }, [page]);
 
-  // Restore page number on initial mount if URL doesn't have a page param or page=1
+  // --- Restore page only when URL has NO page parameter ---
   useEffect(() => {
     if (initialPageRestored.current) return;
+
     const storedPage = sessionStorage.getItem('questionsPage');
     if (storedPage) {
       const storedPageNum = parseInt(storedPage, 10);
-      const currentPage = parseInt(searchParams.get('page') || '1', 10);
-      if (currentPage === 1 && storedPageNum > 1) {
+      const hasPageParam = searchParams.has('page');
+      // Only restore if the URL doesn't already specify a page number
+      if (!hasPageParam && storedPageNum > 1) {
         initialPageRestored.current = true;
         const params = new URLSearchParams(searchParams.toString());
         params.set('page', storedPageNum.toString());
         router.replace(`?${params.toString()}`);
+        // Clear the stored value after restoration to avoid interference on next visit
+        sessionStorage.removeItem('questionsPage');
+        return;
       }
     }
     initialPageRestored.current = true;
@@ -185,7 +203,7 @@ export const QuestionsPageClient: React.FC = () => {
   const getSiblingCount = () => {
     if (isDesktop) return 2;
     if (isTablet) return 1;
-    return 0; // mobile
+    return 0;
   };
   const siblingCount = getSiblingCount();
 
@@ -197,7 +215,6 @@ export const QuestionsPageClient: React.FC = () => {
   const paginationSize = getPaginationSize();
 
   // --- Scroll position persistence ---
-  // Save scroll position on scroll (debounced)
   const handleScroll = useCallback(() => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
@@ -304,7 +321,6 @@ export const QuestionsPageClient: React.FC = () => {
           </main>
         </div>
       ) : (
-        // Mobile/tablet layout with drawer
         <>
           <div className={styles.mobileHeader}>
             <div className={styles.resultInfo}>

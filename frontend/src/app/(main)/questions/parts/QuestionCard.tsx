@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import clsx from 'clsx';
 import { FaCheckCircle } from 'react-icons/fa';
@@ -15,18 +16,38 @@ interface QuestionCardProps {
   question: Question;
 }
 
+// Helper to normalize pattern (string or array) to array
+const normalizePattern = (pattern: string | string[] | undefined): string[] => {
+  if (!pattern) return [];
+  if (Array.isArray(pattern)) return pattern;
+  return [pattern];
+};
+
 export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const lastUpdated = formatDistanceToNow(new Date(question.updatedAt), { addSuffix: true });
 
-  const displayedTags = question.tags.slice(0, 3);
+  const displayedTags = question.tags.slice(0, 4);
   const remainingTags = question.tags.slice(3);
   const hasMoreTags = remainingTags.length > 0;
 
-  const displayedPattern = question.pattern && question.pattern.length > 0 ? question.pattern[0] : null;
-  const remainingPatterns = question.pattern && question.pattern.length > 1 ? question.pattern.slice(1) : [];
+  const patterns = normalizePattern(question.pattern);
+  const displayedPattern = patterns.length > 0 ? patterns[0] : null;
+  const remainingPatterns = patterns.slice(1);
+
+  const handleClick = () => {
+    // Store the current list URL (including filters and page) before leaving
+    const currentUrl = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+    sessionStorage.setItem('lastQuestionsListUrl', currentUrl);
+  };
 
   return (
-    <Link href={`/questions/${question.platformQuestionId}`} className={styles.cardLink}>
+    <Link
+      href={`/questions/${question.platformQuestionId}`}
+      className={styles.cardLink}
+      onClick={handleClick}
+    >
       <Card className={styles.card}>
         <div className={styles.header}>
           <h3 className={styles.title}>{question.title}</h3>
@@ -68,12 +89,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
             </div>
           )}
         </div>
-
-        <div className={styles.footer}>
-          <span className={styles.lastUpdated}>{lastUpdated}</span>
-        </div>
-
-        {/* Solved indicator – bottom‑right corner */}
         {question.isSolved && (
           <div className={styles.solvedBadge}>
             <FaCheckCircle className={styles.solvedIcon} />
