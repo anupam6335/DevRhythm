@@ -11,6 +11,7 @@ export const questionService = {
     pattern?: string;
     tags?: string[];
     search?: string;
+    status?: string;
   }) {
     const query = buildQueryString(params);
     const response = await apiClient.get<{ questions: Question[] }>(`/questions${query}`) as ApiClientResponse<{ questions: Question[] }>;

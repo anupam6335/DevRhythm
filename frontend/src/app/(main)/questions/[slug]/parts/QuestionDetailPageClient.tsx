@@ -19,10 +19,11 @@ import { toast } from '@/shared/components/Toast';
 import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import type { Question } from '@/shared/types';
 import { ProgressCard } from './ProgressCard';
-import { CodeExecutionArea } from './CodeExecutionArea';
 import { SimilarQuestionsGrid } from './SimilarQuestionsGrid';
-import { RevisionTimelinePanel } from './RevisionTimelinePanel';
 import { EditableNotes } from './EditableNotes';
+import { QuestionDetailSkeleton } from './QuestionDetailSkeleton';
+import { LazyRightColumn } from './LazyRightColumn';
+import { LazyRevisionTimeline } from './LazyRevisionTimeline';
 import styles from './QuestionDetailPage.module.css';
 
 interface QuestionDetailPageClientProps {
@@ -36,7 +37,6 @@ interface QuestionDetailPageClientProps {
 function decodeEscapedString(str: string): string {
   if (!str) return '';
 
-  // Replace escaped sequences
   let result = str
     .replace(/\\n/g, '\n')
     .replace(/\\t/g, '\t')
@@ -44,7 +44,6 @@ function decodeEscapedString(str: string): string {
     .replace(/\\"/g, '"')
     .replace(/\\\\/g, '\\');
 
-  // Decode HTML entities
   return result
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -55,20 +54,16 @@ function decodeEscapedString(str: string): string {
 
 /**
  * Convert a raw content string into safe HTML for rendering.
- * If it contains HTML tags, returns it as‑is.
- * Otherwise, escapes HTML and wraps in a <pre>‑like container.
  */
 function prepareHtmlContent(raw: string): string {
   if (!raw) return '';
 
   const decoded = decodeEscapedString(raw);
 
-  // If the content already contains HTML tags, use it directly
   if (decoded.includes('<') && decoded.includes('>')) {
     return decoded;
   }
 
-  // Otherwise, treat as plain text: escape HTML and replace newlines with <br>
   const escaped = decoded
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -79,25 +74,20 @@ function prepareHtmlContent(raw: string): string {
 }
 
 /**
- * Format the <pre> blocks inside the problem statement so that each
- * label (Input, Output, Explanation) appears on its own line,
- * followed by its content on the next line, with spacing between sections.
+ * Format the <pre> blocks inside the problem statement.
  */
 function formatExamplePreBlocks(html: string): string {
   if (!html) return html;
 
   return html.replace(/<pre>([\s\S]*?)<\/pre>/g, (match, preContent) => {
     const parts: string[] = [];
-    // Regex to capture each label and its content up to the next label or end
     const labelRegex = /<strong>(Input|Output|Explanation):<\/strong>\s*([\s\S]*?)(?=<strong>(?:Input|Output|Explanation):<\/strong>|$)/g;
     let m: RegExpExecArray | null;
     while ((m = labelRegex.exec(preContent)) !== null) {
       const label = m[1];
       let content = m[2].trim();
-      // Wrap each section in a div with bottom margin for spacing
       parts.push(`<div style="margin-bottom: 1rem;"><strong>${label}:</strong><br>${content}</div>`);
     }
-    // If we didn't capture any labels, return the original pre content
     if (parts.length === 0) return match;
     return `<pre>${parts.join('')}</pre>`;
   });
@@ -113,12 +103,9 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const [mounted, setMounted] = useState(false);
   const [editorCode, setEditorCode] = useState<string>('');
   const [isFullWindow, setIsFullWindow] = useState(false);
-
   const [leftActiveTab, setLeftActiveTab] = useState('problem');
   const [rightActiveTab, setRightActiveTab] = useState('code');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
-  // Persist results across reloads
   const [persistedResults, setPersistedResults] = useState<any[] | undefined>(undefined);
   const updateStatusMutation = useUpdateStatus(initialQuestion._id);
 
@@ -126,7 +113,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     setMounted(true);
   }, []);
 
-  // Load persisted results from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(`lastResult-${initialQuestion._id}`);
     if (stored) {
@@ -136,18 +122,14 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     }
   }, [initialQuestion._id]);
 
-  // Close full‑window on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullWindow) {
-        setIsFullWindow(false);
-      }
+      if (e.key === 'Escape' && isFullWindow) setIsFullWindow(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullWindow]);
 
-  // Fetch consolidated details
   const {
     data: details,
     isLoading: detailsLoading,
@@ -164,7 +146,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const runCodeMutation = useRunCode();
   const deleteQuestionMutation = useDeleteQuestion();
 
-  // Save results to localStorage and state when mutation succeeds
   useEffect(() => {
     if (runCodeMutation.data?.results) {
       const resultsToStore = runCodeMutation.data.results;
@@ -176,9 +157,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const handleMarkRevised = useCallback(async () => {
     try {
       await markRevisionMutation.mutateAsync();
-      queryClient.invalidateQueries({
-        queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'],
-      });
+      queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
     } catch (error) {
       console.error('Mark revision error:', error);
     }
@@ -187,69 +166,46 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const handleMarkSolved = useCallback(async () => {
     try {
       await updateStatusMutation.mutateAsync('Solved');
-      queryClient.invalidateQueries({
-        queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'],
-      });
+      queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
     } catch (error) {
       console.error('Mark solved error:', error);
     }
   }, [updateStatusMutation, queryClient, initialQuestion._id]);
 
-  const handleSaveNotes = useCallback(
-    async (notes: string, keyInsights: string) => {
-      try {
-        await saveNotesMutation.mutateAsync({ notes, keyInsights });
-        queryClient.invalidateQueries({
-          queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'],
-        });
-      } catch (error) {
-        console.error('Save notes error:', error);
-      }
-    },
-    [saveNotesMutation, queryClient, initialQuestion._id]
-  );
+  const handleSaveNotes = useCallback(async (notes: string, keyInsights: string) => {
+    try {
+      await saveNotesMutation.mutateAsync({ notes, keyInsights });
+      queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
+    } catch (error) {
+      console.error('Save notes error:', error);
+    }
+  }, [saveNotesMutation, queryClient, initialQuestion._id]);
 
-  const handleRunCode = useCallback(
-    async (code: string, language: string, testCases: Array<{ stdin: string; expected: string }>) => {
-      const sanitizedTestCases = testCases.map(({ stdin, expected }) => ({ stdin, expected }));
-      try {
-        await runCodeMutation.mutateAsync({
-          questionId: initialQuestion._id,
-          code,
-          language,
-          testCases: sanitizedTestCases,
-        });
-        // Invalidate and refetch details to get updated progress status
-        await queryClient.invalidateQueries({
-          queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'],
-        });
-        await queryClient.refetchQueries({
-          queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'],
-        });
-      } catch (error) {
-        console.error('Run code error:', error);
-      }
-    },
-    [initialQuestion._id, runCodeMutation, queryClient]
-  );
-
-  const handleLoadSavedCode = useCallback((code: string) => {
-    setEditorCode(code);
-    toast.success('Saved code loaded into editor');
-  }, []);
+  const handleRunCode = useCallback(async (code: string, language: string, testCases: Array<{ stdin: string; expected: string }>) => {
+    const sanitizedTestCases = testCases.map(({ stdin, expected }) => ({ stdin, expected }));
+    try {
+      await runCodeMutation.mutateAsync({
+        questionId: initialQuestion._id,
+        code,
+        language,
+        testCases: sanitizedTestCases,
+      });
+      await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
+      await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
+    } catch (error) {
+      console.error('Run code error:', error);
+    }
+  }, [initialQuestion._id, runCodeMutation, queryClient]);
 
   const handleEditQuestion = useCallback(() => {
     router.push(`/questions/${initialQuestion._id}/edit`);
   }, [initialQuestion._id, router]);
 
-  const handleDeleteClick = useCallback(() => {
-    setDeleteModalOpen(true);
-  }, []);
-
+  const handleDeleteClick = useCallback(() => setDeleteModalOpen(true), []);
   const handleConfirmDelete = useCallback(async () => {
     try {
       await deleteQuestionMutation.mutateAsync(initialQuestion._id);
-      toast.success('Question moved to deleted. You can restore it from the deleted page.');
+      toast.success('Question moved to deleted.');
       router.push('/questions');
     } catch (error) {
       toast.error('Failed to delete question.');
@@ -263,7 +219,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const defaultTestCases = initialQuestion.testCases || [];
   const initialCustomTestCases = progress?.customTestCases || [];
 
-  // Prepare original problem statement HTML
   const originalHtml = useMemo(() => {
     if (!initialQuestion.contentRef) return '';
     return prepareHtmlContent(initialQuestion.contentRef);
@@ -287,10 +242,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
   const userStatus = useMemo(() => {
     if (!isAuthenticated) return null;
-    if (detailsError) {
-      console.error('Details fetch error:', detailsError);
-      return 'Not Started';
-    }
+    if (detailsError) return 'Not Started';
     return progress?.status || 'Not Started';
   }, [progress, detailsError, isAuthenticated]);
 
@@ -313,8 +265,11 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     { id: 'revision', label: 'Revision Timeline' },
     { id: 'notes', label: 'Notes' },
   ];
+
   useTimeTracker(initialQuestion._id, isAuthenticated && mounted);
   const isLoading = detailsLoading && !details;
+
+  if (isLoading) return <QuestionDetailSkeleton />;
 
   return (
     <div className={isFullWindow ? styles.fullWindow : styles.page}>
@@ -358,34 +313,20 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
       {/* Metadata bar */}
       <div className={styles.metadataBar}>
-        <span className={styles.metadataItem}>
-          {initialQuestion.platform}
-        </span>
+        <span className={styles.metadataItem}>{initialQuestion.platform}</span>
         <span className={styles.badge} data-difficulty={initialQuestion.difficulty.toLowerCase()}>
           {initialQuestion.difficulty}
         </span>
         {progress?.personalDifficulty && (
-          <span className={styles.personalBadge}>
-            Personal: {progress.personalDifficulty}
-          </span>
+          <span className={styles.personalBadge}>Personal: {progress.personalDifficulty}</span>
         )}
         {initialQuestion.tags.map(tag => (
-          <span key={tag} className={styles.tag}>
-            #{tag}
-          </span>
+          <span key={tag} className={styles.tag}>#{tag}</span>
         ))}
         {initialQuestion.pattern?.map(p => (
-          <span key={p} className={styles.tag}>
-            {p}
-          </span>
+          <span key={p} className={styles.tag}>{p}</span>
         ))}
-        <a
-          href={initialQuestion.problemLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.linkIcon}
-          title={initialQuestion.problemLink}
-        >
+        <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.linkIcon}>
           🔗 Problem Link
         </a>
         {initialQuestion.solutionLinks?.length > 0 && (
@@ -393,16 +334,14 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             🔗 Solutions
             <select className={styles.solutionSelect}>
               {initialQuestion.solutionLinks.map((link, idx) => (
-                <option key={idx} value={link}>
-                  Solution {idx + 1}
-                </option>
+                <option key={idx} value={link}>Solution {idx + 1}</option>
               ))}
             </select>
           </span>
         )}
       </div>
 
-      {/* Progress Card (full width) */}
+      {/* Progress Card */}
       {mounted && isAuthenticated && (
         <div className={styles.progressCardWrapper}>
           <ProgressCard
@@ -423,30 +362,19 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         {/* LEFT COLUMN */}
         <div className={styles.leftColumn}>
           <div className={styles.problemStatement}>
-            <Tabs
-              tabs={leftTabs}
-              activeTab={leftActiveTab}
-              onChange={setLeftActiveTab}
-              variant="pills"
-            />
+            <Tabs tabs={leftTabs} activeTab={leftActiveTab} onChange={setLeftActiveTab} variant="pills" />
             <div className={styles.tabContent}>
               {leftActiveTab === 'problem' && (
                 <div className={styles.problemContent}>
                   {combinedHtml ? (
-                    <div
-                      className={styles.content}
-                      dangerouslySetInnerHTML={{ __html: combinedHtml }}
-                    />
+                    <div className={styles.content} dangerouslySetInnerHTML={{ __html: combinedHtml }} />
                   ) : (
                     <p className={styles.fallback}>Problem statement not available.</p>
                   )}
                 </div>
               )}
               {leftActiveTab === 'revision' && (
-                <RevisionTimelinePanel
-                  revision={revision}
-                  questionId={initialQuestion._id}
-                />
+                <LazyRevisionTimeline revision={revision} questionId={initialQuestion._id} />
               )}
               {leftActiveTab === 'notes' && (
                 <EditableNotes
@@ -459,9 +387,9 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
           </div>
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT COLUMN – Lazy loaded with Intersection Observer */}
         <div className={styles.rightColumn}>
-          <CodeExecutionArea
+          <LazyRightColumn
             questionId={initialQuestion._id}
             defaultTestCases={defaultTestCases}
             starterCodeByLanguage={starterCode}
@@ -482,11 +410,11 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
       <div className={styles.similarSection}>
         <SimilarQuestionsGrid
           questions={initialSimilarQuestions}
-          onViewAll={() => router.push(`/questions`)}
+          onViewAll={() => router.push('/questions')}
         />
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       <Modal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
@@ -497,12 +425,8 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         showCloseButton
         footer={
           <div className={styles.modalActions}>
-            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="error" onClick={handleConfirmDelete}>
-              Delete
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+            <Button variant="error" onClick={handleConfirmDelete}>Delete</Button>
           </div>
         }
       >

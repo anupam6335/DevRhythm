@@ -11,7 +11,6 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
 const { jobQueue } = require('../services/queue.service');
-const { generateFullRunner } = require('../services/codeRunnerGenerator.service');
 const revisionService = require('../services/revision.service');
 
 // generate a pattern name from tags
@@ -59,24 +58,63 @@ const searchLeetCodeQuestions = async (req, res, next) => {
 const getQuestions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
-    const { platform, difficulty, pattern, tags, search } = req.query;
-    const query = { isActive: true };
+    const { platform, difficulty, pattern, tags, search, status } = req.query;
+    
+    // Base query for active questions
+    let query = { isActive: true };
     if (platform) query.platform = platform;
     if (difficulty) query.difficulty = difficulty;
     if (pattern) query.pattern = pattern;
     if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
     if (search) query.$text = { $search: search };
 
-    // Apply sorting with default by createdAt descending
+    // If filtering by solved status, restrict to user's solved questions
+    if (status === 'solved' && req.user) {
+      const solvedProgress = await UserQuestionProgress.find({
+        userId: req.user._id,
+        status: { $in: ['Solved', 'Mastered'] }
+      }).select('questionId').lean();
+      
+      const solvedIds = solvedProgress.map(p => p.questionId);
+      if (solvedIds.length === 0) {
+        return res.json(formatResponse('Questions retrieved successfully', { questions: [] }, {
+          pagination: paginate(0, page, limit)
+        }));
+      }
+      query._id = { $in: solvedIds };
+    }
+
+    // Apply sorting
     let dbQuery = Question.find(query).skip(skip).limit(limit).select('-__v');
     dbQuery = applySorting(dbQuery, req.query, { createdAt: -1 });
 
     const [questions, total] = await Promise.all([
-      dbQuery,
+      dbQuery.lean(),
       Question.countDocuments(query)
     ]);
 
-    res.json(formatResponse('Questions retrieved successfully', { questions }, {
+    // Attach solved status (skip when status=solved because all are solved)
+    let solvedMap = new Map();
+    if (questions.length > 0 && req.user && status !== 'solved') {
+      const questionIds = questions.map(q => q._id);
+      const solvedProgress = await UserQuestionProgress.find({
+        userId: req.user._id,
+        questionId: { $in: questionIds },
+        status: { $in: ['Solved', 'Mastered'] }
+      }).select('questionId status').lean();
+
+      solvedMap = new Map(
+        solvedProgress.map(p => [p.questionId.toString(), p.status])
+      );
+    }
+
+    const enrichedQuestions = questions.map(q => ({
+      ...q,
+      isSolved: status === 'solved' ? true : solvedMap.has(q._id.toString()),
+      userStatus: status === 'solved' ? 'Solved' : (solvedMap.get(q._id.toString()) || null)
+    }));
+
+    res.json(formatResponse('Questions retrieved successfully', { questions: enrichedQuestions }, {
       pagination: paginate(total, page, limit)
     }));
   } catch (error) {
@@ -102,7 +140,7 @@ const fetchQuestionDetails = async (userId, questionId) => {
     activityLogs
   ] = await Promise.all([
     Question.findById(questionId)
-      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks similarQuestions contentRef testCases starterCode fullRunnerCode source createdBy isActive')
+      .select('title problemLink platform platformQuestionId difficulty tags pattern solutionLinks similarQuestions contentRef testCases starterCode source createdBy isActive')
       .lean(),
     UserQuestionProgress.findOne({ userId, questionId })
       .select('-__v')
@@ -223,7 +261,6 @@ const createQuestion = async (req, res, next) => {
     if (isManual) {
       req.body.source = 'manual';
       req.body.createdBy = req.user._id;
-      // Ensure contentRef and testCases are provided (validation already ensures)
       req.body.contentRef = contentRef;
       req.body.testCases = testCases;
     } else {
@@ -231,9 +268,18 @@ const createQuestion = async (req, res, next) => {
       req.body.createdBy = null;
     }
 
-    // Store starterCode if provided
+    // Filter starterCode to allowed languages
+    let filteredStarterCode = null;
     if (starterCode) {
-      req.body.starterCode = starterCode;
+      const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
+      filteredStarterCode = {};
+      for (const [lang, code] of Object.entries(starterCode)) {
+        const normalizedLang = lang.toLowerCase();
+        if (allowedLanguages.includes(normalizedLang)) {
+          filteredStarterCode[normalizedLang] = code;
+        }
+      }
+      req.body.starterCode = filteredStarterCode;
     }
 
     const question = await Question.create(req.body);
@@ -245,37 +291,30 @@ const createQuestion = async (req, res, next) => {
         if (problemUrl) {
           const details = await fetchProblemDetails(problemUrl);
           if (details.codeSnippets && Object.keys(details.codeSnippets).length > 0) {
-            question.starterCode = details.codeSnippets;
+            // Apply language filter on fetched snippets as well
+            const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
+            const filteredSnippets = {};
+            for (const [lang, code] of Object.entries(details.codeSnippets)) {
+              const normalizedLang = lang.toLowerCase();
+              if (allowedLanguages.includes(normalizedLang)) {
+                filteredSnippets[normalizedLang] = code;
+              }
+            }
+            question.starterCode = filteredSnippets;
             await question.save();
           }
         }
       } catch (fetchErr) {
         console.error('Failed to fetch starter code as fallback:', fetchErr.message);
-        // Non‑critical, continue
       }
     }
 
-    // 🔁 Extract test cases if contentRef exists and there are no test cases yet
+    // Extract test cases if contentRef exists and there are no test cases yet
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
       await jobQueue.add({
         type: 'question.extract_testcases',
         questionId: question._id
       });
-    }
-
-    // ✅ Generate full runner code only for manual questions (test cases exist immediately)
-    if (isManual && question.starterCode && question.testCases && question.testCases.length > 0) {
-      const fullRunners = {};
-      for (const [lang, stub] of Object.entries(question.starterCode)) {
-        try {
-          fullRunners[lang] = generateFullRunner(lang, stub, question.testCases);
-        } catch (err) {
-          console.error(`Failed to generate full runner for ${lang}:`, err.message);
-          fullRunners[lang] = stub; // fallback
-        }
-      }
-      question.fullRunnerCode = fullRunners;
-      await question.save();
     }
 
     // Create revision schedule (if needed)
@@ -335,26 +374,24 @@ const updateQuestion = async (req, res, next) => {
       allowedUpdates.pattern = pattern;
     }
 
+    // Filter starterCode languages if updated
+    if (allowedUpdates.starterCode) {
+      const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
+      const filteredCode = {};
+      for (const [lang, code] of Object.entries(allowedUpdates.starterCode)) {
+        const normalizedLang = lang.toLowerCase();
+        if (allowedLanguages.includes(normalizedLang)) {
+          filteredCode[normalizedLang] = code;
+        }
+      }
+      allowedUpdates.starterCode = filteredCode;
+    }
+
     const updatedQuestion = await Question.findByIdAndUpdate(
       id,
       allowedUpdates,
       { new: true, runValidators: true }
     ).select('-__v');
-
-    // Regenerate full runner code if testCases or starterCode changed
-    if ((allowedUpdates.testCases || allowedUpdates.starterCode) && updatedQuestion.starterCode && updatedQuestion.testCases && updatedQuestion.testCases.length > 0) {
-      const fullRunners = {};
-      for (const [lang, stub] of Object.entries(updatedQuestion.starterCode)) {
-        try {
-          fullRunners[lang] = generateFullRunner(lang, stub, updatedQuestion.testCases);
-        } catch (err) {
-          console.error(`Failed to generate full runner for ${lang}:`, err.message);
-          fullRunners[lang] = stub;
-        }
-      }
-      updatedQuestion.fullRunnerCode = fullRunners;
-      await updatedQuestion.save();
-    }
 
     await invalidateQuestionCache(updatedQuestion._id, updatedQuestion.platform, updatedQuestion.platformQuestionId);
 

@@ -55,11 +55,6 @@ const QuestionSchema = new mongoose.Schema({
     of: String,
     default: {}
   },
-  fullRunnerCode: {
-    type: Map,
-    of: String,
-    default: {}
-  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

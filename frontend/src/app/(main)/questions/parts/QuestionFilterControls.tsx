@@ -8,6 +8,7 @@ import {
   FiRepeat,
   FiTag,
   FiFilter,
+  FiCheckCircle,
 } from 'react-icons/fi';
 import SearchBar from '@/shared/components/SearchBar';
 import Select from '@/shared/components/Select';
@@ -22,6 +23,7 @@ export interface Filters {
   pattern: string;
   tags: string[];
   sort: string;
+  status: string; // new: '' or 'solved'
 }
 
 interface QuestionFilterControlsProps {
@@ -47,6 +49,10 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
 }) => {
   const handleDifficultyChange = (value: string) => {
     onFilterChange('difficulty', value === 'all' ? '' : value);
+  };
+
+  const handleStatusChange = (status: string) => {
+    onFilterChange('status', status === 'all' ? '' : status);
   };
 
   return (
@@ -100,6 +106,26 @@ export const QuestionFilterControls: React.FC<QuestionFilterControlsProps> = ({
               onClick={() => handleDifficultyChange(opt.value)}
             />
           ))}
+        </div>
+      </div>
+
+      {/* Solved Status chip */}
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <FiCheckCircle className={styles.sectionIcon} />
+          <span className={styles.sectionTitle}>Status</span>
+        </div>
+        <div className={styles.chipGroup}>
+          <FilterChip
+            label="All"
+            selected={!filters.status}
+            onClick={() => handleStatusChange('all')}
+          />
+          <FilterChip
+            label="Solved"
+            selected={filters.status === 'solved'}
+            onClick={() => handleStatusChange('solved')}
+          />
         </div>
       </div>
 
