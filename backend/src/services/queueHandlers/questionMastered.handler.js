@@ -53,6 +53,7 @@ const handleQuestionMastered = async (job) => {
           pattern.recentQuestions.unshift({
             questionProgressId: progressId,
             questionId,
+            platformQuestionId: question.platformQuestionId,
             title: question.title,
             problemLink: question.problemLink,
             platform: question.platform,

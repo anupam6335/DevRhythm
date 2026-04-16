@@ -97,6 +97,7 @@ const PatternMasterySchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Question'
     },
+    platformQuestionId: { type: String, trim: true },
     title: {
       type: String,
       trim: true

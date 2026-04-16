@@ -156,6 +156,7 @@ const updatePatternMasteryFromProgress = async (userId, questionProgressId) => {
       const recentQuestionsFormatted = recentQuestions.map(rq => ({
         questionProgressId: rq._id,
         questionId: rq.questionId._id,
+        platformQuestionId: rq.questionId.platformQuestionId, 
         title: rq.questionId.title,
         problemLink: rq.questionId.problemLink,
         platform: rq.questionId.platform,

@@ -169,12 +169,13 @@ const handleQuestionSolved = async (job) => {
         pattern.recentQuestions.unshift({
           questionProgressId: progressId,
           questionId,
+          platformQuestionId: question.platformQuestionId,
           title: question.title,
           problemLink: question.problemLink,
           platform: question.platform,
           difficulty: question.difficulty,
           solvedAt: solvedDate,
-          status: "Solved",
+          status: 'Solved',
           timeSpent,
         });
         if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
