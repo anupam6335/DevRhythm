@@ -64,6 +64,6 @@
 
 /* Optional: style the total card value */
 .stats > div:first-child div:last-child {
-  font-size: 2.25rem;
+  font-size: 1.7rem;
   font-weight: 600;
 }
