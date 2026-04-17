@@ -512,7 +512,7 @@
 
 @media (max-width: 767px) {
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 2fr);
     gap: 0.8rem;
   }
   .statCard {

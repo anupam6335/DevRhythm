@@ -329,7 +329,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
       {/* Stats grid */}
       <div className={styles.statsGrid}>
         <StatCard icon={<FiGrid />} value={totalPatternsCount} label="patterns" rotation="-0.5deg" />
-        <StatCard icon={<FiCheckCircle />} value={totalSolvedCount} label="solved" rotation="0.5deg" />
+        <StatCard icon={<FiCheckCircle />} value={totalSolvedCount} label="solved question" rotation="0.5deg" />
         <StatCard icon={<FiStar />} value={totalMasteredCount} label="mastered" rotation="-0.3deg" />
         <StatCard icon={<FiBarChart2 />} value={parseFloat(avgConfidence.toFixed(1))} label="avg confidence" rotation="0.3deg" />
       </div>
