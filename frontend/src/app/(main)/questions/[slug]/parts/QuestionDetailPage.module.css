@@ -223,6 +223,23 @@
   color: var(--text-primary);
 }
 
+.patternLink {
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  transition: background 0.2s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+.patternLink:hover {
+  background-color: var(--hover-surface);
+  color: var(--accent-moss);
+  border-color: var(--accent-moss);
+}
+
 .linkIcon {
   display: inline-flex;
   align-items: center;
