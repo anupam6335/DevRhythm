@@ -36,9 +36,9 @@
 /* Timeline container – the river */
 .timeline {
   position: relative;
-  margin-left: 20px;          /* space for the node and connector */
+  margin-left: 20px;
   border-left: 1px dashed var(--border);
-  padding-left: 24px;          /* space between river and content */
+  padding-left: 24px;
 }
 
 /* Each item */
@@ -50,8 +50,8 @@
 /* The node – positioned on the river line */
 .node {
   position: absolute;
-  left: -30px;                 /* half width + offset to center on border */
-  top: 0.15em;                 /* align with date text baseline */
+  left: -31px;
+  top: 0.15em;
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -90,7 +90,7 @@
 .connector {
   color: var(--text-muted);
   font-size: 1rem;
-  font-family: monospace;      /* ensures ╰─ displays correctly */
+  font-family: monospace;
   user-select: none;
 }
 

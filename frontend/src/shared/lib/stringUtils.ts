@@ -43,6 +43,14 @@ export const slugify = (text: string): string => {
     .replace(/^-+|-+$/g, ''); // trim leading/trailing hyphens
 };
 
+export function slugToPatternName(slug: string): string {
+  return slug
+    .replace(/-/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 /**
  * Capitalizes the first letter of a string.
  */

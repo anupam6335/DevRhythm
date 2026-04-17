@@ -1,6 +1,7 @@
 const PatternMastery = require('../models/PatternMastery');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
+const { slugify } = require('../utils/helpers/string');
 const { getStartOfDay, getDaysBetween } = require('../utils/helpers/date');
 
 /**
@@ -11,7 +12,6 @@ const { getStartOfDay, getDaysBetween } = require('../utils/helpers/date');
  */
 const calculatePatternStats = async (userId, patternName) => {
   try {
-    // Find all questions that have this pattern (pattern array contains patternName)
     const patternQuestions = await Question.find({ pattern: patternName }).distinct('_id');
     const progressRecords = await UserQuestionProgress.find({
       userId,
@@ -136,12 +136,10 @@ const updatePatternMasteryFromProgress = async (userId, questionProgressId) => {
 
     const updatedPatterns = [];
 
-    // Update each pattern associated with this question
     for (const patternName of patterns) {
       const stats = await calculatePatternStats(userId, patternName);
       if (!stats) continue;
 
-      // Get recent questions for this pattern (up to 5)
       const patternQuestions = await Question.find({ pattern: patternName }).distinct('_id');
       const recentQuestions = await UserQuestionProgress.find({
         userId,
@@ -167,9 +165,11 @@ const updatePatternMasteryFromProgress = async (userId, questionProgressId) => {
       }));
 
       const lastPracticed = recentQuestionsFormatted[0]?.solvedAt || new Date();
+      const patternSlug = slugify(patternName);
 
       const updateData = {
         ...stats,
+        patternSlug,
         lastPracticed,
         lastUpdated: new Date(),
         recentQuestions: recentQuestionsFormatted
@@ -200,7 +200,6 @@ const updatePatternMasteryFromProgress = async (userId, questionProgressId) => {
 const getPatternRecommendations = async (userId, limit = 5) => {
   try {
     const patterns = await PatternMastery.find({ userId }).lean();
-    // Get all distinct patterns from questions
     const allPatterns = await Question.distinct('pattern', { pattern: { $ne: [] } });
     
     const userPatterns = patterns.map(p => p.patternName);
@@ -208,7 +207,6 @@ const getPatternRecommendations = async (userId, limit = 5) => {
     
     const recommendations = [];
     
-    // Add weakest patterns from user's existing patterns
     patterns.sort((a, b) => a.confidenceLevel - b.confidenceLevel || a.masteryRate - b.masteryRate)
       .slice(0, limit)
       .forEach(pattern => {
@@ -222,7 +220,6 @@ const getPatternRecommendations = async (userId, limit = 5) => {
         });
       });
     
-    // Fill remaining slots with new patterns
     if (recommendations.length < limit && missingPatterns.length > 0) {
       missingPatterns.slice(0, limit - recommendations.length).forEach(pattern => {
         recommendations.push({
