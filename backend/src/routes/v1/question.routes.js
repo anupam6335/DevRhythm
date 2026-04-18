@@ -25,6 +25,13 @@ router.post('/fetch-leetcode',
   questionController.fetchLeetCodeQuestion
 );
 
+router.get('/daily',
+  auth,
+  rateLimiters.userLimiter,
+  questionController.getDailyProblemAndGoal
+);
+
+
 router.get('/', auth, rateLimiters.userLimiter, cache(300, 'questions:list'), validate(questionValidator.getQuestions, 'query'), questionController.getQuestions);
 router.get('/patterns', auth, rateLimiters.userLimiter, cache(1800, 'questions:patterns'), questionController.getPatterns);
 router.get('/tags', auth, rateLimiters.userLimiter, cache(1800, 'questions:tags'), questionController.getTags);
