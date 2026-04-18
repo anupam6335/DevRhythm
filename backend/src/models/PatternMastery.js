@@ -29,6 +29,12 @@ const PatternMasterySchema = new mongoose.Schema({
     trim: true,
     index: true
   },
+  patternSlug: {
+    type: String,
+    required: true,
+    unique: false, 
+    trim: true
+  },
   solvedCount: {
     type: Number,
     default: 0,
@@ -97,6 +103,7 @@ const PatternMasterySchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Question'
     },
+    platformQuestionId: { type: String, trim: true },
     title: {
       type: String,
       trim: true
@@ -181,6 +188,7 @@ const PatternMasterySchema = new mongoose.Schema({
   strict: 'throw'
 });
 
+PatternMasterySchema.index({ userId: 1, patternSlug: 1 }, { unique: true });
 PatternMasterySchema.index({ userId: 1, patternName: 1 }, { unique: true });
 PatternMasterySchema.index({ userId: 1, confidenceLevel: -1 });
 PatternMasterySchema.index({ userId: 1, masteryRate: -1 });

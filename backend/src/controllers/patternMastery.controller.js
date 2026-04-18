@@ -5,6 +5,7 @@ const Question = require('../models/Question');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { getStartOfDay, getEndOfDay, getDaysBetween } = require('../utils/helpers/date');
+const { slugify } = require('../utils/helpers/string');
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 
@@ -32,10 +33,28 @@ const getPatternMasteryList = async (req, res, next) => {
 
 const getPatternMastery = async (req, res, next) => {
   try {
-    const pattern = await PatternMastery.findOne({
+    // Get the raw pattern name from the URL parameter
+    let rawPatternName = req.params.patternName;
+    if (!rawPatternName) {
+      throw new AppError('Pattern name is required', 400);
+    }
+    
+    // Convert to slug for database lookup
+    const patternSlug = slugify(rawPatternName);
+    
+    // Find by slug (or fallback to patternName for backward compatibility)
+    let pattern = await PatternMastery.findOne({
       userId: req.user._id,
-      patternName: req.params.patternName
+      patternSlug: patternSlug
     }).lean();
+    
+    // If not found by slug, try by exact patternName (for old data without slug)
+    if (!pattern) {
+      pattern = await PatternMastery.findOne({
+        userId: req.user._id,
+        patternName: rawPatternName
+      }).lean();
+    }
     
     if (!pattern) throw new AppError('Pattern mastery not found', 404);
     
@@ -188,6 +207,7 @@ const syncPatternMastery = async (userId, questionProgress) => {
       patternMastery = new PatternMastery({
         userId,
         patternName,
+        patternSlug: slugify(patternName),
         solvedCount: 0,
         masteredCount: 0,
         totalAttempts: 0,
@@ -235,6 +255,7 @@ const syncPatternMastery = async (userId, questionProgress) => {
     console.error('Pattern mastery sync error:', error);
   }
 };
+
 /**
  * GET /api/v1/users/:userId/pattern-mastery
  * Public – returns pattern mastery data for a specific user (paginated)
@@ -244,30 +265,15 @@ const getUserPatternMastery = async (req, res, next) => {
     const { userId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const sort = req.query.sort || '-confidenceLevel'; // default sort by confidence
+    const sort = req.query.sort || '-confidenceLevel';
     const skip = (page - 1) * limit;
 
-    // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new AppError('Invalid user ID', 400);
     }
 
-    // Optional: check if the target user's profile is public
-    // (You can implement a privacy setting on the User model)
-    // const targetUser = await User.findById(userId).select('privacy');
-    // if (!targetUser) throw new AppError('User not found', 404);
-    // const isOwner = req.user && req.user._id.toString() === userId;
-    // if (!isOwner && targetUser.privacy === 'private') {
-    //   throw new AppError('This user\'s patterns are private', 403);
-    // }
-
-    // Build query
     const query = { userId };
 
-    // If you have a visibility field on PatternMastery, filter here
-    // if (!isOwner) query.visibility = 'public';
-
-    // Execute
     const [patterns, total] = await Promise.all([
       PatternMastery.find(query)
         .sort(sort)

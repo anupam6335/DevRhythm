@@ -118,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Link href={ROUTES.QUESTIONS.ROOT} className={styles.dropdownItem}>
                     Browse all questions
                   </Link>
-                  <Link href={ROUTES.QUESTIONS.PATTERNS} className={styles.dropdownItem}>
+                  <Link href={ROUTES.PATTERNS.ROOT} className={styles.dropdownItem}>
                     Patterns
                   </Link>
                   <Link href={ROUTES.QUESTIONS.TAGS} className={styles.dropdownItem}>

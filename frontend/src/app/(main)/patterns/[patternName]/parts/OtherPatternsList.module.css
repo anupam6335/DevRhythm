@@ -1,0 +1,107 @@
+.container {
+  margin: 2rem 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 400;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  height: 100%;
+}
+
+.otherCard {
+  height: 100%;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+.cardName {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  /* Truncate long pattern names */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardMastery {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.masteryValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-moss);
+}
+
+.masteryLabel {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .title {
+    font-size: 1.3rem;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .otherCard {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+    align-items: center;
+  }
+  .cardName {
+    margin-bottom: 0;
+  }
+}

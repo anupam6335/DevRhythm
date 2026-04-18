@@ -1,0 +1,124 @@
+.header {
+  text-align: right;
+  min-width: 0;
+}
+
+/* Abbreviated name – multi‑line, right‑aligned, up to 10rem */
+.abbreviatedName {
+  font-family: 'Playfair Display';
+  font-size: clamp(4rem, 10vw, 10rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.abbrLine1,
+.abbrLine2 {
+  display: block;
+}
+
+/* Full name below abbreviation */
+.fullName {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+  text-align: right;
+}
+
+/* For non‑abbreviated two‑line pattern name */
+.patternName {
+  font-family: 'Playfair Display';
+  font-size: clamp(2rem, 6vw, 8rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.line1,
+.line2 {
+  display: block;
+  overflow-wrap: break-word;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.masteryBadge {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 0.25rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 30px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.trendUp {
+  background: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+}
+.trendDown {
+  background: rgba(211, 47, 47, 0.1);
+  color: #d32f2f;
+}
+.trendNeutral {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .header {
+    text-align: left;
+  }
+  .badgeRow {
+    justify-content: flex-start;
+  }
+  .abbreviatedName {
+    align-items: flex-start;
+    font-size: clamp(3rem, 12vw, 8rem);
+  }
+  .fullName {
+    text-align: left;
+  }
+  .patternName {
+    font-size: clamp(1.8rem, 7vw, 3.5rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .abbreviatedName {
+    font-size: clamp(2rem, 10vw, 6rem);
+  }
+  .patternName {
+    font-size: clamp(1.5rem, 8vw, 2.5rem);
+  }
+  .fullName {
+    font-size: 0.8rem;
+  }
+}

@@ -70,5 +70,12 @@ export const patternMasteryService = {
     const query = buildQueryString(params);
     const response = await apiClient.get<PatternMasteryListResponse>(`/users/${userId}/pattern-mastery${query}`);
     return response.data;
-  }
+  },
+
+  async getPatternMasteryByName(patternName: string) {
+    const response = await apiClient.get<{ pattern: PatternMastery }>(
+      `/pattern-mastery/${encodeURIComponent(patternName)}`
+    );
+    return response.data.pattern;
+  },
 };

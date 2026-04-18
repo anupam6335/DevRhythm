@@ -1,0 +1,66 @@
+
+.container {
+  padding: 1.5rem 0;
+  width: 100%;
+}
+
+/* Hero: 60% / 40% split, no backgrounds */
+.hero {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: stretch;
+}
+
+.metricsWrapper {
+  flex: 6; /* 60% */
+}
+
+.nameWrapper {
+  flex: 4;
+  min-width: 0; 
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Skeleton placeholders */
+.metricsSkeleton {
+  height: 380px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+}
+
+.headerSkeleton {
+  height: 200px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+}
+
+.listSkeleton {
+  height: 300px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.gridSkeleton {
+  height: 200px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .hero {
+    flex-direction: column-reverse;
+    gap: 1.5rem;
+  }
+  .metricsWrapper,
+  .nameWrapper {
+    flex: auto;
+    width: 100%;
+  }
+}

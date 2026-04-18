@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import Breadcrumb from '@/shared/components/Breadcrumb';
+import SkeletonLoader from '@/shared/components/SkeletonLoader'; // <-- add import
 import { questionServiceServer } from '@/features/question/services/questionService.server';
 import { QuestionDetailPageClient } from './parts/QuestionDetailPageClient';
 import NotFoundPage from '@/shared/components/NotFoundPage';
@@ -33,6 +34,18 @@ const breadcrumbItems = (questionTitle: string) => [
   { label: questionTitle },
 ];
 
+// Skeleton component for better UX
+function QuestionPageSkeleton() {
+  return (
+    <div className="devRhythmContainer" style={{ paddingTop: '2rem' }}>
+      <SkeletonLoader variant="text" width="30%" height={24} style={{ marginBottom: '1rem' }} />
+      <SkeletonLoader variant="text" width="80%" height={40} style={{ marginBottom: '1rem' }} />
+      <SkeletonLoader variant="text" width="100%" height={20} count={3} style={{ marginBottom: '1rem' }} />
+      <SkeletonLoader variant="custom" height={400} width="100%" />
+    </div>
+  );
+}
+
 export default async function QuestionDetailPage({ params }: PageProps) {
   const { slug } = await params;
   try {
@@ -49,7 +62,7 @@ export default async function QuestionDetailPage({ params }: PageProps) {
             </Link>
           )}
         />
-        <Suspense fallback={<div>Loading question...</div>}>
+        <Suspense fallback={<QuestionPageSkeleton />}>
           <QuestionDetailPageClient
             initialQuestion={question}
             initialSimilarQuestions={similarQuestions}

@@ -78,8 +78,8 @@ export interface PatternRecentQuestion {
   solvedAt: ISODateString;
   status: 'Solved' | 'Mastered';
   timeSpent?: number;
+  platformQuestionId?: string;
 }
-
 /** Daily data inside HeatmapData */
 export interface HeatmapDailyData {
   date: ISODateString;

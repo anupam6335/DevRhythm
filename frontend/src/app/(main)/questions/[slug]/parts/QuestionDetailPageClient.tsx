@@ -11,7 +11,7 @@ import { useDeleteQuestion } from '@/features/question/hooks/useDeleteQuestion';
 import { useQuestionDetails } from '@/features/question/hooks/useQuestionDetails';
 import { useUpdateStatus } from '@/features/progress/hooks/useUpdateStatus';
 import { useTimeTracker } from '@/features/revision/hooks/useTimeTracker';
-import { questionsKeys } from '@/shared/lib';
+import { questionsKeys, slugify } from '@/shared/lib';
 import Button from '@/shared/components/Button';
 import Tabs from '@/shared/components/Tabs';
 import Modal from '@/shared/components/Modal';
@@ -25,6 +25,7 @@ import { QuestionDetailSkeleton } from './QuestionDetailSkeleton';
 import { LazyRightColumn } from './LazyRightColumn';
 import { LazyRevisionTimeline } from './LazyRevisionTimeline';
 import styles from './QuestionDetailPage.module.css';
+import Link from 'next/link';
 
 interface QuestionDetailPageClientProps {
   initialQuestion: Question;
@@ -324,8 +325,11 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
           <span key={tag} className={styles.tag}>#{tag}</span>
         ))}
         {initialQuestion.pattern?.map(p => (
-          <span key={p} className={styles.tag}>{p}</span>
+          <Link key={p} href={`/patterns/${slugify(p)}`} className={styles.patternLink}>
+            {p}
+          </Link>
         ))}
+
         <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.linkIcon}>
           🔗 Problem Link
         </a>
