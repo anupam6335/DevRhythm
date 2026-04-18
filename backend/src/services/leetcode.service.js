@@ -165,7 +165,80 @@ const searchProblems = async (query, filterType = 'name') => {
   }
 };
 
+/**
+ * Fetch today's LeetCode Problem of the Day.
+ * Cached for 24 hours.
+ */
+const getDailyProblem = async () => {
+  const cacheKey = 'leetcode:daily';
+  // Try to get from cache
+  if (redisClient) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (err) {
+      console.warn('Redis cache read error for daily problem:', err.message);
+    }
+  }
+
+  const query = `
+    query questionOfToday {
+      activeDailyCodingChallengeQuestion {
+        date
+        userStatus
+        link
+        question {
+          title
+          titleSlug
+          difficulty
+          content
+          topicTags {
+            name
+          }
+          codeSnippets {
+            lang
+            code
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await axios.post(LEETCODE_GRAPHQL_URL, { query });
+  const daily = response.data?.data?.activeDailyCodingChallengeQuestion;
+  if (!daily) {
+    throw new Error('No daily problem found on LeetCode');
+  }
+
+  const result = {
+    date: daily.date,
+    title: daily.question.title,
+    titleSlug: daily.question.titleSlug,
+    difficulty: daily.question.difficulty,
+    link: `https://leetcode.com${daily.link}`,
+    tags: daily.question.topicTags.map(t => t.name),
+    codeSnippets: daily.question.codeSnippets.reduce((acc, snippet) => {
+      acc[snippet.lang] = snippet.code;
+      return acc;
+    }, {})
+  };
+
+  // Cache for 24 hours (86400 seconds)
+  if (redisClient) {
+    try {
+      await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));
+    } catch (err) {
+      console.warn('Redis cache write error for daily problem:', err.message);
+    }
+  }
+
+  return result;
+};
+
 module.exports = {
   fetchProblemDetails,
   searchProblems,
+  getDailyProblem,
 };

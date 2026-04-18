@@ -1,4 +1,5 @@
 const Question = require('../models/Question');
+const Goal = require('../models/Goal');  
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const CodeExecutionHistory = require('../models/CodeExecutionHistory');
@@ -584,6 +585,64 @@ const getStatistics = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+
+/**
+ * GET /api/v1/questions/daily
+ * Returns LeetCode Problem of the Day, user's daily goal for today, and current/longest streak.
+ */
+const getDailyProblemAndGoal = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    // 1. Get user's current and max streak directly from the user object (already populated by auth middleware)
+    const currentStreak = req.user.streak.current;
+    const longestStreak = req.user.streak.longest;
+
+    // 2. Get today's daily goal (if any)
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const dailyGoal = await Goal.findOne({
+      userId,
+      goalType: 'daily',
+      startDate: { $lte: startOfDay },
+      endDate: { $gte: endOfDay },
+      status: 'active'
+    }).lean();
+
+    const todayGoal = dailyGoal ? {
+      targetCount: dailyGoal.targetCount,
+      completedCount: dailyGoal.completedCount,
+      completionPercentage: dailyGoal.completionPercentage,
+      status: dailyGoal.status
+    } : null;
+
+    // 3. Fetch LeetCode daily problem (cached)
+    let dailyProblem = null;
+    try {
+      dailyProblem = await require('../services/leetcode.service').getDailyProblem();
+    } catch (error) {
+      console.error('Failed to fetch LeetCode daily problem:', error.message);
+      // Continue without daily problem, but still return streak and goal
+    }
+
+    const responseData = {
+      dailyProblem: dailyProblem || null,
+      todayGoal,
+      currentStreak,
+      longestStreak,
+    };
+
+    res.json(formatResponse('Daily problem and goal retrieved successfully', responseData));
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   getQuestions,
   getQuestionById,
@@ -602,4 +661,5 @@ module.exports = {
   getStatistics,
   fetchLeetCodeQuestion,
   searchLeetCodeQuestions,
+  getDailyProblemAndGoal, 
 };
