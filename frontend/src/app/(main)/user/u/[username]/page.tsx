@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
   // If authenticated and the URL username matches the logged-in user's username
   if (user && user.username === username) {
     return {
-      title: `${user.displayName} (@${user.username}) · My Profile · ${SITE_NAME}`,
+      title: `${user.displayName} · My Profile · ${SITE_NAME}`,
       robots: 'noindex, nofollow', // Private page – do not index
       alternates: {
         canonical: `${SITE_URL}/user/u/${username}`,
