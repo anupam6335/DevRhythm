@@ -29,7 +29,17 @@ router.post('/:questionId/time-spent', auth, rateLimiters.revisionCompleteLimite
 router.put('/:revisionId/reschedule', auth, rateLimiters.progressUpdateLimiter, validate(progressValidator.rescheduleRevision, 'body'), revisionController.rescheduleRevision);
 router.delete('/:revisionId', auth, rateLimiters.progressUpdateLimiter, revisionController.deleteRevision);
 router.delete('/question/:questionId', auth, rateLimiters.progressUpdateLimiter, revisionController.deleteQuestionRevision);
-router.get('/stats', auth, rateLimiters.userLimiter, cache(60, 'revisions:stats'), revisionController.getRevisionStats);
+router.get('/stats',
+  auth,
+  rateLimiters.userLimiter,
+  cache(60, 'revisions:stats'),
+  (req, res, next) => {
+    if (req.query.detailed === 'true') {
+      return revisionController.getDetailedRevisionStats(req, res, next);
+    }
+    return revisionController.getRevisionStats(req, res, next);
+  }
+);
 router.get('/overdue', auth, rateLimiters.userLimiter, cache(30, 'revisions:overdue'), validate(progressValidator.getOverdue, 'query'), revisionController.getOverdueRevisions);
 
 module.exports = router;

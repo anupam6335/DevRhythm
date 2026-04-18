@@ -41,11 +41,9 @@ const getRevisions = async (req, res, next) => {
       RevisionSchedule.countDocuments(query),
     ]);
     
-    // Enhance revisions with status label for current pending revision
     const enhancedRevisions = revisions.map(rev => {
       const revObj = rev.toObject();
       revObj.currentStatus = revisionService.getRevisionStatusLabel(rev);
-      // Also provide status for each scheduled date if needed
       revObj.scheduleStatuses = rev.schedule.map((date, idx) => ({
         date,
         status: revisionService.getRevisionStatusLabel(rev, idx)
@@ -166,7 +164,6 @@ const getUpcomingRevisions = async (req, res, next) => {
     
     const stats = await revisionService.calculateUpcomingStats(req.user._id, startDate, endDate);
     
-    // For upcoming endpoint, we already have status implied (Upcoming) but we can add it
     upcoming.forEach(group => {
       group.questions = group.questions.map(q => ({
         ...q,
@@ -265,7 +262,6 @@ const createRevision = async (req, res, next) => {
       throw new AppError('Question not found', 404);
     }
 
-    // Ensure the user has solved the question before creating a revision schedule
     const progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -314,22 +310,29 @@ const createRevision = async (req, res, next) => {
 const completeRevision = async (req, res, next) => {
   try {
     const { revisionId } = req.params;
+    const skipOverdue = req.query.skipOverdue === 'true';
+    const allowOverdue = req.query.overdue === 'true';
+
     const revision = await RevisionSchedule.findOne({ _id: revisionId, userId: req.user._id });
     if (!revision) throw new AppError('Revision schedule not found', 404);
-    
-    const today = new Date();
+
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       revision.questionId,
-      today,
-      'manual'
+      new Date(),
+      'manual',
+      { skipOverdue, allowOverdue }
     );
-    
+
     if (!result.completed) {
       throw new AppError(result.message, 400);
     }
-    
-    res.json(formatResponse(result.message, { revisionCompleted: true }));
+
+    res.json(formatResponse(result.message, {
+      revisionCompleted: true,
+      overdueCompleted: result.overdueCompleted || false,
+      skippedCount: result.skippedCount || 0
+    }));
   } catch (error) {
     next(error);
   }
@@ -338,19 +341,26 @@ const completeRevision = async (req, res, next) => {
 const completeQuestionRevision = async (req, res, next) => {
   try {
     const { questionId } = req.params;
-    const today = new Date();
+    const skipOverdue = req.query.skipOverdue === 'true';
+    const allowOverdue = req.query.overdue === 'true';
+
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
-      today,
-      'manual'
+      new Date(),
+      'manual',
+      { skipOverdue, allowOverdue }
     );
-    
+
     if (!result.completed) {
       throw new AppError(result.message, 400);
     }
-    
-    res.json(formatResponse(result.message, { revisionCompleted: true }));
+
+    res.json(formatResponse(result.message, {
+      revisionCompleted: true,
+      overdueCompleted: result.overdueCompleted || false,
+      skippedCount: result.skippedCount || 0
+    }));
   } catch (error) {
     next(error);
   }
@@ -362,37 +372,30 @@ const recordTimeSpent = async (req, res, next) => {
     const { minutes } = req.body;
     const today = new Date();
 
-    // 1. Record time in Redis
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    // 2. Update UserQuestionProgress – WITHOUT affecting attempt count
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
     });
 
     if (!progress) {
-      // Create new progress record – no attempt fields are set
       progress = new UserQuestionProgress({
         userId: req.user._id,
         questionId,
         totalTimeSpent: minutes,
-        status: 'Not Started',   // will be updated below if minutes >= 20
-        // attempts object is left with default values (count: 0, no dates)
+        status: 'Not Started',
       });
     } else {
-      // Only add time – do not touch attempts
       progress.totalTimeSpent += minutes;
     }
 
-    // If total time reaches 20 minutes and status is still 'Not Started', mark as 'Attempted'
     if (progress.totalTimeSpent >= 20 && progress.status === 'Not Started') {
       progress.status = 'Attempted';
     }
 
     await progress.save();
 
-    // 3. Create revision schedule if total time >= 20 AND no schedule exists
     const existingRevision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId
@@ -415,7 +418,6 @@ const recordTimeSpent = async (req, res, next) => {
       await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     }
 
-    // 4. Check if revision can be completed (existing logic)
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
@@ -450,23 +452,16 @@ const rescheduleRevision = async (req, res, next) => {
       throw new AppError('Revision schedule not found', 404);
     }
     
-    // --- NEW VALIDATION: Only allow rescheduling if the current pending due date is today ---
-    // If revision is completed, cannot reschedule
     if (revision.status === 'completed') {
       throw new AppError('Cannot reschedule a completed revision schedule.', 400);
     }
     
-    // Get the current due date (the one the user should be working on)
     const currentDueDate = revision.schedule[revision.currentRevisionIndex];
     
     if (!isToday(currentDueDate)) {
       throw new AppError('Revisions can only be rescheduled on their scheduled due date.', 400);
     }
     
-    // Optional: Prevent rescheduling past due dates that are already overdue
-    // Already handled above (if not today, cannot reschedule)
-    
-    // Proceed with rescheduling
     revision.schedule[revisionIndex] = new Date(newDate);
     revision.updatedAt = new Date();
     
@@ -566,7 +561,7 @@ const getOverdueRevisions = async (req, res, next) => {
     
     const enhancedRevisions = revisions.map(rev => {
       const revObj = rev.toObject();
-      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev); // Will be 'Overdue'
+      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev);
       return revObj;
     });
     
@@ -575,6 +570,15 @@ const getOverdueRevisions = async (req, res, next) => {
     }, {
       pagination: paginate(total, page, limit),
     }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getDetailedRevisionStats = async (req, res, next) => {
+  try {
+    const stats = await revisionService.getDetailedRevisionStats(req.user._id);
+    res.json(formatResponse('Detailed revision statistics retrieved', { stats }));
   } catch (error) {
     next(error);
   }
@@ -595,5 +599,6 @@ module.exports = {
   deleteQuestionRevision,
   getRevisionStats,
   getOverdueRevisions,
+  getDetailedRevisionStats,
   calculateSpacedRepetitionSchedule,
 };
