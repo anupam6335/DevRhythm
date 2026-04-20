@@ -1,0 +1,116 @@
+.container {
+  padding: 1.5rem 0;
+}
+.heroStats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.heroCard {
+  flex: 1;
+  height: 100px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+.twoColumnCore {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.funnelSkeleton, .quickStatsSkeleton {
+  flex: 1;
+  height: 280px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+.rhythmSkeleton {
+  margin-bottom: 2rem;
+}
+.rhythmHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.tabsSkeleton {
+  display: flex;
+  gap: 0.5rem;
+}
+.graphsRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.graphSkeleton {
+  flex: 1;
+  height: 180px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+.heatmapSkeleton {
+  height: 200px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+.wisdomBoard {
+  display: flex;
+  gap: 1.5rem;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+}
+.wisdomCard {
+  flex: 1;
+  height: 240px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+.actionStream {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+.actionColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.actionHeader {
+  height: 48px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+.actionItem {
+  height: 80px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+.paginationSkeleton {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:0.5; }
+}
+@media (max-width: 939px) {
+  .twoColumnCore { flex-direction: column; }
+  .wisdomBoard { flex-direction: column; }
+  .actionStream { flex-direction: column; }
+}
+@media (max-width: 767px) {
+  .heroStats { flex-direction: column; }
+  .graphsRow { flex-direction: column; }
+}

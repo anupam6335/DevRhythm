@@ -3323,15 +3323,20 @@ const runCode = async (req, res, next) => {
 
       await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
 
+      // Automatically complete today's revision by skipping any overdue revisions
       const revisionResult = await revisionActivityService.checkAndCompleteRevision(
         req.user._id,
         questionId,
         new Date(),
-        'auto'
+        'auto',
+        { targetDate: new Date() }
       );
+
       if (revisionResult.completed) {
         responseData.revisionCompleted = true;
         responseData.revisionMessage = revisionResult.message;
+        responseData.revisionOutOfOrder = revisionResult.outOfOrder || false;
+        responseData.revisionOverdueCompleted = revisionResult.overdueCompleted || false;
       }
     }
 

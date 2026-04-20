@@ -1,5 +1,6 @@
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
+const UserQuestionProgress = require('../models/UserQuestionProgress');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('./queue.service');
@@ -30,82 +31,144 @@ const getRevisionActivity = async (userId, questionId, date) => {
   };
 };
 
-const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto') => {
+/**
+ * Complete a revision (or a specific revision by date) for a given question.
+ * @param {string} userId
+ * @param {string} questionId
+ * @param {Date} date - current date (used for overdue checks)
+ * @param {string} source - 'auto' or 'manual'
+ * @param {Object} options - { targetDate: Date, allowOverdue: boolean }
+ * @returns {Object} { completed: boolean, message: string, skippedCount: number, overdueCompleted: boolean }
+ */
+const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto', options = {}) => {
+  const { targetDate = null, allowOverdue = false } = options;
   const todayStart = getStartOfDay(date);
-  const todayEnd = getEndOfDay(date);
 
-  // Find active revision where today's date matches a pending scheduled date
   const revision = await RevisionSchedule.findOne({
     userId,
     questionId,
     status: 'active',
-    schedule: { $elemMatch: { $gte: todayStart, $lte: todayEnd } },
-    $expr: {
-      $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
-    },
   });
 
   if (!revision) {
-    return { completed: false, message: null };
+    return { completed: false, message: 'No active revision schedule found', skippedCount: 0 };
   }
 
-  // Additional safety: ensure the scheduled date for the current index is today
-  const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-  if (!isToday(scheduledDate)) {
-    // This should never happen due to query filter, but acts as a safeguard
-    return { completed: false, message: 'Revision cannot be completed on a date other than its scheduled due date.' };
+  // Determine which revision to complete
+  let targetIndex = null;
+  if (targetDate) {
+    const targetDayStart = getStartOfDay(targetDate);
+    // Find the index whose schedule date matches the target day
+    for (let i = 0; i < revision.schedule.length; i++) {
+      if (getStartOfDay(revision.schedule[i]).getTime() === targetDayStart.getTime()) {
+        targetIndex = i;
+        break;
+      }
+    }
+    if (targetIndex === null) {
+      return { completed: false, message: 'No revision scheduled for the given date', skippedCount: 0 };
+    }
+  } else {
+    // Default: complete the current pending revision
+    targetIndex = revision.currentRevisionIndex;
   }
 
-  // Check activity for today
-  const activity = await getRevisionActivity(userId, questionId, date);
-  const conditionsMet = activity.timeSpent > 20 || activity.codeSubmitted;
+  // Check if this revision is already completed
+  const alreadyCompleted = revision.completedRevisions.some(rev =>
+    getStartOfDay(rev.date).getTime() === getStartOfDay(revision.schedule[targetIndex]).getTime()
+  );
+  if (alreadyCompleted) {
+    return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
+  }
 
-  if (!conditionsMet && source === 'manual') {
+  const isOverdue = revision.schedule[targetIndex] < todayStart;
+
+  // For manual completion, check conditions (unless it's an auto completion from code submission)
+  if (source === 'manual' && targetIndex === revision.currentRevisionIndex) {
+    const activity = await getRevisionActivity(userId, questionId, date);
+    const conditionsMet = activity.timeSpent > 20 || activity.codeSubmitted;
+    if (!conditionsMet) {
+      return {
+        completed: false,
+        message: 'Please spend more than 20 minutes or submit code (all test cases must pass) before marking the revision as complete.',
+        skippedCount: 0
+      };
+    }
+  }
+
+  // If the target revision is overdue and allowOverdue is false, reject
+  if (isOverdue && !allowOverdue) {
     return {
       completed: false,
-      message: 'Please spend more than 20 minutes or submit code (all test cases must pass) before marking the revision as complete.',
+      message: 'This revision is overdue. Please add ?overdue=true to complete it.',
+      skippedCount: 0
     };
   }
 
-  if (conditionsMet) {
-    // Mark the revision as completed
-    revision.completedRevisions.push({
-      date: scheduledDate,
-      completedAt: new Date(),
-      status: 'completed',
-    });
+  // Get confidence after completion
+  const progress = await UserQuestionProgress.findOne({ userId, questionId });
+  const confidenceAfter = progress?.confidenceLevel || null;
+  const activity = await getRevisionActivity(userId, questionId, date);
 
-    if (revision.currentRevisionIndex < revision.schedule.length - 1) {
-      revision.currentRevisionIndex += 1;
+  // Push completed entry
+  const outOfOrder = (targetIndex !== revision.currentRevisionIndex);
+  revision.completedRevisions.push({
+    date: revision.schedule[targetIndex],
+    completedAt: new Date(),
+    status: 'completed',
+    timeSpent: activity.timeSpent,
+    confidenceAfter,
+    overdueCompleted: isOverdue,
+    skipped: false,
+    outOfOrder: outOfOrder
+  });
+
+  // If the completed revision is the current pending one, advance the index
+  if (targetIndex === revision.currentRevisionIndex) {
+    // Find the next pending revision (not already completed)
+    let nextIndex = revision.currentRevisionIndex + 1;
+    while (nextIndex < revision.schedule.length &&
+           revision.completedRevisions.some(rev => getStartOfDay(rev.date).getTime() === getStartOfDay(revision.schedule[nextIndex]).getTime())) {
+      nextIndex++;
+    }
+    if (nextIndex < revision.schedule.length) {
+      revision.currentRevisionIndex = nextIndex;
     } else {
       revision.status = 'completed';
     }
+  }
+  // If completed out of order, do not change currentRevisionIndex
 
-    revision.updatedAt = new Date();
-    await revision.save();
+  revision.updatedAt = new Date();
+  await revision.save();
 
-    // Emit event
-    if (jobQueue) {
-      await jobQueue.add({
-        type: 'revision.completed',
-        userId,
-        revisionId: revision._id,
-        questionId,
-        completedAt: new Date(),
-        revisionIndex: revision.currentRevisionIndex - 1,
-        status: 'completed',
-      });
-    }
-
-    await invalidateCache(`revisions:*:user:${userId}:*`);
-
-    return {
-      completed: true,
-      message: 'Great, your revision is done.',
-    };
+  // Emit event
+  const { jobQueue } = require('./queue.service');
+  if (jobQueue) {
+    await jobQueue.add({
+      type: 'revision.completed',
+      userId,
+      revisionId: revision._id,
+      questionId,
+      completedAt: new Date(),
+      revisionIndex: targetIndex,
+      status: 'completed',
+      overdueCompleted: isOverdue,
+      outOfOrder
+    });
   }
 
-  return { completed: false, message: null };
+  await invalidateCache(`revisions:*:user:${userId}:*`);
+
+  return {
+    completed: true,
+    message: outOfOrder
+      ? `Completed revision for ${getStartOfDay(revision.schedule[targetIndex]).toDateString()} (out of order).`
+      : 'Great, your revision is done.',
+    skippedCount: 0,
+    overdueCompleted: isOverdue,
+    outOfOrder
+  };
 };
 
 module.exports = {

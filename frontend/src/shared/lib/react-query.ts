@@ -62,6 +62,10 @@ export const revisionKeys = {
   overdue: (filters?: Record<string, any>) => [...revisionKeys.all, 'overdue', filters] as const,
   question: (questionId: string) => [...revisionKeys.all, 'question', questionId] as const,
   stats: () => [...revisionKeys.all, 'stats'] as const,
+  // New keys for dashboard
+  detailedStats: () => [...revisionKeys.all, 'detailed'] as const,
+  upcomingList: (page: number, limit: number) => [...revisionKeys.all, 'upcomingList', { page, limit }] as const,
+  overdueList: (page: number, limit: number) => [...revisionKeys.all, 'overdueList', { page, limit }] as const,
 };
 
 export const goalKeys = {

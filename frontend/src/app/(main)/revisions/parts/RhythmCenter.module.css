@@ -1,0 +1,177 @@
+.container {
+  margin-bottom: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.graphsRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.graphCard {
+  flex: 1;
+  min-width: 240px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 1rem;
+  transition: box-shadow 0.2s;
+}
+
+.graphCard h4 {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-secondary);
+}
+
+.svgWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.graphTooltip {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 2px 8px var(--shadow);
+  white-space: nowrap;
+}
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.xAxis span {
+  white-space: nowrap;
+}
+
+/* Compact heatmap – cells ~28px */
+.heatmapContainer {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.heatmapHeader {
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(50px, 50px));
+  gap: 4px;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .heatmapGrid {
+    grid-template-columns: repeat(7, minmax(24px, 24px));
+    gap: 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .heatmapGrid {
+    grid-template-columns: repeat(7, minmax(20px, 20px));
+    gap: 2px;
+  }
+}
+
+.heatmapCell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  position: relative;
+  transition: transform 0.1s ease;
+}
+
+.heatmapCell:hover {
+  transform: scale(1.05);
+  z-index: 2;
+}
+
+.cellLabel {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.confidenceDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+@media (max-width: 767px) {
+  .confidenceDot {
+    width: 4px;
+    height: 4px;
+    top: 1px;
+    right: 1px;
+  }
+  .cellLabel {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .confidenceDot {
+    width: 3px;
+    height: 3px;
+    top: 1px;
+    right: 1px;
+  }
+  .cellLabel {
+    font-size: 0.55rem;
+  }
+}
+
+/* Responsive graphs row */
+@media (max-width: 939px) {
+  .graphsRow {
+    flex-direction: column;
+  }
+  .graphCard {
+    width: 100%;
+  }
+}

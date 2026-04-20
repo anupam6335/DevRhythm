@@ -33,7 +33,7 @@ const getRevisions = async (req, res, next) => {
       RevisionSchedule.find(query)
         .populate({
           path: 'questionId',
-          select: 'title platform difficulty tags',
+          select: 'title platform difficulty tags platformQuestionId', 
         })
         .sort(sort)
         .skip(skip)
@@ -41,11 +41,9 @@ const getRevisions = async (req, res, next) => {
       RevisionSchedule.countDocuments(query),
     ]);
     
-    // Enhance revisions with status label for current pending revision
     const enhancedRevisions = revisions.map(rev => {
       const revObj = rev.toObject();
       revObj.currentStatus = revisionService.getRevisionStatusLabel(rev);
-      // Also provide status for each scheduled date if needed
       revObj.scheduleStatuses = rev.schedule.map((date, idx) => ({
         date,
         status: revisionService.getRevisionStatusLabel(rev, idx)
@@ -77,7 +75,7 @@ const getTodayRevisions = async (req, res, next) => {
       },
     }).populate({
       path: 'questionId',
-      select: 'title platform difficulty tags',
+      select: 'title platform difficulty tags platformQuestionId', 
     });
     
     const stats = await revisionService.calculateRevisionStats(req.user._id);
@@ -150,6 +148,7 @@ const getUpcomingRevisions = async (req, res, next) => {
               _id: '$_id',
               questionId: {
                 _id: '$question._id',
+                platformQuestionId: '$question.platformQuestionId', // ✅ added
                 title: '$question.title',
                 platform: '$question.platform',
                 difficulty: '$question.difficulty',
@@ -166,7 +165,6 @@ const getUpcomingRevisions = async (req, res, next) => {
     
     const stats = await revisionService.calculateUpcomingStats(req.user._id, startDate, endDate);
     
-    // For upcoming endpoint, we already have status implied (Upcoming) but we can add it
     upcoming.forEach(group => {
       group.questions = group.questions.map(q => ({
         ...q,
@@ -188,6 +186,9 @@ const getQuestionRevision = async (req, res, next) => {
     const revision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
+    }).populate({
+      path: 'questionId',
+      select: 'platformQuestionId title difficulty platform', 
     });
     
     if (!revision) {
@@ -218,6 +219,9 @@ const getQuestionRevisionByPlatform = async (req, res, next) => {
     const revision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: question._id,
+    }).populate({
+      path: 'questionId',
+      select: 'platformQuestionId title difficulty platform', 
     });
 
     if (!revision) throw new AppError('Revision schedule not found', 404);
@@ -265,7 +269,6 @@ const createRevision = async (req, res, next) => {
       throw new AppError('Question not found', 404);
     }
 
-    // Ensure the user has solved the question before creating a revision schedule
     const progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -314,22 +317,29 @@ const createRevision = async (req, res, next) => {
 const completeRevision = async (req, res, next) => {
   try {
     const { revisionId } = req.params;
+    const skipOverdue = req.query.skipOverdue === 'true';
+    const allowOverdue = req.query.overdue === 'true';
+
     const revision = await RevisionSchedule.findOne({ _id: revisionId, userId: req.user._id });
     if (!revision) throw new AppError('Revision schedule not found', 404);
-    
-    const today = new Date();
+
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       revision.questionId,
-      today,
-      'manual'
+      new Date(),
+      'manual',
+      { skipOverdue, allowOverdue }
     );
-    
+
     if (!result.completed) {
       throw new AppError(result.message, 400);
     }
-    
-    res.json(formatResponse(result.message, { revisionCompleted: true }));
+
+    res.json(formatResponse(result.message, {
+      revisionCompleted: true,
+      overdueCompleted: result.overdueCompleted || false,
+      skippedCount: result.skippedCount || 0
+    }));
   } catch (error) {
     next(error);
   }
@@ -338,19 +348,26 @@ const completeRevision = async (req, res, next) => {
 const completeQuestionRevision = async (req, res, next) => {
   try {
     const { questionId } = req.params;
-    const today = new Date();
+    const skipOverdue = req.query.skipOverdue === 'true';
+    const allowOverdue = req.query.overdue === 'true';
+
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
-      today,
-      'manual'
+      new Date(),
+      'manual',
+      { skipOverdue, allowOverdue }
     );
-    
+
     if (!result.completed) {
       throw new AppError(result.message, 400);
     }
-    
-    res.json(formatResponse(result.message, { revisionCompleted: true }));
+
+    res.json(formatResponse(result.message, {
+      revisionCompleted: true,
+      overdueCompleted: result.overdueCompleted || false,
+      skippedCount: result.skippedCount || 0
+    }));
   } catch (error) {
     next(error);
   }
@@ -362,37 +379,30 @@ const recordTimeSpent = async (req, res, next) => {
     const { minutes } = req.body;
     const today = new Date();
 
-    // 1. Record time in Redis
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    // 2. Update UserQuestionProgress – WITHOUT affecting attempt count
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
     });
 
     if (!progress) {
-      // Create new progress record – no attempt fields are set
       progress = new UserQuestionProgress({
         userId: req.user._id,
         questionId,
         totalTimeSpent: minutes,
-        status: 'Not Started',   // will be updated below if minutes >= 20
-        // attempts object is left with default values (count: 0, no dates)
+        status: 'Not Started',
       });
     } else {
-      // Only add time – do not touch attempts
       progress.totalTimeSpent += minutes;
     }
 
-    // If total time reaches 20 minutes and status is still 'Not Started', mark as 'Attempted'
     if (progress.totalTimeSpent >= 20 && progress.status === 'Not Started') {
       progress.status = 'Attempted';
     }
 
     await progress.save();
 
-    // 3. Create revision schedule if total time >= 20 AND no schedule exists
     const existingRevision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId
@@ -415,7 +425,6 @@ const recordTimeSpent = async (req, res, next) => {
       await invalidateCache(`revisions:*:user:${req.user._id}:*`);
     }
 
-    // 4. Check if revision can be completed (existing logic)
     const result = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
@@ -450,23 +459,16 @@ const rescheduleRevision = async (req, res, next) => {
       throw new AppError('Revision schedule not found', 404);
     }
     
-    // --- NEW VALIDATION: Only allow rescheduling if the current pending due date is today ---
-    // If revision is completed, cannot reschedule
     if (revision.status === 'completed') {
       throw new AppError('Cannot reschedule a completed revision schedule.', 400);
     }
     
-    // Get the current due date (the one the user should be working on)
     const currentDueDate = revision.schedule[revision.currentRevisionIndex];
     
     if (!isToday(currentDueDate)) {
       throw new AppError('Revisions can only be rescheduled on their scheduled due date.', 400);
     }
     
-    // Optional: Prevent rescheduling past due dates that are already overdue
-    // Already handled above (if not today, cannot reschedule)
-    
-    // Proceed with rescheduling
     revision.schedule[revisionIndex] = new Date(newDate);
     revision.updatedAt = new Date();
     
@@ -524,13 +526,121 @@ const deleteQuestionRevision = async (req, res, next) => {
   }
 };
 
+// Now accepts a limit parameter (default 50 for backward compatibility)
+const fetchOverdueRevisionsForStats = async (userId, limit = 50) => {
+  const todayStart = getStartOfDay();
+  const overdue = await RevisionSchedule.find({
+    userId,
+    status: 'active',
+    $expr: {
+      $and: [
+        { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, todayStart] },
+        { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] }
+      ]
+    }
+  })
+    .populate({
+      path: 'questionId',
+      select: '_id platformQuestionId title difficulty platform'
+    })
+    .sort({ 'schedule': 1 })
+    .limit(limit)   // ← limit applied here
+    .lean();
+
+  return overdue.map(rev => ({
+    questionId: rev.questionId?._id || null,
+    platformQuestionId: rev.questionId?.platformQuestionId || null,
+    title: rev.questionId?.title || 'Unknown',
+    difficulty: rev.questionId?.difficulty || null,
+    platform: rev.questionId?.platform || null,
+    currentRevisionIndex: rev.currentRevisionIndex,
+    nextRevisionDue: rev.schedule[rev.currentRevisionIndex] || null,
+    totalTimeSpent: rev.completedRevisions.reduce((sum, cr) => sum + (cr.timeSpent || 0), 0),
+    confidenceLevel: rev.completedRevisions.length
+      ? rev.completedRevisions[rev.completedRevisions.length - 1].confidenceAfter
+      : null,
+    status: 'overdue'
+  }));
+};
+
+
+// Now accepts a limit parameter (default 20 for backward compatibility)
+const fetchUpcomingRevisionsForStats = async (userId, limit = 20) => {
+  const startDate = getStartOfDay();
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + 30);
+  endDate.setHours(23, 59, 59, 999);
+
+  const upcoming = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
+    { $unwind: { path: '$schedule', includeArrayIndex: 'revisionIndex' } },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $gte: ['$schedule', startDate] },
+            { $lte: ['$schedule', endDate] },
+            { $eq: ['$revisionIndex', '$currentRevisionIndex'] }
+          ]
+        }
+      }
+    },
+    { $sort: { schedule: 1 } },
+    { $limit: limit },   // ← limit applied here
+    {
+      $lookup: {
+        from: 'questions',
+        localField: 'questionId',
+        foreignField: '_id',
+        as: 'question'
+      }
+    },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        questionId: '$question._id',
+        platformQuestionId: '$question.platformQuestionId',
+        title: '$question.title',
+        platform: '$question.platform',
+        difficulty: '$question.difficulty',
+        scheduledDate: '$schedule',
+        revisionIndex: '$revisionIndex',
+        status: 'Upcoming'
+      }
+    }
+  ]);
+  return upcoming;
+};
+
 const getRevisionStats = async (req, res, next) => {
   try {
-    const stats = await revisionService.calculateRevisionStats(req.user._id);
+    const detailed = req.query.detailed === 'true';
     
-    res.json(formatResponse('Revision statistics retrieved', {
-      stats,
-    }));
+    let stats;
+    if (detailed) {
+      // Get the full detailed stats (trends, byDifficulty, etc.)
+      stats = await revisionService.getDetailedRevisionStats(req.user._id);
+      
+      // Add limited overdue and upcoming revisions
+      const [overdueRevisions, upcomingRevisions] = await Promise.all([
+        fetchOverdueRevisionsForStats(req.user._id, 5),
+        fetchUpcomingRevisionsForStats(req.user._id, 5)
+      ]);
+      stats.overdueRevisions = overdueRevisions;
+      stats.upcomingRevisions = upcomingRevisions;
+      
+      // Optionally remove the old questionLevelDetails if you want to avoid duplication
+      // delete stats.questionLevelDetails;
+    } else {
+      // Basic stats only
+      stats = await revisionService.calculateRevisionStats(req.user._id);
+    }
+    
+    res.json(formatResponse(
+      detailed ? 'Detailed revision statistics retrieved' : 'Revision statistics retrieved',
+      { stats }
+    ));
   } catch (error) {
     next(error);
   }
@@ -556,7 +666,7 @@ const getOverdueRevisions = async (req, res, next) => {
       RevisionSchedule.find(query)
         .populate({
           path: 'questionId',
-          select: 'title platform difficulty tags',
+          select: 'title platform difficulty tags platformQuestionId', 
         })
         .sort({ schedule: 1 })
         .skip(skip)
@@ -566,7 +676,7 @@ const getOverdueRevisions = async (req, res, next) => {
     
     const enhancedRevisions = revisions.map(rev => {
       const revObj = rev.toObject();
-      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev); // Will be 'Overdue'
+      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev);
       return revObj;
     });
     
@@ -578,6 +688,12 @@ const getOverdueRevisions = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Kept for backward compatibility, but now redirects to getRevisionStats with detailed=true
+const getDetailedRevisionStats = async (req, res, next) => {
+  req.query.detailed = 'true';
+  return getRevisionStats(req, res, next);
 };
 
 module.exports = {
@@ -595,5 +711,8 @@ module.exports = {
   deleteQuestionRevision,
   getRevisionStats,
   getOverdueRevisions,
+  getDetailedRevisionStats,
   calculateSpacedRepetitionSchedule,
 };
+
+
