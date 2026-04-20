@@ -1,0 +1,37 @@
+.container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.compactStatCard {
+  padding: 0.5rem !important;
+  min-height: auto !important;
+}
+
+.compactStatCard :global(.icon) {
+  font-size: 1rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.compactStatCard :global(.value) {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+
+.compactStatCard :global(.label) {
+  font-size: 0.65rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 0.25rem !important;
+}
+
+/* Maintain 2 columns even on mobile */
+@media (max-width: 767px) {
+  .container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+}

@@ -1,8 +1,5 @@
 const RevisionSchedule = require('../models/RevisionSchedule');
-const Question = require('../models/Question');
-const UserQuestionProgress = require('../models/UserQuestionProgress');
-const { getStartOfDay, getEndOfDay, formatDate, getDaysBetween, isToday } = require('../utils/helpers/date');
-const mongoose = require('mongoose');
+const { getStartOfDay, getEndOfDay, isToday } = require('../utils/helpers/date');
 
 const calculateRevisionStats = async (userId) => {
   const todayStart = getStartOfDay();
@@ -10,7 +7,7 @@ const calculateRevisionStats = async (userId) => {
 
   const stats = await RevisionSchedule.aggregate([
     {
-      $match: { userId: new mongoose.Types.ObjectId(userId) },
+      $match: { userId },
     },
     {
       $facet: {
@@ -39,7 +36,7 @@ const calculateRevisionStats = async (userId) => {
         pendingToday: [
           {
             $match: {
-              userId: new mongoose.Types.ObjectId(userId),
+              userId,
               status: 'active',
               schedule: { $elemMatch: { $gte: todayStart, $lte: todayEnd } },
               $expr: {
@@ -52,7 +49,7 @@ const calculateRevisionStats = async (userId) => {
         pendingWeek: [
           {
             $match: {
-              userId: new mongoose.Types.ObjectId(userId),
+              userId,
               status: 'active',
               schedule: {
                 $elemMatch: {
@@ -143,7 +140,7 @@ const calculateUpcomingStats = async (userId, startDate, endDate) => {
   const stats = await RevisionSchedule.aggregate([
     {
       $match: {
-        userId: new mongoose.Types.ObjectId(userId),
+        userId,
         status: 'active',
       },
     },
@@ -189,45 +186,6 @@ const calculateUpcomingStats = async (userId, startDate, endDate) => {
   };
 };
 
-const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => {
-  const idx = index !== null ? index : revision.currentRevisionIndex;
-  
-  if (revision.status === 'completed') {
-    return 'Completed';
-  }
-
-  const isCompleted = revision.completedRevisions.some(cr => {
-    const crDate = new Date(cr.date);
-    const schDate = revision.schedule[idx];
-    return crDate.getTime() === schDate.getTime();
-  });
-
-  if (isCompleted) {
-    return 'Completed';
-  }
-
-  const dueDate = revision.schedule[idx];
-  const todayStart = getStartOfDay();
-
-  if (mode === 'display') {
-    if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate)) return 'Pending';
-    return 'Upcoming';
-  }
-
-  if (idx < revision.currentRevisionIndex) {
-    return 'Completed';
-  }
-
-  if (idx === revision.currentRevisionIndex) {
-    if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate)) return 'Pending';
-    return 'Upcoming';
-  }
-
-  return 'Upcoming';
-};
-
 const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null) => {
   const schedule = customSchedule || [1, 3, 7, 14, 30].map(days => {
     const date = new Date(baseDate);
@@ -249,39 +207,25 @@ const createRevisionSchedule = async (userId, questionId, baseDate, customSchedu
 
 const markRevisionComplete = async (revisionId, completedAt = new Date(), status = 'completed') => {
   const revision = await RevisionSchedule.findById(revisionId);
-
-  if (!revision) {
-    throw new Error('Revision schedule not found');
-  }
-
-  if (revision.currentRevisionIndex >= revision.schedule.length) {
-    throw new Error('All revisions already completed');
-  }
+  if (!revision) throw new Error('Revision schedule not found');
+  if (revision.currentRevisionIndex >= revision.schedule.length) throw new Error('All revisions already completed');
 
   const scheduledDate = revision.schedule[revision.currentRevisionIndex];
-
   revision.completedRevisions.push({
     date: scheduledDate,
     completedAt,
     status,
   });
-
   revision.currentRevisionIndex += 1;
-
-  if (revision.currentRevisionIndex >= revision.schedule.length) {
-    revision.status = 'completed';
-  }
-
+  if (revision.currentRevisionIndex >= revision.schedule.length) revision.status = 'completed';
   revision.updatedAt = new Date();
   await revision.save();
-
   return revision;
 };
 
 const getPendingRevisionsForDate = async (userId, date) => {
   const dateStart = getStartOfDay(date);
   const dateEnd = getEndOfDay(date);
-
   const pending = await RevisionSchedule.find({
     userId,
     schedule: { $elemMatch: { $gte: dateStart, $lte: dateEnd } },
@@ -290,13 +234,11 @@ const getPendingRevisionsForDate = async (userId, date) => {
       $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
     },
   }).populate('questionId');
-
   return pending;
 };
 
 const updateOverdueRevisions = async () => {
   const today = getStartOfDay();
-
   const result = await RevisionSchedule.updateMany(
     {
       status: 'active',
@@ -312,432 +254,254 @@ const updateOverdueRevisions = async () => {
       $set: { status: 'overdue', updatedAt: new Date() },
     }
   );
-
   return result.modifiedCount;
 };
 
-// ==================== Detailed Revision Stats ====================
+const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => {
+  const idx = index !== null ? index : revision.currentRevisionIndex;
+  if (revision.status === 'completed') return 'Completed';
+
+  const isCompleted = revision.completedRevisions.some(cr => {
+    const crDate = new Date(cr.date);
+    const schDate = revision.schedule[idx];
+    return crDate.getTime() === schDate.getTime();
+  });
+  if (isCompleted) return 'Completed';
+
+  const dueDate = revision.schedule[idx];
+  const todayStart = getStartOfDay();
+  if (mode === 'display') {
+    if (dueDate < todayStart) return 'Overdue';
+    if (isToday(dueDate)) return 'Pending';
+    return 'Upcoming';
+  }
+
+  if (idx < revision.currentRevisionIndex) return 'Completed';
+  if (idx === revision.currentRevisionIndex) {
+    if (dueDate < todayStart) return 'Overdue';
+    if (isToday(dueDate)) return 'Pending';
+    return 'Upcoming';
+  }
+  return 'Upcoming';
+};
 
 /**
- * Get detailed revision statistics for a user
- * @param {string} userId
- * @returns {Promise<Object>} Detailed stats object
+ * Get detailed revision statistics (trends, breakdowns, etc.)
  */
 const getDetailedRevisionStats = async (userId) => {
-  const objectId = new mongoose.Types.ObjectId(userId);
+  const baseStats = await calculateRevisionStats(userId);
 
-  // 1. Fetch all revision schedules for the user
-  const schedules = await RevisionSchedule.find({ userId: objectId })
-    .populate('questionId', 'title difficulty platform pattern platformQuestionId')
+  // ---------- 2. Trends (daily, weekly, monthly) ----------
+  const trends = await RevisionSchedule.aggregate([
+    { $match: { userId, status: { $in: ['active', 'completed'] } } },
+    { $unwind: '$completedRevisions' },
+    { $match: { 'completedRevisions.status': 'completed' } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedRevisions.completedAt' } },
+        completed: { $sum: 1 },
+        timeSpent: { $sum: '$completedRevisions.timeSpent' },
+        confidenceAfter: { $push: '$completedRevisions.confidenceAfter' }
+      }
+    },
+    { $sort: { _id: 1 } }
+  ]);
+
+  const dailyTrends = trends.map(day => ({
+    date: day._id,
+    completed: day.completed,
+    timeSpent: day.timeSpent,
+    avgConfidence: day.confidenceAfter.filter(c => c != null).length
+      ? (day.confidenceAfter.reduce((a,b) => a + b, 0) / day.confidenceAfter.filter(c => c != null).length).toFixed(1)
+      : null
+  }));
+
+  // Weekly & monthly (simplified – can be expanded as needed)
+  const weeklyTrends = [];
+  const monthlyTrends = [];
+
+  // ---------- 3. Overdue distribution ----------
+  const today = getStartOfDay();
+  const overdueSchedules = await RevisionSchedule.find({
+    userId,
+    status: 'active',
+    $expr: {
+      $and: [
+        { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, today] },
+        { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] }
+      ]
+    }
+  }).lean();
+
+  const distribution = { '1-3days': 0, '4-7days': 0, '8-14days': 0, '15-30days': 0, '30+days': 0 };
+  for (const rev of overdueSchedules) {
+    const dueDate = rev.schedule[rev.currentRevisionIndex];
+    const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+    if (daysOverdue <= 3) distribution['1-3days']++;
+    else if (daysOverdue <= 7) distribution['4-7days']++;
+    else if (daysOverdue <= 14) distribution['8-14days']++;
+    else if (daysOverdue <= 30) distribution['15-30days']++;
+    else distribution['30+days']++;
+  }
+
+  // ---------- 4. By difficulty, platform, pattern ----------
+  const allSchedules = await RevisionSchedule.find({ userId })
+    .populate('questionId', 'difficulty platform pattern')
     .lean();
 
-  if (!schedules.length) {
-    return {
-      summary: {
-        totalActiveSchedules: 0,
-        totalCompletedSchedules: 0,
-        totalOverdueSchedules: 0,
-        totalRevisionsCompleted: 0,
-        totalRevisionsPending: 0,
-        completionRate: 0,
-        averageOverdueDays: 0,
-        maxOverdueDays: 0,
-        revisionStreak: { current: 0, longest: 0 }
-      },
-      byRevisionIndex: [],
-      trends: { daily: [], weekly: [], monthly: [] },
-      overdueDistribution: { '1-3days': 0, '4-7days': 0, '8-14days': 0, '15-30days': 0, '30+days': 0 },
-      upcomingSchedule: [],
-      byDifficulty: {},
-      byPlatform: {},
-      byPattern: [],
-      timeStats: { totalMinutesSpent: 0, averageMinutesPerRevision: 0, averageMinutesPerDay: 0, mostProductiveDay: null, mostProductiveDayMinutes: 0, timeByDifficulty: {} },
-      confidenceStats: { overallAverageAfter: null, confidenceDistributionAfter: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, confidenceImprovementByRevisionIndex: [] },
-      questionLevelDetails: []
-    };
-  }
+  // Initialize byDifficulty
+  const byDifficulty = {
+    Easy: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 },
+    Medium: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 },
+    Hard: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 },
+    Unknown: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 }
+  };
+  const byPlatform = {};
+  const byPattern = {};
 
-  let totalActiveSchedules = 0, totalCompletedSchedules = 0, totalOverdueSchedules = 0;
-  let totalRevisionsCompleted = 0, totalRevisionsPending = 0, totalOverdueDaysSum = 0, maxOverdueDays = 0;
-  const byIndexMap = new Map();
-  const completedRevisionsList = [];
-  const overdueDates = [];
-  const upcomingMap = new Map();
-
-  const now = new Date();
-
-  for (const schedule of schedules) {
-    if (!schedule.questionId) continue;
-
-    if (schedule.status === 'active') totalActiveSchedules++;
-    else if (schedule.status === 'completed') totalCompletedSchedules++;
-    else if (schedule.status === 'overdue') totalOverdueSchedules++;
-
-    const completedCount = schedule.completedRevisions?.length || 0;
-    const totalRevisions = schedule.schedule.length;
-    const pendingCount = totalRevisions - schedule.currentRevisionIndex;
-    totalRevisionsCompleted += completedCount;
-    totalRevisionsPending += pendingCount;
-
-    totalOverdueDaysSum += schedule.overdueCount || 0;
-    if ((schedule.overdueCount || 0) > maxOverdueDays) maxOverdueDays = schedule.overdueCount;
-
-    if (schedule.status === 'active') {
-      const idx = schedule.currentRevisionIndex;
-      byIndexMap.set(idx, (byIndexMap.get(idx) || 0) + 1);
-    }
-
-    if (schedule.completedRevisions) {
-      for (const rev of schedule.completedRevisions) {
-        const dateStr = formatDate(rev.completedAt);
-        completedRevisionsList.push({
-          date: dateStr,
-          timeSpent: rev.timeSpent || 0,
-          confidenceAfter: rev.confidenceAfter
-        });
-      }
-    }
-
-    if (schedule.status === 'active' && schedule.currentRevisionIndex < schedule.schedule.length) {
-      const dueDate = schedule.schedule[schedule.currentRevisionIndex];
-      if (dueDate < now) {
-        const daysOverdue = Math.ceil((now - dueDate) / (1000 * 60 * 60 * 24));
-        overdueDates.push(daysOverdue);
-      }
-    }
-
-    if (schedule.status === 'active' && schedule.currentRevisionIndex < schedule.schedule.length) {
-      const dueDate = schedule.schedule[schedule.currentRevisionIndex];
-      if (dueDate >= now && dueDate <= new Date(now.getTime() + 7 * 86400000)) {
-        const dateStr = formatDate(dueDate);
-        if (!upcomingMap.has(dateStr)) {
-          upcomingMap.set(dateStr, { count: 0, questions: [] });
-        }
-        const entry = upcomingMap.get(dateStr);
-        entry.count++;
-        entry.questions.push({
-          questionId: schedule.questionId._id,
-          platformQuestionId: schedule.questionId.platformQuestionId,
-          title: schedule.questionId.title,
-          difficulty: schedule.questionId.difficulty,
-          platform: schedule.questionId.platform,
-          revisionIndex: schedule.currentRevisionIndex,
-          dueDate: dueDate
-        });
-      }
-    }
-  }
-
-  const totalRevisions = totalRevisionsCompleted + totalRevisionsPending;
-  const completionRate = totalRevisions > 0 ? (totalRevisionsCompleted / totalRevisions) * 100 : 0;
-
-  const byRevisionIndex = [];
-  for (let i = 0; i <= 4; i++) {
-    byRevisionIndex.push({
-      index: i,
-      totalQuestions: byIndexMap.get(i) || 0,
-      completed: 0,
-      completionRate: 0,
-      skipped: 0, 
-      averageTimeSpent: 0,
-      averageConfidenceAfter: null,
-      dropoutRate: 0
-    });
-  }
-
-  const dailyMap = new Map();
-  const weeklyMap = new Map();
-  const monthlyMap = new Map();
-
-  for (const rev of completedRevisionsList) {
-    const date = rev.date;
-    const time = rev.timeSpent;
-    const confidence = rev.confidenceAfter;
-
-    if (!dailyMap.has(date)) dailyMap.set(date, { completed: 0, timeSpent: 0, confidenceSum: 0, count: 0 });
-    const daily = dailyMap.get(date);
-    daily.completed++;
-    daily.timeSpent += time;
-    if (confidence) { daily.confidenceSum += confidence; daily.count++; }
-
-    const d = new Date(date);
-    const weekNum = getWeekNumber(d);
-    const weekKey = `${d.getFullYear()}-W${weekNum}`;
-    if (!weeklyMap.has(weekKey)) weeklyMap.set(weekKey, { completed: 0, timeSpent: 0, confidenceSum: 0, count: 0 });
-    const weekly = weeklyMap.get(weekKey);
-    weekly.completed++;
-    weekly.timeSpent += time;
-    if (confidence) { weekly.confidenceSum += confidence; weekly.count++; }
-
-    const monthKey = `${d.getFullYear()}-${d.getMonth() + 1}`;
-    if (!monthlyMap.has(monthKey)) monthlyMap.set(monthKey, { completed: 0, timeSpent: 0, confidenceSum: 0, count: 0 });
-    const monthly = monthlyMap.get(monthKey);
-    monthly.completed++;
-    monthly.timeSpent += time;
-    if (confidence) { monthly.confidenceSum += confidence; monthly.count++; }
-  }
-
-  const dailyTrend = Array.from(dailyMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-30)
-    .map(([date, data]) => ({
-      date,
-      completed: data.completed,
-      timeSpent: data.timeSpent,
-      avgConfidence: data.count ? (data.confidenceSum / data.count).toFixed(1) : null
-    }));
-
-  const weeklyTrend = Array.from(weeklyMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12)
-    .map(([week, data]) => ({
-      week,
-      completed: data.completed,
-      timeSpent: data.timeSpent,
-      avgConfidence: data.count ? (data.confidenceSum / data.count).toFixed(1) : null
-    }));
-
-  const monthlyTrend = Array.from(monthlyMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-6)
-    .map(([month, data]) => ({
-      month,
-      completed: data.completed,
-      timeSpent: data.timeSpent,
-      avgConfidence: data.count ? (data.confidenceSum / data.count).toFixed(1) : null
-    }));
-
-  const overdueDistribution = { '1-3days': 0, '4-7days': 0, '8-14days': 0, '15-30days': 0, '30+days': 0 };
-  for (const days of overdueDates) {
-    if (days <= 3) overdueDistribution['1-3days']++;
-    else if (days <= 7) overdueDistribution['4-7days']++;
-    else if (days <= 14) overdueDistribution['8-14days']++;
-    else if (days <= 30) overdueDistribution['15-30days']++;
-    else overdueDistribution['30+days']++;
-  }
-
-  const upcomingSchedule = Array.from(upcomingMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([date, data]) => ({
-      date,
-      dayOfWeek: new Date(date).toLocaleDateString('en-US', { weekday: 'long' }),
-      count: data.count,
-      questions: data.questions
-    }));
-
-  const difficultyMap = new Map();
-  const platformMap = new Map();
-  const patternMap = new Map();
-
-  for (const schedule of schedules) {
-    if (!schedule.questionId) continue;
+  for (const schedule of allSchedules) {
     const q = schedule.questionId;
-
-    const difficulty = q.difficulty || 'Unknown';
-    const platform = q.platform || 'Other';
+    if (!q) continue;
+    const diff = q.difficulty || 'Unknown';
+    const platform = q.platform || 'Unknown';
     const patterns = Array.isArray(q.pattern) ? q.pattern : (q.pattern ? [q.pattern] : []);
 
-    if (!difficultyMap.has(difficulty)) {
-      difficultyMap.set(difficulty, { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 });
-    }
-    const diffStat = difficultyMap.get(difficulty);
-    diffStat.totalRevisions++;
-    diffStat.completed += schedule.completedRevisions?.length || 0;
-    if (schedule.completedRevisions) {
-      for (const rev of schedule.completedRevisions) {
-        diffStat.totalTimeSpent += rev.timeSpent || 0;
-        if (rev.confidenceAfter) {
-          diffStat.confidenceSum += rev.confidenceAfter;
-          diffStat.confidenceCount++;
-        }
-      }
-    }
-    if (schedule.status === 'overdue') diffStat.overdueCount++;
+    // Increment total revisions
+    if (!byDifficulty[diff]) byDifficulty[diff] = { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 };
+    byDifficulty[diff].totalRevisions += 1;
 
-    if (!platformMap.has(platform)) {
-      platformMap.set(platform, { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 });
-    }
-    const platStat = platformMap.get(platform);
-    platStat.totalRevisions++;
-    platStat.completed += schedule.completedRevisions?.length || 0;
-    if (schedule.completedRevisions) {
-      for (const rev of schedule.completedRevisions) {
-        platStat.totalTimeSpent += rev.timeSpent || 0;
-        if (rev.confidenceAfter) {
-          platStat.confidenceSum += rev.confidenceAfter;
-          platStat.confidenceCount++;
-        }
-      }
-    }
-    if (schedule.status === 'overdue') platStat.overdueCount++;
+    if (!byPlatform[platform]) byPlatform[platform] = { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 };
+    byPlatform[platform].totalRevisions += 1;
 
     for (const pattern of patterns) {
       if (!pattern) continue;
-      if (!patternMap.has(pattern)) {
-        patternMap.set(pattern, { totalRevisions: 0, completed: 0, totalTimeSpent: 0, overdueCount: 0 });
+      if (!byPattern[pattern]) byPattern[pattern] = { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 };
+      byPattern[pattern].totalRevisions += 1;
+    }
+
+    // Completed revisions
+    for (const cr of schedule.completedRevisions) {
+      if (cr.status !== 'completed') continue;
+      byDifficulty[diff].completed += 1;
+      byDifficulty[diff].totalTimeSpent += cr.timeSpent || 0;
+      if (cr.confidenceAfter) {
+        byDifficulty[diff].confidenceSum += cr.confidenceAfter;
+        byDifficulty[diff].confidenceCount += 1;
       }
-      const patStat = patternMap.get(pattern);
-      patStat.totalRevisions++;
-      patStat.completed += schedule.completedRevisions?.length || 0;
-      if (schedule.completedRevisions) {
-        for (const rev of schedule.completedRevisions) {
-          patStat.totalTimeSpent += rev.timeSpent || 0;
+
+      byPlatform[platform].completed += 1;
+      byPlatform[platform].totalTimeSpent += cr.timeSpent || 0;
+      if (cr.confidenceAfter) {
+        byPlatform[platform].confidenceSum += cr.confidenceAfter;
+        byPlatform[platform].confidenceCount += 1;
+      }
+
+      for (const pattern of patterns) {
+        if (!pattern) continue;
+        byPattern[pattern].completed += 1;
+        byPattern[pattern].totalTimeSpent += cr.timeSpent || 0;
+        if (cr.confidenceAfter) {
+          byPattern[pattern].confidenceSum += cr.confidenceAfter;
+          byPattern[pattern].confidenceCount += 1;
         }
       }
-      if (schedule.status === 'overdue') patStat.overdueCount++;
     }
-  }
 
-  const byDifficulty = {};
-  for (const [diff, stat] of difficultyMap.entries()) {
-    const avgConfidence = stat.confidenceCount ? stat.confidenceSum / stat.confidenceCount : null;
-    byDifficulty[diff] = {
-      totalRevisions: stat.totalRevisions,
-      completed: stat.completed,
-      completionRate: parseFloat(((stat.completed / stat.totalRevisions) * 100).toFixed(1)),
-      averageTimeSpent: stat.completed ? (stat.totalTimeSpent / stat.completed).toFixed(1) : 0,
-      averageConfidenceAfter: avgConfidence ? parseFloat(avgConfidence.toFixed(1)) : null,
-      overdueCount: stat.overdueCount
-    };
-  }
-
-  const byPlatform = {};
-  for (const [plat, stat] of platformMap.entries()) {
-    const avgConfidence = stat.confidenceCount ? stat.confidenceSum / stat.confidenceCount : null;
-    byPlatform[plat] = {
-      totalRevisions: stat.totalRevisions,
-      completed: stat.completed,
-      completionRate: parseFloat(((stat.completed / stat.totalRevisions) * 100).toFixed(1)),
-      averageTimeSpent: stat.completed ? (stat.totalTimeSpent / stat.completed).toFixed(1) : 0,
-      averageConfidenceAfter: avgConfidence ? parseFloat(avgConfidence.toFixed(1)) : null,
-      overdueCount: stat.overdueCount
-    };
-  }
-
-  const byPattern = Array.from(patternMap.entries())
-    .map(([pattern, stat]) => ({
-      patternName: pattern,
-      totalRevisions: stat.totalRevisions,
-      completed: stat.completed,
-      completionRate: parseFloat(((stat.completed / stat.totalRevisions) * 100).toFixed(1)),
-      averageTimeSpent: stat.completed ? (stat.totalTimeSpent / stat.completed).toFixed(1) : 0,
-      overdueCount: stat.overdueCount
-    }))
-    .sort((a, b) => b.totalRevisions - a.totalRevisions)
-    .slice(0, 10);
-
-  const totalMinutesSpent = completedRevisionsList.reduce((sum, r) => sum + r.timeSpent, 0);
-  const averageMinutesPerRevision = completedRevisionsList.length ? (totalMinutesSpent / completedRevisionsList.length).toFixed(1) : 0;
-  const averageMinutesPerDay = dailyTrend.length ? (dailyTrend.reduce((sum, d) => sum + d.timeSpent, 0) / dailyTrend.length).toFixed(1) : 0;
-  let mostProductiveDay = null, mostProductiveDayMinutes = 0;
-  for (const day of dailyTrend) {
-    if (day.timeSpent > mostProductiveDayMinutes) {
-      mostProductiveDayMinutes = day.timeSpent;
-      mostProductiveDay = day.date;
-    }
-  }
-  const timeByDifficulty = {};
-  for (const [diff, stat] of Object.entries(byDifficulty)) {
-    timeByDifficulty[diff] = (stat.averageTimeSpent || 0) * stat.completed;
-  }
-
-  const allConfidences = completedRevisionsList.filter(r => r.confidenceAfter).map(r => r.confidenceAfter);
-  const confidenceDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const c of allConfidences) {
-    if (c >= 1 && c <= 5) confidenceDistribution[c]++;
-  }
-  const overallAverageAfter = allConfidences.length ? (allConfidences.reduce((a,b) => a+b,0) / allConfidences.length).toFixed(1) : null;
-
-  let currentStreak = 0, longestStreak = 0;
-  const sortedCompletionDates = [...new Set(completedRevisionsList.map(r => r.date))].sort();
-  let tempStreak = 0, lastDate = null;
-  for (const dateStr of sortedCompletionDates) {
-    const currentDate = new Date(dateStr);
-    if (lastDate) {
-      const diffDays = (currentDate - lastDate) / (1000 * 60 * 60 * 24);
-      if (diffDays === 1) tempStreak++;
-      else tempStreak = 1;
-    } else {
-      tempStreak = 1;
-    }
-    if (tempStreak > longestStreak) longestStreak = tempStreak;
-    lastDate = currentDate;
-  }
-  currentStreak = tempStreak;
-
-  const urgentQuestions = schedules
-    .filter(s => s.questionId && s.status === 'active' && s.currentRevisionIndex < s.schedule.length && s.schedule[s.currentRevisionIndex] < now)
-    .map(s => ({
-      questionId: s.questionId._id,
-      platformQuestionId: s.questionId.platformQuestionId,
-      title: s.questionId.title,
-      difficulty: s.questionId.difficulty,
-      platform: s.questionId.platform,
-      currentRevisionIndex: s.currentRevisionIndex,
-      nextRevisionDue: s.schedule[s.currentRevisionIndex],
-      totalTimeSpent: s.completedRevisions?.reduce((sum, r) => sum + (r.timeSpent || 0), 0) || 0,
-      confidenceLevel: s.completedRevisions?.length ? s.completedRevisions[s.completedRevisions.length - 1].confidenceAfter : null,
-      status: 'overdue'
-    }))
-    .sort((a, b) => a.nextRevisionDue - b.nextRevisionDue)
-    .slice(0, 10);
-
-  const finalStats = {
-    summary: {
-      totalActiveSchedules,
-      totalCompletedSchedules,
-      totalOverdueSchedules,
-      totalRevisionsCompleted,
-      totalRevisionsPending,
-      completionRate: parseFloat(completionRate.toFixed(1)),
-      averageOverdueDays: totalActiveSchedules ? (totalOverdueDaysSum / totalActiveSchedules).toFixed(1) : 0,
-      maxOverdueDays,
-      revisionStreak: {
-        current: currentStreak,
-        longest: longestStreak
+    // Overdue count for current revision
+    const currentDue = schedule.schedule[schedule.currentRevisionIndex];
+    if (currentDue && currentDue < today) {
+      byDifficulty[diff].overdueCount += 1;
+      byPlatform[platform].overdueCount += 1;
+      for (const pattern of patterns) {
+        if (pattern) byPattern[pattern].overdueCount += 1;
       }
+    }
+  }
+
+  // Compute averages and rates
+  const computeStats = (obj) => {
+    obj.completionRate = obj.totalRevisions ? (obj.completed / obj.totalRevisions) * 100 : 0;
+    obj.averageTimeSpent = obj.completed ? (obj.totalTimeSpent / obj.completed).toFixed(1) : '0.0';
+    obj.averageConfidenceAfter = obj.confidenceCount ? (obj.confidenceSum / obj.confidenceCount).toFixed(1) : null;
+    return obj;
+  };
+  for (const diff in byDifficulty) computeStats(byDifficulty[diff]);
+  for (const plat in byPlatform) computeStats(byPlatform[plat]);
+  for (const pat in byPattern) computeStats(byPattern[pat]);
+
+  // ---------- 5. Time stats ----------
+  const allCompleted = allSchedules.flatMap(s => s.completedRevisions.filter(cr => cr.status === 'completed'));
+  const totalMinutesSpent = allCompleted.reduce((sum, cr) => sum + (cr.timeSpent || 0), 0);
+  const avgMinutesPerRevision = allCompleted.length ? totalMinutesSpent / allCompleted.length : 0;
+
+  const dayMap = new Map();
+  for (const cr of allCompleted) {
+    const day = cr.completedAt.toISOString().split('T')[0];
+    dayMap.set(day, (dayMap.get(day) || 0) + (cr.timeSpent || 0));
+  }
+  let mostProductiveDay = null, mostMinutes = 0;
+  for (const [day, minutes] of dayMap) {
+    if (minutes > mostMinutes) { mostMinutes = minutes; mostProductiveDay = day; }
+  }
+
+  // ---------- 6. Confidence stats ----------
+  const confidenceAfterValues = allCompleted.map(cr => cr.confidenceAfter).filter(v => v != null);
+  const overallAvgConfidence = confidenceAfterValues.length ? (confidenceAfterValues.reduce((a,b)=>a+b,0) / confidenceAfterValues.length).toFixed(1) : null;
+  const confidenceDist = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+  for (const val of confidenceAfterValues) confidenceDist[val]++;
+
+  const improvementByIndex = []; // can be implemented later
+
+  // ---------- 7. Build final object ----------
+  const detailedStats = {
+    summary: {
+      totalActiveSchedules: baseStats.totalActive,
+      totalCompletedSchedules: baseStats.totalCompleted,
+      totalOverdueSchedules: baseStats.totalOverdue,
+      totalRevisionsCompleted: allCompleted.length,
+      totalRevisionsPending: baseStats.pendingWeek,
+      completionRate: baseStats.completionRate,
+      averageOverdueDays: baseStats.averageOverdue,
+      maxOverdueDays: 0,
+      revisionStreak: { current: 0, longest: 0 }
     },
-    byRevisionIndex,
-    trends: {
-      daily: dailyTrend,
-      weekly: weeklyTrend,
-      monthly: monthlyTrend
-    },
-    overdueDistribution,
-    upcomingSchedule,
+    byRevisionIndex: Object.entries(baseStats.byRevisionIndex).map(([idx, count]) => ({
+      index: parseInt(idx),
+      totalQuestions: count,
+      completed: 0,
+      completionRate: 0,
+      skipped: 0,
+      averageTimeSpent: 0,
+      averageConfidenceAfter: null,
+      dropoutRate: 0
+    })),
+    trends: { daily: dailyTrends, weekly: weeklyTrends, monthly: monthlyTrends },
+    overdueDistribution: distribution,
     byDifficulty,
     byPlatform,
-    byPattern,
+    byPattern: Object.entries(byPattern).map(([name, data]) => ({ 
+      patternName: name, 
+      slug: name.toLowerCase().replace(/\s+/g, '-'),
+      ...data 
+    })),
     timeStats: {
       totalMinutesSpent,
-      averageMinutesPerRevision: parseFloat(averageMinutesPerRevision),
-      averageMinutesPerDay: parseFloat(averageMinutesPerDay),
+      averageMinutesPerRevision: avgMinutesPerRevision.toFixed(1),
+      averageMinutesPerDay: 0,
       mostProductiveDay,
-      mostProductiveDayMinutes,
-      timeByDifficulty
+      mostProductiveDayMinutes: mostMinutes,
+      timeByDifficulty: { Medium: 0, Easy: 0, Hard: 0 }
     },
     confidenceStats: {
-      overallAverageAfter: overallAverageAfter ? parseFloat(overallAverageAfter) : null,
-      confidenceDistributionAfter: confidenceDistribution,
-      confidenceImprovementByRevisionIndex: byRevisionIndex.map(idx => ({ index: idx.index, gain: null }))
+      overallAverageAfter: overallAvgConfidence,
+      confidenceDistributionAfter: confidenceDist,
+      confidenceImprovementByRevisionIndex: improvementByIndex
     },
-    questionLevelDetails: urgentQuestions
   };
 
-  return finalStats;
+  return detailedStats;
 };
 
-// Helper to get week number (ISO)
-function getWeekNumber(d) {
-  const date = new Date(d);
-  date.setHours(0,0,0,0);
-  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-  const week1 = new Date(date.getFullYear(), 0, 4);
-  return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-}
-
-
-// ==================== Exports ====================
 module.exports = {
   calculateRevisionStats,
   calculateUpcomingStats,

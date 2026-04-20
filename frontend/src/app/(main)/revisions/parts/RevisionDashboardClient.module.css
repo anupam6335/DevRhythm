@@ -1,0 +1,26 @@
+.container {
+  padding: 1.5rem 0;
+}
+
+.twoColumnCore {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.leftColumn, .rightColumn {
+  flex: 1;
+}
+.wisdomBoard {
+  display: flex;
+  gap: 1.5rem;
+  margin: 2rem 0;
+  flex-wrap: wrap;
+}
+.wisdomBoard > * {
+  flex: 1;
+}
+
+@media (max-width: 939px) {
+  .twoColumnCore { flex-direction: column; }
+  .wisdomBoard { flex-direction: column; }
+}

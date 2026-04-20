@@ -1,0 +1,233 @@
+.card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+/* Ensure the content area stretches */
+.stones, .seeds, .scrolls {
+  flex: 1;
+}
+.titleWrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.titleLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.titleIcon {
+  font-size: 1.2rem;
+  color: var(--accent-moss);
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.viewAll {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.viewAll:hover {
+  color: var(--accent-moss);
+}
+
+.stones {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.stone {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: transform 0.2s;
+}
+.stone:hover {
+  transform: translateX(4px);
+}
+
+.stoneIcon {
+  font-size: 1.5rem;
+}
+
+.stoneContent {
+  flex: 1;
+}
+
+.stoneHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.stats {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.percentage {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.seeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.seed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border-radius: 30px;
+  padding: 0.25rem 0.75rem;
+  transition: transform 0.2s;
+}
+.seed:hover {
+  transform: scale(1.05);
+}
+
+.platformName {
+  font-weight: 500;
+}
+
+/* Difficulty stones  */
+.progressWrapper {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.progressLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.infoIcon {
+  font-size: 0.7rem;
+  cursor: help;
+  color: var(--text-muted);
+}
+
+.over100Badge {
+  font-size: 0.7rem;
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.1);
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  margin-top: 0.25rem;
+  display: inline-block;
+}
+.revisionBadge {
+  font-size: 0.7rem;
+  font-weight: normal;
+  padding: 0.125rem 0.5rem;
+}
+/* TOP Patterns  */
+.scrolls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scroll {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--divider);
+  transition: transform 0.2s, background 0.2s;
+  border-radius: 8px;
+}
+
+.scroll:hover {
+  transform: translateX(4px);
+  background: var(--hover-surface);
+}
+
+.scrollHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.patternName {
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: color 0.2s;
+}
+
+.patternName:hover {
+  color: var(--accent-moss);
+}
+
+.trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  white-space: nowrap;
+}
+
+.trendUp {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.1);
+}
+
+.trendDown {
+  color: #d32f2f;
+  background: rgba(211, 47, 47, 0.1);
+}
+
+.trendNeutral {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+.statsRow {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.statBadge {
+  font-size: 0.7rem;
+  font-weight: normal;
+  padding: 0.125rem 0.5rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

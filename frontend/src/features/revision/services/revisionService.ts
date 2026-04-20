@@ -6,6 +6,9 @@ import type {
   UpcomingRevisionsResponse,
   OverdueRevisionsResponse,
   RevisionStats,
+  RevisionDashboardStats,
+  UpcomingRevisionsListResponse,
+  OverdueRevisionsListResponse,
 } from '../types/revision.types';
 
 export const revisionService = {
@@ -86,5 +89,59 @@ export const revisionService = {
       `/revisions/overdue${query}`
     ) as ApiClientResponse<OverdueRevisionsResponse>;
     return response.meta?.pagination?.total ?? 0;
+  },
+
+  // ===== Dashboard Methods =====
+
+  /**
+   * Fetch detailed revision statistics (includes limited upcoming/overdue items).
+   */
+  async getDetailedRevisionStats(): Promise<RevisionDashboardStats> {
+    const response = await apiClient.get<{ stats: RevisionDashboardStats }>('/revisions/stats?detailed=true');
+    return response.data.stats;
+  },
+
+  /**
+   * Fetch all upcoming revisions (no server pagination). Client-side pagination applied.
+   */
+  async getUpcomingRevisionsList(params?: { page?: number; limit?: number }): Promise<UpcomingRevisionsListResponse> {
+    const response = await apiClient.get<UpcomingRevisionsListResponse>(`/revisions/upcoming`);
+    const upcomingRevisions = response.data.upcomingRevisions || [];
+    const total = upcomingRevisions.reduce((sum, group) => sum + group.questions.length, 0);
+    const page = params?.page || 1;
+    const limit = params?.limit || 5;
+    return {
+      upcomingRevisions,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
+  },
+
+  /**
+   * Fetch overdue revisions with server‑side pagination.
+   */
+  async getOverdueRevisionsList(params?: { page?: number; limit?: number }): Promise<OverdueRevisionsListResponse> {
+    const query = buildQueryString(params);
+    const response = await apiClient.get<OverdueRevisionsListResponse>(
+      `/revisions/overdue${query}`
+    ) as ApiClientResponse<OverdueRevisionsListResponse>;
+    return {
+      revisions: response.data.revisions,
+      pagination: response.meta?.pagination,
+    };
+  },
+
+  /**
+   * Mark a revision as completed or skipped.
+   */
+  async completeRevisionAction(questionId: string, status: 'completed' | 'skipped' = 'completed', options?: { overdue?: boolean }): Promise<void> {
+    const query = options?.overdue ? '?overdue=true' : '';
+    await apiClient.post(`/revisions/question/${questionId}/complete${query}`, { status });
   },
 };

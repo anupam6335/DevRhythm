@@ -728,3 +728,112 @@ export interface Notification extends Timestamp {
   readAt?: ISODateString;
   expiresAt?: ISODateString;
 }
+
+// ===== New types for Revision Dashboard =====
+
+/**
+ * Detailed revision statistics for the dashboard.
+ * Returned by GET /revisions/stats?detailed=true
+ */
+export interface RevisionDashboardStats {
+  summary: {
+    totalActiveSchedules: number;
+    completionRate: number;
+    revisionStreak: { current: number; longest: number };
+    totalOverdueSchedules: number;
+  };
+  byRevisionIndex: Array<{
+    index: number;
+    stage: string; // "1st review", "2nd review", etc.
+    totalQuestions: number;
+    completed: number;
+  }>;
+  byDifficulty: Array<{
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    totalRevisions: number;
+    completionRate: number;
+  }>;
+  byPlatform: Array<{
+    platform: string;
+    totalRevisions: number;
+    completionRate: number;
+  }>;
+  byPattern: Array<{
+    patternName: string;
+    totalRevisions: number;
+    completed: number;
+    completionRate: number;
+  }>;
+  trends: {
+    daily: Array<{
+      date: string; // YYYY-MM-DD
+      completed: number;
+      avgConfidence: number;
+      totalTimeSpent: number;
+    }>;
+  };
+  overdueDistribution: any;
+  questionLevelDetails: Array<{
+    _id: string;
+    title: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    status: string;
+    nextRevisionDue: string;
+  }>;
+}
+
+/**
+ * Response for GET /revisions/upcoming with pagination.
+ */
+export interface UpcomingRevisionsListResponse {
+  upcomingRevisions: Array<{
+    _id: string;
+    date: string;
+    count: number;
+    questions: Array<{
+      _id: string;
+      questionId: {
+        _id: string;
+        title: string;
+        difficulty: string;
+        platform: string;
+      };
+      revisionIndex: number;
+    }>;
+  }>;
+  stats?: any;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+/**
+ * Response for GET /revisions/overdue with pagination.
+ */
+export interface OverdueRevisionsListResponse {
+  revisions: Array<{
+    _id: string;
+    questionId: {
+      _id: string;
+      title: string;
+      difficulty: string;
+      platform: string;
+    };
+    scheduledDate: string;
+    revisionIndex: number;
+    status: string;
+  }>;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
