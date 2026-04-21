@@ -487,6 +487,7 @@ export default function ActionStream() {
                       currentPage={upcomingPage}
                       totalPages={upcomingTotalPages}
                       onPageChange={setUpcomingPage}
+                      siblingCount={0}
                       size="sm"
                     />
                   </div>
@@ -643,6 +644,7 @@ export default function ActionStream() {
                       currentPage={overduePage}
                       totalPages={overdueTotalPages}
                       onPageChange={setOverduePage}
+                      siblingCount={0}
                       size="sm"
                     />
                   </div>
