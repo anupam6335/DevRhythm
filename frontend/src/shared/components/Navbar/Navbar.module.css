@@ -37,7 +37,7 @@
   align-items: center;
 }
 
-/* Nav link (desktop) – using Button, so we just add minimal overrides */
+/* Nav link (desktop) */
 .navLink {
   height: 40px;
   border-radius: 40px !important;
@@ -71,7 +71,6 @@
   border-radius: 3px 3px 0 0;
 }
 
-/* Icon inside nav link */
 .navLink svg {
   font-size: 1.2rem;
 }
@@ -94,46 +93,12 @@
   line-height: 1;
 }
 
-/* Badge inside dropdown item */
 .badgeInline {
   composes: badge;
   margin-left: 0.5rem;
   background-color: var(--accent-sand);
   color: var(--text-primary);
   box-shadow: none;
-}
-
-/* Goal pill – custom button, not using Button */
-.goalPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  margin-left: 0.5rem;
-  background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface));
-  border: 1px solid var(--border);
-  border-radius: 40px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px var(--shadow);
-  line-height: 1;
-  height: 34px;
-  white-space: nowrap;
-}
-
-.goalPill:hover {
-  background: var(--hover-surface);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px var(--shadow);
-  border-color: var(--accent-moss);
-}
-
-.goalPillIcon {
-  color: var(--accent-moss);
-  font-size: 1rem;
 }
 
 /* Theme Toggle button (desktop) */
@@ -205,7 +170,7 @@
   margin: 0.5rem 0;
 }
 
-/* Avatar button – using Button, minimal overrides */
+/* Avatar button */
 .avatarButton {
   position: relative;
   height: 48px;
@@ -226,34 +191,10 @@
   box-shadow: var(--focus-ring) !important;
 }
 
-.streakFlame {
-  position: absolute;
-  bottom: -4px;
-  right: -4px;
-  display: flex;
-  align-items: center;
-  gap: 0.1rem;
-  background-color: var(--primary-action);
-  color: var(--primary-text-on-action);
-  padding: 0.1rem 0.6rem;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border: 2px solid var(--bg-surface);
-  line-height: 1;
-  box-shadow: 0 2px 8px var(--shadow);
-  z-index: 1;
-}
-
-.streakFlame svg {
-  color: #ff8c00;
-  font-size: 0.8rem;
-}
-
 /* Login link */
 .loginLink {
   font-size: 0.95rem;
-  color: var(--text-primary); 
+  color: var(--text-primary);
   text-decoration: none;
   padding: 0 1rem;
   border-radius: 40px;
@@ -277,6 +218,70 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px var(--shadow);
 }
+
+/* ===== New streak pill (desktop) ===== */
+.streakPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.9rem;
+  margin: 0 0.25rem;
+  background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface));
+  border: 1px solid var(--border);
+  border-radius: 40px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  height: 34px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: all 0.2s ease;
+  cursor: default;
+  user-select: none;
+}
+
+.streakPill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px var(--shadow);
+  border-color: var(--accent-moss);
+}
+
+.streakFireIcon {
+  color: #ff8c00;
+  font-size: 1.1rem;
+  animation: flameFlicker 2.5s infinite ease-in-out;
+  transform-origin: center;
+}
+
+/* Smooth slow motion fire animation */
+@keyframes flameFlicker {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 2px #ff8c00);
+  }
+  25% {
+    transform: scale(1.06);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 5px #ff8c00);
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 2px #ff8c00);
+  }
+  75% {
+    transform: scale(0.97);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 3px #ff8c00);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 2px #ff8c00);
+  }
+}
+
 /* ===== Mobile Header (top bar) ===== */
 .mobileHeader {
   display: flex;
@@ -305,13 +310,17 @@
   color: var(--text-secondary) !important;
   font-size: 1.8rem !important;
   padding: 0 !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .hamburgerButton:hover {
   color: var(--text-primary) !important;
   background-color: var(--hover-surface) !important;
-  transform: scale(1.05);
+  transform: scale(1.1) rotate(5deg);
+}
+
+.hamburgerOpen {
+  transform: rotate(90deg) !important;
 }
 
 /* ===== Drawer ===== */
@@ -392,6 +401,12 @@
   border-bottom: 1px solid var(--divider);
 }
 
+.drawerUserInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
 .drawerUserName {
   font-weight: 600;
   color: var(--text-primary);
@@ -399,7 +414,7 @@
 }
 
 .drawerLoginLink {
- display: block;
+  display: block;
   width: 100%;
   padding: 0.75rem 1rem;
   background-color: var(--bg-elevated);
@@ -416,7 +431,7 @@
 }
 
 .drawerLoginLink:hover {
- color: var(--accent-moss);
+  color: var(--accent-moss);
   background-color: var(--hover-surface);
   border-color: var(--accent-moss);
   transform: translateY(-2px);
@@ -432,7 +447,6 @@
   font-family: var(--font-code);
 }
 
-/* Standard drawer links (not buttons) */
 .drawerSection a {
   display: block;
   padding: 0.7rem 0;
@@ -452,7 +466,6 @@
   padding-left: 0.75rem;
 }
 
-/* Logout button inside drawer – needs to match link styles */
 .drawerLogout {
   display: flex !important;
   align-items: center !important;
@@ -500,17 +513,19 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.4rem 0.8rem;
   background-color: var(--bg-surface);
   border-radius: 40px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   border: 1px solid var(--border);
   box-shadow: 0 2px 8px var(--shadow);
+  width: fit-content;
 }
 
 .drawerStreak svg {
   color: #ff8c00;
+  animation: flameFlicker 2.5s infinite ease-in-out;
 }
 
 /* ===== Mobile bottom navigation ===== */
@@ -531,7 +546,7 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  max-width: 600px;
+  max-width: 500px;
   margin: 0 auto;
 }
 
@@ -617,16 +632,16 @@
 
 .quickAddButton svg {
   stroke-width: 1.5;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .mobileSpacer {
-  /* height: 80px; */
+  /* Optional spacer if needed */
 }
 
 /* ===== Responsive adjustments ===== */
 
-/* Hide mobile UI on screens above tablet (769px = tablet + 1) */
+/* Hide mobile UI on larger screens */
 @media (min-width: 769px) {
   .mobileHeader,
   .drawerOverlay,
@@ -636,21 +651,49 @@
   }
 }
 
-/* Hide desktop navbar on screens up to tablet breakpoint (768px) */
-@media (max-width: var(--breakpoint-tablet)) {
+/* Hide desktop navbar on tablet and below */
+@media (max-width: 768px) {
   .navbar {
     display: none;
   }
 }
 
-/* Adjust spacing for desktop items when screen width is below desktop breakpoint (940px) */
+/* Intermediate breakpoint: 880px – 769px (desktop navbar is active but space is tight) */
+@media (max-width: 880px) {
+  /* Hide streak count text, show only fire icon */
+  .streakPill span:last-child {
+    display: none;
+  }
+  .streakPill {
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* Reduce nav link padding and font size further */
+  .navLink {
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Slightly reduce container padding */
+  .desktopContainer {
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Reduce gap between nav items */
+  .navLinks {
+    gap: 0.15rem;
+  }
+}
+
+/* General desktop adjustments below desktop breakpoint */
 @media (max-width: var(--breakpoint-desktop)) {
   .navLink {
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
     font-size: 0.9rem !important;
   }
-  .goalPill {
+  .streakPill {
     padding: 0.25rem 0.5rem;
     font-size: 0.85rem;
   }
@@ -659,15 +702,4 @@
   }
 }
 
-/* Extra narrow desktop: hide goal pill text, show only icon (custom breakpoint) */
-@media (max-width: 820px) {
-  .goalPill span:last-child {
-    display: none;
-  }
-  .goalPill {
-    padding: 0.25rem 0.5rem;
-  }
-  .goalPillIcon {
-    margin: 0;
-  }
-}
+/* Remove outdated goalPill rules – not needed */

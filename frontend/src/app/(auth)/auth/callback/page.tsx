@@ -1,15 +1,21 @@
 import { Suspense } from 'react';
 import { AuthCallbackHandler } from '@/features/auth/components/AuthCallbackHandler';
+import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import styles from './page.module.css';
 
 export default function CallbackPage() {
   return (
-    <div className="devRhythmContainer">
-      <div className={styles.container}>
-        <Suspense fallback={<div className={styles.loading}>Loading...</div>}>
-          <AuthCallbackHandler />
-        </Suspense>
-      </div>
-    </div>
+    <>
+      <Suspense
+        fallback={
+          <div className={styles.loading}>
+            <SkeletonLoader variant="custom" width={300} height={120} />
+            <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Loading...</p>
+          </div>
+        }
+      >
+        <AuthCallbackHandler />
+      </Suspense>
+    </>
   );
 }

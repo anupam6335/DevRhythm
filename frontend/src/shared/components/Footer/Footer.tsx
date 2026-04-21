@@ -163,14 +163,22 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
               { label: 'Patterns', href: ROUTES.QUESTIONS.PATTERNS },
-              { label: 'Tags', href: ROUTES.QUESTIONS.TAGS },
+              // { label: 'Tags', href: ROUTES.QUESTIONS.TAGS },
+            ]}
+          />
+          <LinkGroup
+            title="Progress"
+            links={[
+              { label: 'Revisions', href: ROUTES.REVISIONS.ROOT },
+              { label: 'Goals', href: ROUTES.GOALS.ROOT },
+              // { label: 'Tags', href: ROUTES.QUESTIONS.TAGS },
             ]}
           />
           <LinkGroup
             title="Community"
             links={[
               { label: 'My Groups', href: ROUTES.GROUPS.MY },
-              { label: 'Discover', href: ROUTES.GROUPS.ROOT },
+              // { label: 'Discover', href: ROUTES.GROUPS.ROOT },
               { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
             ]}
           />
@@ -179,7 +187,7 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Profile', href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN },
               { label: 'Shares', href: ROUTES.SHARES.ROOT },
-              { label: 'Settings', href: '/settings' },
+              // { label: 'Settings', href: '/settings' },
             ]}
           />
           <LinkGroup
@@ -187,7 +195,7 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Privacy', href: '/privacy' },
               { label: 'Terms', href: '/terms' },
-              { label: 'Cookies', href: '/cookies' },
+              // { label: 'Cookies', href: '/cookies' },
             ]}
           />
         </div>
