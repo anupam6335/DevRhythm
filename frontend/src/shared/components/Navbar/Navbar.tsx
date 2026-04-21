@@ -288,7 +288,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link href={ROUTES.QUESTIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   Browse all questions
                 </Link>
-                <Link href={ROUTES.QUESTIONS.PATTERNS} onClick={() => setIsDrawerOpen(false)}>
+                 <Link href={ROUTES.PATTERNS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   Patterns
                 </Link>
                 <Link href={ROUTES.QUESTIONS.TAGS} onClick={() => setIsDrawerOpen(false)}>
