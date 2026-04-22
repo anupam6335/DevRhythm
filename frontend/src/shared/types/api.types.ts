@@ -345,6 +345,7 @@ export interface UserQuestionProgress extends Timestamp {
     title: string;
     problemLink: string;
     platform: Platform;
+    platformQuestionId?: string;
     difficulty: Difficulty;
     tags: string[];
     pattern?: string;
@@ -376,6 +377,7 @@ export interface PublicProgressItem {
     title: string;
     problemLink: string;
     platform: Platform;
+    platformQuestionId?: string;
     difficulty: Difficulty;
     tags: string[];
     pattern?: string;
@@ -430,13 +432,14 @@ export interface PatternMastery extends Timestamp {
   _id: ID;
   userId: ID;
   patternName: string;
+  patternSlug: string;
   solvedCount: number;
   masteredCount: number;
   totalAttempts: number;
   successfulAttempts: number;
-  successRate: number; // 0-100
-  masteryRate: number; // 0-100
-  confidenceLevel: number; // 1-5
+  successRate: number;
+  masteryRate: number;
+  confidenceLevel: number;
   totalTimeSpent: number;
   averageTimePerQuestion: number;
   lastPracticed?: ISODateString;

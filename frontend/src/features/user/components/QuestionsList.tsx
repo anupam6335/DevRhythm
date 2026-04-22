@@ -18,7 +18,6 @@ import { truncate } from '@/shared/lib/stringUtils';
 import type { PublicProgressItem, UserQuestionProgress } from '@/shared/types';
 
 import styles from './QuestionsList.module.css';
-import Button from '@/shared/components/Button';
 
 export interface QuestionsListProps {
   userId?: string;
@@ -27,17 +26,14 @@ export interface QuestionsListProps {
   initialProgress?: PublicProgressItem[]; // server‑fetched data for public profiles
 }
 
-// Unified type
 type ProgressItem = PublicProgressItem | UserQuestionProgress;
 
-// Helper to safely create a Date object
 const safeParseDate = (dateStr?: string): Date | null => {
   if (!dateStr) return null;
   const date = new Date(dateStr);
   return isNaN(date.getTime()) ? null : date;
 };
 
-// Short revision time
 const formatShortRelativeTime = (date: Date): string => {
   const now = new Date();
   const diffInSeconds = (now.getTime() - date.getTime()) / 1000;
@@ -56,7 +52,6 @@ const formatShortRelativeTime = (date: Date): string => {
   return `${Math.floor(diffInYears)}y`;
 };
 
-// Confidence glow
 const confidenceGlow = (level: number): React.CSSProperties => {
   const spread = level * 4;
   const size = level * 2;
@@ -96,7 +91,7 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
       return userService.getUserPublicProgress(userId!, {
         limit,
         sortBy: 'solvedAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
       }) as Promise<ProgressItem[]>;
     }
   };
@@ -104,16 +99,13 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
   const { data, isLoading, isFetching, error } = useQuery<ProgressItem[]>({
     queryKey,
     queryFn,
-    // Disable query if we already have initial data for public profile
     enabled: (isOwnProfile ? true : !!userId) && !(initialProgress && !isOwnProfile),
-    // For public profile, use initialData as starting point
     initialData: !isOwnProfile ? initialProgress : undefined,
     staleTime: 5 * 60 * 1000,
   });
 
   const showSkeleton = isLoading || (isFetching && !data);
 
-  // Fallback client‑side sorting using solvedAt as primary date
   const getSolvedDate = React.useCallback(
     (item: ProgressItem): Date => {
       if (isOwnProfile) {
@@ -175,7 +167,7 @@ const QuestionsList: React.FC<QuestionsListProps> = ({
       <div className={styles.header}>
         <h2 className={styles.title}>The path of solved</h2>
         <Link
-          href={isOwnProfile ? '/progress' : `/users/${userId}/progress`}
+          href={`/questions`}
           className={styles.viewAll}
         >
           View All →
@@ -195,15 +187,22 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
   isOwnProfile,
 }) => {
   const questionId = item.questionId;
-  if(!questionId) return null;
+  if (!questionId) return null;
   const status = item.status;
   const attempts = item.attempts;
   const revisionCount = item.revisionCount || 0;
   const totalTimeSpent = item.totalTimeSpent || 0;
   const confidenceLevel = item.confidenceLevel || 1;
-  const { title, difficulty, pattern, tags, problemLink } = questionId;
+  const {
+    title,
+    difficulty,
+    pattern,
+    tags,
+    problemLink,
+    platform,
+    platformQuestionId,
+  } = questionId;
 
-  // Extract dates
   let solvedDateStr: string | undefined;
   let lastActivityStr: string | undefined;
 
@@ -221,7 +220,6 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
   const lastActivityDate = safeParseDate(lastActivityStr);
 
   const difficultyClass = styles[difficulty.toLowerCase()];
-
   const timeDisplay =
     totalTimeSpent < 60 ? `${totalTimeSpent}m` : `${Math.round(totalTimeSpent / 60)}h`;
   const revisionShort = lastActivityDate ? formatShortRelativeTime(lastActivityDate) : 'N/A';
@@ -229,9 +227,15 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
     ? formatDistanceToNow(lastActivityDate, { addSuffix: true })
     : 'N/A';
 
-  // Display max 2 tags
   const displayedTags = tags.slice(0, 2);
   const remainingTags = tags.length - 2;
+
+  // Build internal link using platform and platformQuestionId (slug) for own profile
+  const href = isOwnProfile
+    ? `/questions/${platformQuestionId}`
+    : problemLink;
+  const target = isOwnProfile ? undefined : '_blank';
+  const rel = isOwnProfile ? undefined : 'noopener noreferrer';
 
   return (
     <div className={styles.item}>
@@ -242,12 +246,7 @@ const QuestionItem: React.FC<{ item: ProgressItem; isOwnProfile: boolean }> = ({
       <div className={styles.titleLine}>
         <span className={styles.connector}>╰─</span>
         <Tooltip content={problemLink}>
-          <Link
-            href={isOwnProfile ? `/questions/${questionId._id}` : problemLink}
-            className={styles.titleLink}
-            target={isOwnProfile ? undefined : '_blank'}
-            rel={isOwnProfile ? undefined : 'noopener noreferrer'}
-          >
+          <Link href={href} className={styles.titleLink} target={target} rel={rel}>
             {title}
           </Link>
         </Tooltip>

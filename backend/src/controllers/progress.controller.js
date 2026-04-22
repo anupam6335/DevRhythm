@@ -47,7 +47,7 @@ const getProgress = async (req, res, next) => {
 
     const [progress, total] = await Promise.all([
       UserQuestionProgress.find(query)
-        .populate('questionId', '_id title problemLink platform difficulty tags pattern')
+        .populate('questionId', '_id title problemLink platform platformQuestionId difficulty tags pattern')
         .skip(skip)
         .limit(limit)
         .sort(sort)

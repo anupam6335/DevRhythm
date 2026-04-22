@@ -64,56 +64,56 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
 };
 
 // ===== Predefined limiters (Redis-backed if possible) =====
-const oauthLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'oauth');
-const tokenLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'token');
-const logoutLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'logout');
-const userLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'user');
-const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'snapshot');
-const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'notification');
-const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'leaderboard');
-const publicLimiter = createRedisLimiter(60 * 1000, 30, 'public');
+const oauthLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'oauth');
+const tokenLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'token');
+const logoutLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'logout');
+const userLimiter = createRedisLimiter(15 * 60 * 1000, 250, 'user');
+const progressSnapshotLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'snapshot');
+const notificationReadLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'notification');
+const leaderboardLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'leaderboard');
+const publicLimiter = createRedisLimiter(60 * 1000, 60, 'public');
 
 // Question endpoints
-const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:create');
-const questionUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:update');
-const questionDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'question:delete');
-const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 30, 'leetcode:search');
-const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 30, 'leetcode:fetch');
+const questionCreateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'question:create');
+const questionUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'question:update');
+const questionDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'question:delete');
+const leetcodeSearchLimiter = createRedisLimiter(60 * 1000, 100, 'leetcode:search');
+const leetcodeFetchLimiter = createRedisLimiter(60 * 1000, 100, 'leetcode:fetch');
 
 // Progress endpoints
-const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'progress:update');
+const progressUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'progress:update');
 
 // Revision endpoints
-const revisionCompleteLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'revision:complete');
+const revisionCompleteLimiter = createRedisLimiter(15 * 60 * 1000, 200, 'revision:complete');
 
 // Share endpoints
-const shareCreateLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'share:create');
-const shareUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'share:update');
-const shareDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'share:delete');
-const shareTokenLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:token');
-const shareUserLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:user');
-const shareRefreshLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'share:refresh');
+const shareCreateLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'share:create');
+const shareUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:update');
+const shareDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 50, 'share:delete');
+const shareTokenLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'share:token');
+const shareUserLimiter = createRedisLimiter(15 * 60 * 1000, 300, 'share:user');
+const shareRefreshLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'share:refresh');
 
 // Follow endpoints
-const followLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'follow');
-const unfollowLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'unfollow');
-const followGetLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'follow:get');
+const followLimiter = createRedisLimiter(15 * 60 * 1000, 150, 'follow');
+const unfollowLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'unfollow');
+const followGetLimiter = createRedisLimiter(15 * 60 * 1000, 500, 'follow:get');
 
 // Group endpoints
-const groupCreateLimiter = createRedisLimiter(15 * 60 * 1000, 10, 'group:create');
-const groupUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:update');
-const groupDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 5, 'group:delete');
-const groupJoinLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'group:join');
-const groupLeaveLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'group:leave');
-const groupGoalLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:goal');
-const groupChallengeLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:challenge');
+const groupCreateLimiter = createRedisLimiter(15 * 60 * 1000, 30, 'group:create');
+const groupUpdateLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'group:update');
+const groupDeleteLimiter = createRedisLimiter(15 * 60 * 1000, 20, 'group:delete');
+const groupJoinLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'group:join');
+const groupLeaveLimiter = createRedisLimiter(15 * 60 * 1000, 100, 'group:leave');
+const groupGoalLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'group:goal');
+const groupChallengeLimiter = createRedisLimiter(15 * 60 * 1000, 60, 'group:challenge');
 
 // Heatmap endpoints
-const heatmapGetLimiter = createRedisLimiter(60 * 60 * 1000, 100, 'heatmap:get');
-const heatmapRefreshLimiter = createRedisLimiter(60 * 60 * 1000, 10, 'heatmap:refresh');
-const heatmapExportLimiter = createRedisLimiter(60 * 60 * 1000, 5, 'heatmap:export');
-const heatmapStatsLimiter = createRedisLimiter(60 * 60 * 1000, 150, 'heatmap:stats');
-const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 100, 'heatmap:filter');
+const heatmapGetLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:get');
+const heatmapRefreshLimiter = createRedisLimiter(60 * 60 * 1000, 30, 'heatmap:refresh');
+const heatmapExportLimiter = createRedisLimiter(60 * 60 * 1000, 20, 'heatmap:export');
+const heatmapStatsLimiter = createRedisLimiter(60 * 60 * 1000, 1000, 'heatmap:stats');
+const heatmapFilterLimiter = createRedisLimiter(60 * 60 * 1000, 500, 'heatmap:filter');
 
 module.exports = {
   oauthLimiter,

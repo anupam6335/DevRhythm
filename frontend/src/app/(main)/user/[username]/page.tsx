@@ -1,52 +1,99 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { userService } from '@/features/user/services/userService';
-import { heatmapService } from '@/features/heatmap/services/heatmapService';
+import { userServiceServer } from '@/features/user/services/userServiceServer';
+import { heatmapServiceServer } from '@/features/heatmap/services/heatmapServiceServer';
 import { studyGroupService } from '@/features/studyGroup/services/studyGroupService';
 import { patternMasteryService } from '@/features/patternMastery/services/patternMasteryService';
 import { userStatsService } from '@/features/user/services/userStatsService';
 import { UserPageWrapper } from '@/features/user/components';
-import { SITE_NAME, SITE_URL } from '@/shared/config/seo';
+import Breadcrumb from '@/shared/components/Breadcrumb';
+import { SITE_NAME, SITE_URL, DEFAULT_DESCRIPTION } from '@/shared/config/seo';
 import NotFoundPage from '@/shared/components/NotFoundPage';
 import type { GroupListResponse } from '@/features/studyGroup/types/studyGroup.types';
 import type { PatternMasteryListResponse } from '@/features/patternMastery/types/patternMastery.types';
+
+// Helper to generate Person schema
+function generatePersonSchema(user: any, canonicalUrl: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: user.displayName || user.username,
+    alternateName: `@${user.username}`,
+    description: `Solved ${user.stats.totalSolved} coding problems with a ${user.streak.current} day streak and ${user.stats.masteryRate}% mastery rate.`,
+    image: user.avatarUrl || undefined,
+    url: canonicalUrl,
+    mainEntityOfPage: {
+      '@type': 'ProfilePage',
+      '@id': canonicalUrl,
+    },
+  };
+}
+
+// Helper to generate BreadcrumbList schema
+function generateBreadcrumbSchema(items: { name: string; item?: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      ...(item.item && { item: item.item }),
+    })),
+  };
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
 
   try {
-    const user = await userService.getUserByUsername(username);
-    const title = `${user.displayName} (@${user.username}) · ${SITE_NAME}`;
-    const description = `Solved ${user.stats.totalSolved} problems · ${user.streak.current} day streak · ${user.stats.masteryRate}% mastery.`;
+    const user = await userServiceServer.getUserByUsername(username);
+    if (!user?._id || !user.username) {
+      throw new Error('User not found');
+    }
+    const displayName = user.displayName || user.username;
+    const title = `${displayName} (@${user.username}) · Coding Profile · ${SITE_NAME}`;
+    const description = `Solved ${user.stats?.totalSolved ?? 0} problems · 🔥 ${user.streak?.current ?? 0} day streak · 📈 ${user.stats?.masteryRate ?? 0}% mastery. View their progress, heatmap, and solved questions.`;
 
     return {
       title,
       description,
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-snippet': -1,
+          'max-image-preview': 'large',
+          'max-video-preview': -1,
+        },
+      },
       openGraph: {
         title,
         description,
         url: `${SITE_URL}/user/${username}`,
         siteName: SITE_NAME,
-        images: user.avatarUrl ? [{ url: user.avatarUrl }] : undefined,
+        images: user.avatarUrl ? [{ url: user.avatarUrl, alt: displayName }] : [],
         type: 'profile',
-        ...(user.username && {
-          profile: {
-            username: user.username,
-          },
-        }),
+        username: user.username,        // ✅ correct placement for profile type
       },
       twitter: {
-        card: 'summary',
+        card: 'summary_large_image',
         title,
         description,
-        images: user.avatarUrl ? [user.avatarUrl] : undefined,
+        images: user.avatarUrl ? [user.avatarUrl] : [],
+      },
+      alternates: {
+        canonical: `${SITE_URL}/user/${username}`,
       },
     };
   } catch (error) {
     console.error(`Metadata fetch failed for ${username}:`, error);
     return {
       title: 'User Not Found',
-      description: 'The requested user profile does not exist or is private.',
+      description: DEFAULT_DESCRIPTION,
+      robots: 'noindex, nofollow',
     };
   }
 }
@@ -55,12 +102,14 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
   const { username } = await params;
 
   try {
-    // 1. Fetch user first (needed for userId)
-    const user = await userService.getUserByUsername(username);
+    const user = await userServiceServer.getUserByUsername(username);
+    if (!user?._id) {
+      throw new Error('User not found');
+    }
+
     const userId = user._id;
     const currentYear = new Date().getFullYear();
 
-    // 2. Fetch all other public data in parallel
     const [
       heatmapResult,
       progressResult,
@@ -68,45 +117,51 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
       patternsResult,
       statsResult,
     ] = await Promise.allSettled([
-      heatmapService.getPublicUserHeatmap(userId, currentYear),
-      userService.getUserPublicProgress(userId, { limit: 6 }),
+      heatmapServiceServer.getPublicUserHeatmap(userId, currentYear),
+      userServiceServer.getUserPublicProgress(userId, { limit: 6 }),
       studyGroupService.getUserPublicGroups(userId, { limit: 5 }),
       patternMasteryService.getUserPatternMastery(userId, { limit: 4 }),
       userStatsService.getPublicUserStats(userId),
     ]);
 
-    // 3. Extract data with proper typing and fallbacks
     const initialHeatmap = heatmapResult.status === 'fulfilled' ? heatmapResult.value : null;
     const initialProgress = progressResult.status === 'fulfilled' ? progressResult.value : [];
     const initialGroups = groupsResult.status === 'fulfilled' ? groupsResult.value as GroupListResponse : null;
     const initialPatterns = patternsResult.status === 'fulfilled' ? (patternsResult.value as PatternMasteryListResponse).patterns : [];
     const initialDetailedStats = statsResult.status === 'fulfilled' ? statsResult.value : null;
 
-    // 4. Generate structured data (JSON-LD)
-    const structuredData = {
-      '@context': 'https://schema.org',
-      '@type': 'Person',
-      name: user.displayName,
-      alternateName: `@${user.username}`,
-      description: `Solved ${user.stats.totalSolved} coding problems with a ${user.streak.current} day streak and ${user.stats.masteryRate}% mastery rate.`,
-      image: user.avatarUrl || undefined,
-      url: `${SITE_URL}/user/${username}`,
-      sameAs: [], 
-      mainEntityOfPage: {
-        '@type': 'ProfilePage',
-        '@id': `${SITE_URL}/user/${username}`,
-      },
-    };
+    const canonicalUrl = `${SITE_URL}/user/${username}`;
+    const personSchema = generatePersonSchema(user, canonicalUrl);
+    const breadcrumbItemsForSchema = [
+      { name: 'Home', item: SITE_URL },
+      { name: 'Users', item: `${SITE_URL}/users` },
+      { name: user.displayName || user.username },
+    ];
+    const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItemsForSchema);
+
+    const breadcrumbUiItems = [
+      { label: 'Home', href: '/' },
+      { label: 'Users', href: '/users' },
+      { label: user.displayName || user.username },
+    ];
 
     return (
       <>
-        {/* Structured data */}
+        {/* Person Schema */}
         <Script
           id="schema-person"
           type="application/ld+json"
           strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personSchema) }}
         />
+        {/* BreadcrumbList Schema */}
+        <Script
+          id="schema-breadcrumb"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+        <Breadcrumb items={breadcrumbUiItems} />
         <UserPageWrapper
           user={user}
           isOwnProfile={false}
@@ -119,6 +174,7 @@ export default async function PublicUserPage({ params }: { params: Promise<{ use
       </>
     );
   } catch (error) {
+    console.error(`Failed to load user ${username}:`, error);
     return (
       <NotFoundPage
         title="User Not Found"
