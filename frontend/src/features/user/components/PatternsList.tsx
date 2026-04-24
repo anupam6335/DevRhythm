@@ -1,4 +1,3 @@
-// src/features/user/components/PatternsList.tsx
 'use client';
 
 import React from 'react';
@@ -20,10 +19,9 @@ export interface PatternsListProps {
   isOwnProfile?: boolean;
   limit?: number;
   className?: string;
-  initialPatterns?: PatternMastery[]; // server‑fetched data
+  initialPatterns?: PatternMastery[];
 }
 
-// ===== Mastery Ring with hover animation (0% → current) =====
 const MasteryRing: React.FC<{ percentage: number }> = ({ percentage }) => {
   const size = 24;
   const strokeWidth = 2;
@@ -69,7 +67,6 @@ const MasteryRing: React.FC<{ percentage: number }> = ({ percentage }) => {
   );
 };
 
-// ===== Difficulty Dot =====
 const DifficultyDot: React.FC<{ difficulty: 'Easy' | 'Medium' | 'Hard' }> = ({ difficulty }) => {
   const color = {
     Easy: '#2e7d32',
@@ -79,7 +76,6 @@ const DifficultyDot: React.FC<{ difficulty: 'Easy' | 'Medium' | 'Hard' }> = ({ d
   return <span className={styles.difficultyDot} style={{ backgroundColor: color }} title={difficulty} />;
 };
 
-// ===== Pattern Card =====
 const PatternCard: React.FC<{ pattern: PatternMastery; href: string }> = ({ pattern, href }) => {
   const recent = pattern.recentQuestions?.slice(0, 2) || [];
 
@@ -117,7 +113,6 @@ const PatternCard: React.FC<{ pattern: PatternMastery; href: string }> = ({ patt
   );
 };
 
-// ===== Main Component =====
 const PatternsList: React.FC<PatternsListProps> = ({
   userId,
   isOwnProfile = false,
@@ -130,14 +125,13 @@ const PatternsList: React.FC<PatternsListProps> = ({
   const { data, isLoading, error } = useQuery({
     queryKey: ['patterns', userId, { limit }],
     queryFn: () => patternMasteryService.getUserPatternMastery(userId, { limit, page: 1 }),
-    enabled: !!userId && !initialPatterns, // disable if we already have data
+    enabled: !!userId && !initialPatterns,
     initialData: initialPatterns ? { patterns: initialPatterns, pagination: { total: initialPatterns.length } } : undefined,
     staleTime: 5 * 60 * 1000,
   });
 
   const patterns = data?.patterns ?? [];
 
-  // Loading state
   if (isLoading) {
     return (
       <div className={clsx(styles.container, className)}>
@@ -154,7 +148,6 @@ const PatternsList: React.FC<PatternsListProps> = ({
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className={clsx(styles.container, styles.error, className)}>
@@ -163,7 +156,6 @@ const PatternsList: React.FC<PatternsListProps> = ({
     );
   }
 
-  // Empty state
   if (patterns.length === 0) {
     return (
       <div className={clsx(styles.container, styles.empty, className)}>
@@ -192,15 +184,10 @@ const PatternsList: React.FC<PatternsListProps> = ({
     );
   }
 
-  // Display first 4 patterns
   const displayPatterns = patterns.slice(0, 4);
 
-  const getPatternHref = (patternName: string) =>
-    isOwnProfile
-      ? ROUTES.PATTERNS.DETAIL(patternName)
-      : `/users/${userId}/patterns/${encodeURIComponent(patternName)}`;
-
-  // Desktop layout with alternating 60/40 widths
+  const getPatternHref = (pattern: PatternMastery) => ROUTES.PATTERNS.DETAIL(pattern.patternSlug);
+  
   if (isDesktop && displayPatterns.length === 4) {
     const [first, second, third, fourth] = displayPatterns;
 
@@ -209,7 +196,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
         <div className={styles.header}>
           <h2 className={styles.title}>Knowledge Seeds</h2>
           <Link
-            href={isOwnProfile ? ROUTES.PATTERNS.ROOT : `/users/${userId}/patterns`}
+            href={ROUTES.PATTERNS.ROOT}
             className={styles.viewAll}
           >
             View All →
@@ -219,19 +206,19 @@ const PatternsList: React.FC<PatternsListProps> = ({
         <div className={styles.desktopRows}>
           <div className={styles.row}>
             <div className={styles.largeLeft}>
-              <PatternCard pattern={first} href={getPatternHref(first.patternName)} />
+              <PatternCard pattern={first} href={getPatternHref(first)} />
             </div>
             <div className={styles.smallRight}>
-              <PatternCard pattern={second} href={getPatternHref(second.patternName)} />
+              <PatternCard pattern={second} href={getPatternHref(second)} />
             </div>
           </div>
 
           <div className={styles.row}>
             <div className={styles.smallLeft}>
-              <PatternCard pattern={third} href={getPatternHref(third.patternName)} />
+              <PatternCard pattern={third} href={getPatternHref(third)} />
             </div>
             <div className={styles.largeRight}>
-              <PatternCard pattern={fourth} href={getPatternHref(fourth.patternName)} />
+              <PatternCard pattern={fourth} href={getPatternHref(fourth)} />
             </div>
           </div>
         </div>
@@ -239,7 +226,6 @@ const PatternsList: React.FC<PatternsListProps> = ({
     );
   }
 
-  // Tablet / mobile layout
   return (
     <div className={clsx(styles.container, className)}>
       <div className={styles.header}>
@@ -257,7 +243,7 @@ const PatternsList: React.FC<PatternsListProps> = ({
           <PatternCard
             key={pattern._id}
             pattern={pattern}
-            href={getPatternHref(pattern.patternName)}
+            href={getPatternHref(pattern)}
           />
         ))}
       </div>

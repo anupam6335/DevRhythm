@@ -1,4 +1,5 @@
-"use client"
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
@@ -10,7 +11,6 @@ import {
 import { useRecentActivity } from '../hooks/useRecentActivity';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
 import NoRecordFound from '@/shared/components/NoRecordFound';
-import Button from '@/shared/components/Button';
 
 import styles from './RecentActivitySection.module.css';
 
@@ -21,23 +21,28 @@ export interface RecentActivitySectionProps {
   className?: string;
 }
 
-// Helper to format action into human-readable message with icon
+// Helper to format action into human-readable message with icon and link
 const formatActivity = (log: any): { icon: React.ReactNode; message: string; link?: string } => {
   const { action, metadata, targetId } = log;
 
   switch (action) {
     case 'question_solved':
+    case 'question_mastered': {
+      // Use platform-based slug if targetId is populated and has platform info
+      let link: string | undefined;
+      if (targetId && typeof targetId !== 'string') {
+        if (targetId.platform && targetId.platformQuestionId) {
+          link = `/questions/${targetId.platformQuestionId}`;
+        } else if (targetId._id) {
+          link = `/questions`; // fallback
+        }
+      }
       return {
-        icon: <FiCheckCircle className={styles.icon} />,
-        message: `Solved “${metadata?.title || 'a problem'}” (${metadata?.difficulty || '?'}) · ${metadata?.platform || 'Unknown'}`,
-        link: targetId?._id ? `/questions/${targetId._id}` : undefined,
+        icon: action === 'question_mastered' ? <FiStar className={styles.icon} /> : <FiCheckCircle className={styles.icon} />,
+        message: `${action === 'question_mastered' ? 'Mastered' : 'Solved'} “${metadata?.title || 'a problem'}” (${metadata?.difficulty || '?'}) · ${metadata?.platform || 'Unknown'}`,
+        link,
       };
-    case 'question_mastered':
-      return {
-        icon: <FiStar className={styles.icon} />,
-        message: `Mastered “${metadata?.title || 'a problem'}” (${metadata?.difficulty || '?'}) · ${metadata?.platform || 'Unknown'}`,
-        link: targetId?._id ? `/questions/${targetId._id}` : undefined,
-      };
+    }
     case 'joined_group':
       return {
         icon: <FiUsers className={styles.icon} />,
@@ -65,7 +70,6 @@ const formatActivity = (log: any): { icon: React.ReactNode; message: string; lin
   }
 };
 
-// Helper to format relative time
 const formatTime = (timestamp: string): string => {
   try {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -82,10 +86,7 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
 }) => {
   const { data, isLoading, error } = useRecentActivity(userId, isOwnProfile, limit);
 
-  // Don't render anything for public profiles (activity is private)
-  if (!isOwnProfile) {
-    return null;
-  }
+  if (!isOwnProfile) return null;
 
   if (isLoading) {
     return (
