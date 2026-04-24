@@ -397,6 +397,25 @@ const recordTimeSpent = async (req, res, next) => {
       progress.totalTimeSpent += minutes;
     }
 
+    // Check if time threshold reached and question not yet solved
+    const isTimeThresholdReached = progress.totalTimeSpent >= 20;
+    const isNotSolved = progress.status !== 'Solved' && progress.status !== 'Mastered';
+
+    if (isTimeThresholdReached && isNotSolved) {
+      // Queue question.solved job
+      const { jobQueue } = require('../services/queue.service');
+      await jobQueue.add({
+        type: 'question.solved',
+        userId: req.user._id,
+        questionId,
+        progressId: progress._id,
+        timeSpent: minutes,
+        solvedAt: new Date(),
+        source: 'time_based'
+      });
+      // Do NOT change progress.status here – the job will handle it
+    }
+
     if (progress.totalTimeSpent >= 20 && progress.status === 'Not Started') {
       progress.status = 'Attempted';
     }

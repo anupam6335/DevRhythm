@@ -2,6 +2,8 @@ const leaderboardJobs = require('./leaderboard.job');
 const notificationJobs = require('./notification.job');
 const progressSnapshotJobs = require('./progressSnapshot.job');
 const digestJob = require('./digestEmail.job');
+const plannedGoalExpiry = require('./plannedGoalExpiry.job');
+const expiredGoalsJob = require('./expiredGoals.job');  
 
 const startAllJobs = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -9,6 +11,8 @@ const startAllJobs = () => {
     notificationJobs.startNotificationJobs();
     progressSnapshotJobs.startSnapshotJobs();
     digestJob.startDigestJob();
+    plannedGoalExpiry.startPlannedGoalExpiryJob();
+    expiredGoalsJob.startExpiredGoalsJob();  
   }
 };
 
@@ -17,6 +21,8 @@ const stopAllJobs = () => {
   notificationJobs.stopNotificationJobs();
   progressSnapshotJobs.stopSnapshotJobs();
   digestJob.stopDigestJob();
+  plannedGoalExpiry.stopPlannedGoalExpiryJob();
+  expiredGoalsJob.stopExpiredGoalsJob();  
 };
 
 module.exports = {
@@ -26,4 +32,6 @@ module.exports = {
   notificationJobs,
   progressSnapshotJobs,
   digestJob,
+  plannedGoalExpiry,
+  expiredGoalsJob, 
 };

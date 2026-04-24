@@ -5,7 +5,6 @@ const { invalidateCache } = require("../middleware/cache");
 const cacheService = require("../services/cache.service");
 const AppError = require("../utils/errors/AppError");
 const constants = require("../config/constants");
-const { goalCompletedQueue } = require('../services/queue.service');
 const { jobQueue } = require('../services/queue.service');
 
 const getGoals = async (req, res, next) => {
@@ -16,7 +15,13 @@ const getGoals = async (req, res, next) => {
     
     const query = { userId };
     if (goalType) query.goalType = goalType;
-    if (status) query.status = status;
+    if (status) {
+      if (status.includes(',')) {
+        query.status = { $in: status.split(',') };
+      } else {
+        query.status = status;
+      }
+    }
     if (startDate) query.startDate = { $gte: new Date(startDate) };
     if (endDate) query.endDate = { $lte: new Date(endDate) };
     
@@ -24,7 +29,12 @@ const getGoals = async (req, res, next) => {
     sort[sortBy || "startDate"] = sortOrder === "asc" ? 1 : -1;
     
     const [goals, total] = await Promise.all([
-      Goal.find(query).sort(sort).skip(skip).limit(limit).lean(),
+      Goal.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('targetQuestions', '_id title platformQuestionId platform difficulty')
+        .lean(),
       Goal.countDocuments(query)
     ]);
     
@@ -74,7 +84,9 @@ const getCurrentGoals = async (req, res, next) => {
 
 const getGoalById = async (req, res, next) => {
   try {
-    const goal = await Goal.findOne({ _id: req.params.id, userId: req.user._id }).lean();
+    const goal = await Goal.findOne({ _id: req.params.id, userId: req.user._id })
+      .populate('targetQuestions', '_id title platformQuestionId platform difficulty')
+      .lean();
     if (!goal) throw new AppError("Goal not found", 404);
     res.json(formatResponse("Goal retrieved successfully", { goal }));
   } catch (error) {
@@ -89,6 +101,10 @@ const createGoal = async (req, res, next) => {
     
     const start = new Date(startDate);
     const end = new Date(endDate);
+    //  Reject start dates earlier than today (midnight)
+    if (start < getStartOfDay(new Date())) {
+      throw new AppError("Start date cannot be in the past", 400);
+    }
     
     if (end <= start) throw new AppError("End date must be after start date", 400);
     
@@ -125,25 +141,26 @@ const updateGoal = async (req, res, next) => {
     const goalId = req.params.id;
     const updates = req.body;
     
+    const goal = await Goal.findOne({ _id: goalId, userId });
+    if (!goal) throw new AppError("Goal not found", 404);
+    if (goal.status !== "active") throw new AppError("Cannot update a non‑active goal", 400);
+    
     if (updates.startDate || updates.endDate) {
-      const goal = await Goal.findById(goalId);
-      if (!goal) throw new AppError("Goal not found", 404);
-      if (goal.userId.toString() !== userId.toString()) throw new AppError("Unauthorized", 403);
       if (goal.status === "completed") throw new AppError("Cannot update completed goal", 400);
     }
     
-    const goal = await Goal.findOneAndUpdate(
+    const updatedGoal = await Goal.findOneAndUpdate(
       { _id: goalId, userId },
       updates,
       { new: true, runValidators: true }
     );
     
-    if (!goal) throw new AppError("Goal not found", 404);
+    if (!updatedGoal) throw new AppError("Goal not found", 404);
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
     
-    res.json(formatResponse("Goal updated successfully", { goal }));
+    res.json(formatResponse("Goal updated successfully", { goal: updatedGoal }));
   } catch (error) {
     next(error);
   }
@@ -164,7 +181,6 @@ const incrementGoal = async (req, res, next) => {
     
     await goal.save();
     
-    // Emit event if just completed
     await jobQueue.add({
       type: 'goal.completed',
       userId,
@@ -496,6 +512,228 @@ const getGoalHistory = async (req, res, next) => {
   }
 };
 
+const createPlannedGoal = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { questionIds, timeframe, startDate, endDate } = req.body;
+
+    if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
+      throw new AppError('At least one question ID is required', 400);
+    }
+
+    const Question = require("../models/Question");
+    const questions = await Question.find({ _id: { $in: questionIds }, isActive: true }).select("_id");
+    if (questions.length !== questionIds.length) {
+      throw new AppError("One or more question IDs are invalid or inactive", 400);
+    }
+
+    let goalStartDate, goalEndDate;
+
+    if (startDate && endDate) {
+      goalStartDate = new Date(startDate);
+      goalEndDate = new Date(endDate);
+      if (isNaN(goalStartDate.getTime()) || isNaN(goalEndDate.getTime())) {
+        throw new AppError("Invalid startDate or endDate format", 400);
+      }
+      if (goalEndDate <= goalStartDate) {
+        throw new AppError("End date must be after start date", 400);
+      }
+      
+      //  Reject past end dates
+      const now = new Date();
+      if (goalEndDate < now) {
+        throw new AppError("End date cannot be in the past", 400);
+      }
+    } else if (timeframe) {
+      const { getDateRangeFromTimeframe } = require("../services/timeframe.service");
+      const range = getDateRangeFromTimeframe(timeframe);
+      goalStartDate = range.startDate;
+      goalEndDate = range.endDate;
+      // Timeframe presets already ensure future dates (today, tomorrow, nextWeek, withinMonth)
+    } else {
+      throw new AppError("Either timeframe or startDate/endDate must be provided", 400);
+    }
+
+    // Start date cannot be in the past
+    if (goalStartDate < getStartOfDay(new Date())) {
+      throw new AppError("Start date cannot be in the past", 400);
+    }
+
+    // Check for overlapping goals
+    const overlappingGoals = await Goal.find({
+      userId,
+      goalType: "planned",
+      status: "active",
+      startDate: { $lte: goalEndDate },
+      endDate: { $gte: goalStartDate },
+      targetQuestions: { $in: questionIds },
+    }).lean();
+
+    if (overlappingGoals.length > 0) {
+      const conflictingQuestionIds = overlappingGoals.flatMap((g) => g.targetQuestions);
+      const conflictSet = new Set(conflictingQuestionIds.map((id) => id.toString()));
+      const conflicting = questionIds.filter((id) => conflictSet.has(id.toString()));
+      throw new AppError(
+        `Question(s) ${conflicting.join(", ")} already belong to another active planned goal in the same time period`,
+        409
+      );
+    }
+
+    const goal = await Goal.create({
+      userId,
+      goalType: "planned",
+      targetCount: questionIds.length,
+      targetQuestions: questionIds,
+      completedQuestions: [],
+      startDate: goalStartDate,
+      endDate: goalEndDate,
+      status: "active",
+    });
+
+    await invalidateCache(`goals:*:user:${userId}:*`);
+    res.status(201).json(formatResponse("Planned goal created successfully", { goal }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPlannedGoals = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = getPaginationParams(req);
+    const { status } = req.query;
+    const query = { userId: req.user._id, goalType: "planned" };
+    
+    if (status) {
+      if (status.includes(',')) {
+        query.status = { $in: status.split(',') };
+      } else {
+        query.status = status;
+      }
+    }
+    
+    const sort = { startDate: -1 };
+    const [goals, total] = await Promise.all([
+      Goal.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('targetQuestions', '_id title platformQuestionId platform difficulty')
+        .lean(),
+      Goal.countDocuments(query),
+    ]);
+
+    res.json(
+      formatResponse("Planned goals retrieved", { goals }, { pagination: paginate(total, page, limit) })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deletePlannedGoal = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const goalId = req.params.id;
+    const goal = await Goal.findOneAndDelete({ _id: goalId, userId, goalType: "planned" });
+    if (!goal) throw new AppError("Planned goal not found", 404);
+    await invalidateCache(`goals:*:user:${userId}:*`);
+    res.json(formatResponse("Planned goal deleted successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+const copyGoal = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const goalId = req.params.id;
+    const { timeframe, startDate, endDate } = req.body;
+
+    const originalGoal = await Goal.findOne({ _id: goalId, userId });
+    if (!originalGoal) {
+      throw new AppError('Goal not found', 404);
+    }
+
+    let newStartDate, newEndDate;
+    if (startDate && endDate) {
+      newStartDate = new Date(startDate);
+      newEndDate = new Date(endDate);
+      if (isNaN(newStartDate.getTime()) || isNaN(newEndDate.getTime())) {
+        throw new AppError('Invalid startDate or endDate', 400);
+      }
+      if (newEndDate <= newStartDate) {
+        throw new AppError('End date must be after start date', 400);
+      }
+    } else if (timeframe) {
+      const { getDateRangeFromTimeframe } = require('../services/timeframe.service');
+      const range = getDateRangeFromTimeframe(timeframe);
+      newStartDate = range.startDate;
+      newEndDate = range.endDate;
+    } else {
+      throw new AppError('Either timeframe or startDate/endDate must be provided', 400);
+    }
+
+     //  Start date cannot be in the past
+    if (newStartDate < getStartOfDay(new Date())) {
+      throw new AppError("Start date cannot be in the past", 400);
+    }
+
+    let newGoalData = {
+      userId,
+      goalType: originalGoal.goalType,
+      startDate: newStartDate,
+      endDate: newEndDate,
+      status: 'active',
+      completedCount: 0,
+      completedQuestions: [],
+    };
+
+    if (originalGoal.goalType === 'planned') {
+      newGoalData.targetQuestions = originalGoal.targetQuestions;
+      newGoalData.targetCount = originalGoal.targetQuestions.length;
+    } else {
+      newGoalData.targetCount = originalGoal.targetCount;
+    }
+
+    if (originalGoal.goalType === 'planned') {
+      const overlapping = await Goal.findOne({
+        userId,
+        goalType: 'planned',
+        status: 'active',
+        startDate: { $lte: newEndDate },
+        endDate: { $gte: newStartDate },
+        targetQuestions: { $in: originalGoal.targetQuestions },
+      });
+      if (overlapping) {
+        throw new AppError(
+          'One or more questions already belong to another active planned goal in the new time period',
+          409
+        );
+      }
+    } else {
+      const existing = await Goal.findOne({
+        userId,
+        goalType: originalGoal.goalType,
+        startDate: { $lte: newEndDate },
+        endDate: { $gte: newStartDate },
+        status: 'active',
+      });
+      if (existing) {
+        throw new AppError(
+          `You already have an active ${originalGoal.goalType} goal in the selected period`,
+          409
+        );
+      }
+    }
+
+    const newGoal = await Goal.create(newGoalData);
+    await invalidateCache(`goals:*:user:${userId}:*`);
+    res.status(201).json(formatResponse('Goal copied successfully', { goal: newGoal }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getDaysBetween = (startDate, endDate) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -515,5 +753,9 @@ module.exports = {
   autoCreateGoals,
   deleteGoal,
   getGoalStats,
-  getGoalHistory
+  getGoalHistory,
+  createPlannedGoal,
+  getPlannedGoals,
+  deletePlannedGoal,
+  copyGoal,
 };

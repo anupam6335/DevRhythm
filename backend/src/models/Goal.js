@@ -9,7 +9,7 @@ const GoalSchema = new mongoose.Schema(
     },
     goalType: {
       type: String,
-      enum: ["daily", "weekly"],
+      enum: ["daily", "weekly", "planned"],
       required: true,
     },
     targetCount: {
@@ -50,6 +50,18 @@ const GoalSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    targetQuestions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Question",
+      },
+    ],
+    completedQuestions: [
+      {
+        questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question" },
+        completedAt: Date,
+      },
+    ],
   },
   {
     timestamps: true,
@@ -61,13 +73,23 @@ GoalSchema.index({ userId: 1, status: 1, endDate: 1 });
 GoalSchema.index({ userId: 1, endDate: -1 });
 GoalSchema.index({ userId: 1, completionPercentage: -1 });
 GoalSchema.index({ userId: 1, goalType: 1, status: 1 });
+GoalSchema.index({ userId: 1, targetQuestions: 1 });
+GoalSchema.index({ userId: 1, goalType: "planned", status: 1, startDate: 1, endDate: 1 });
 
 GoalSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
+
+  // For planned goals, derive targetCount and completedCount from arrays
+  if (this.goalType === "planned") {
+    this.targetCount = this.targetQuestions.length;
+    this.completedCount = this.completedQuestions.length;
+  }
+
   this.completionPercentage = Math.min(
     100,
     Math.round((this.completedCount / this.targetCount) * 100)
   );
+
   if (this.completedCount >= this.targetCount && this.status !== "completed") {
     this.status = "completed";
     this.achievedAt = new Date();

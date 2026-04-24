@@ -28,7 +28,7 @@ const handleQuestionSolved = async (job) => {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
-    // --- Determine if this is a first-time solve ---
+    // Determine if this is a first-time solve
     const existingProgress = await UserQuestionProgress.findOne({
       userId,
       questionId,
@@ -74,7 +74,7 @@ const handleQuestionSolved = async (job) => {
     await user.save();
     await invalidateUserCache(userId);
 
-    // --- 2. Update UserQuestionProgress atomically ---
+    // --- 2. Update UserQuestionProgress ---
     await UserQuestionProgress.findOneAndUpdate(
       { userId, questionId },
       {
@@ -92,7 +92,7 @@ const handleQuestionSolved = async (job) => {
           "attempts.firstAttemptAt": solvedDate,
         },
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true }
     );
 
     // --- 3. Update PatternMastery for each pattern ---
@@ -121,24 +121,21 @@ const handleQuestionSolved = async (job) => {
           pattern.totalAttempts += 1;
           pattern.successfulAttempts += 1;
         } else {
-          // Repeat solve: still count as an attempt, but not as a new solve
           pattern.totalAttempts += 1;
           pattern.successfulAttempts += 1;
         }
 
+        // Defensive check for data inconsistency
         if (pattern.successfulAttempts > pattern.totalAttempts) {
           console.warn(
-            `[pattern] Data inconsistency for ${patternName}: successfulAttempts=${pattern.successfulAttempts}, totalAttempts=${pattern.totalAttempts}. Correcting.`,
+            `[pattern] Data inconsistency for ${patternName}: successfulAttempts=${pattern.successfulAttempts}, totalAttempts=${pattern.totalAttempts}. Correcting.`
           );
           pattern.successfulAttempts = pattern.totalAttempts;
         }
 
         pattern.successRate =
           pattern.totalAttempts > 0
-            ? Math.min(
-                100,
-                (pattern.successfulAttempts / pattern.totalAttempts) * 100,
-              )
+            ? Math.min(100, (pattern.successfulAttempts / pattern.totalAttempts) * 100)
             : 0;
 
         const totalPatternQuestions = await Question.countDocuments({
@@ -146,22 +143,19 @@ const handleQuestionSolved = async (job) => {
         });
         pattern.masteryRate =
           totalPatternQuestions > 0
-            ? Math.min(
-                100,
-                (pattern.masteredCount / totalPatternQuestions) * 100,
-              )
+            ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100)
             : 0;
 
         pattern.confidenceLevel =
           pattern.masteryRate >= 80
             ? 5
             : pattern.masteryRate >= 60
-              ? 4
-              : pattern.masteryRate >= 40
-                ? 3
-                : pattern.masteryRate >= 20
-                  ? 2
-                  : 1;
+            ? 4
+            : pattern.masteryRate >= 40
+            ? 3
+            : pattern.masteryRate >= 20
+            ? 2
+            : 1;
 
         pattern.lastPracticed = solvedDate;
         pattern.lastUpdated = new Date();
@@ -175,7 +169,7 @@ const handleQuestionSolved = async (job) => {
           platform: question.platform,
           difficulty: question.difficulty,
           solvedAt: solvedDate,
-          status: 'Solved',
+          status: "Solved",
           timeSpent,
         });
         if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
@@ -185,7 +179,40 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
 
-    // --- 4. RevisionSchedule (auto‑complete first revision) – only for first solve ---
+    // --- 4. Update Planned Goals (new feature) ---
+    const activePlannedGoals = await Goal.find({
+      userId,
+      goalType: "planned",
+      status: "active",
+      targetQuestions: questionId,
+      startDate: { $lte: solvedDate },
+      endDate: { $gte: solvedDate },
+    });
+
+    for (const goal of activePlannedGoals) {
+      const alreadyCompleted = goal.completedQuestions.some(
+        (cq) => cq.questionId.toString() === questionId.toString()
+      );
+      if (!alreadyCompleted) {
+        goal.completedQuestions.push({ questionId, completedAt: solvedDate });
+        await goal.save();
+
+        if (goal.status === "completed") {
+          const { jobQueue } = require("../services/queue.service");
+          await jobQueue.add({
+            type: "goal.completed",
+            userId,
+            goalId: goal._id,
+            completedAt: goal.achievedAt,
+            goalType: goal.goalType,
+            targetCount: goal.targetCount,
+            completedCount: goal.completedCount,
+          });
+        }
+      }
+    }
+
+    // --- 5. RevisionSchedule (auto‑complete first revision) ---
     if (isFirstSolve) {
       const existingRevision = await RevisionSchedule.findOne({
         userId,
@@ -219,7 +246,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`revisions:*:user:${userId}:*`);
     }
 
-    // --- 5. Update Goals (only first solve contributes to goal progress) ---
+    // --- 6. Update daily/weekly goals (existing) ---
     if (isFirstSolve) {
       const dayStart = getStartOfDay(solvedDate);
       const dailyGoal = await Goal.findOne({
@@ -233,8 +260,9 @@ const handleQuestionSolved = async (job) => {
         dailyGoal.completedCount += 1;
         await dailyGoal.save();
         if (dailyGoal.completedCount >= dailyGoal.targetCount) {
-          const { goalCompletedQueue } = require("../queue.service");
-          await goalCompletedQueue.add({
+          const { jobQueue } = require("../services/queue.service");
+          await jobQueue.add({
+            type: "goal.completed",
             userId,
             goalId: dailyGoal._id,
             completedAt: new Date(),
@@ -247,7 +275,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
-    // --- 6. ActivityLog (always log) ---
+    // --- 7. ActivityLog (with platformQuestionId) ---
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -255,6 +283,7 @@ const handleQuestionSolved = async (job) => {
       targetModel: "Question",
       metadata: {
         title: question.title,
+        platformQuestionId: question.platformQuestionId,
         difficulty: question.difficulty,
         platform: question.platform,
         pattern: question.pattern,
@@ -264,7 +293,7 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    // --- 7. HeatmapData – create if missing, update correctly ---
+    // --- 8. HeatmapData ---
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -273,35 +302,23 @@ const handleQuestionSolved = async (job) => {
     if (heatmap) {
       const activityDateStr = solvedDate.toISOString().split("T")[0];
       const dayEntry = heatmap.dailyData.find(
-        (d) => d.date.toISOString().split("T")[0] === activityDateStr,
+        (d) => d.date.toISOString().split("T")[0] === activityDateStr
       );
       if (dayEntry) {
-        // Always increment total activities and time spent
         dayEntry.totalActivities += 1;
         dayEntry.totalSubmissions += 1;
         dayEntry.totalTimeSpent += timeSpent;
-
-        // Only increment newProblemsSolved on first solve
         if (isFirstSolve) {
           dayEntry.newProblemsSolved += 1;
         }
-
-        // Update intensity level (0-4 based on totalActivities)
-        dayEntry.intensityLevel = Math.min(
-          4,
-          Math.floor(dayEntry.totalActivities / 3),
-        );
-      } else {
-        console.error(
-          `[heatmap] No daily entry found for date ${activityDateStr}`,
-        );
+        dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }
       heatmap.lastUpdated = new Date();
       await heatmap.save();
       await invalidateCache(`heatmap:*:user:${userId}:*`);
     }
 
-    // --- 8. Notifications ---
+    // --- 9. Notifications (with platformQuestionId) ---
     if (isFirstSolve) {
       await Notification.create({
         userId,
@@ -310,6 +327,7 @@ const handleQuestionSolved = async (job) => {
         message: `You solved "${question.title}"`,
         data: {
           questionId,
+          platformQuestionId: question.platformQuestionId,
           title: question.title,
           difficulty: question.difficulty,
           platform: question.platform,
@@ -338,10 +356,7 @@ const handleQuestionSolved = async (job) => {
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
   } catch (error) {
-    console.error(
-      `[question.solved] Error processing for user ${userId}:`,
-      error,
-    );
+    console.error(`[question.solved] Error processing for user ${userId}:`, error);
     throw error;
   }
 };
