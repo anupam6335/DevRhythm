@@ -3333,6 +3333,19 @@ const runCode = async (req, res, next) => {
       await progress.save();
       await invalidateProgressCache(req.user._id);
 
+      // --- Queue question.solved job for goal and revision sync ---
+      if (jobQueue) {
+        await jobQueue.add({
+          type: 'question.solved',
+          userId: req.user._id,
+          questionId,
+          progressId: progress._id,
+          timeSpent: 0,
+          solvedAt: new Date(),
+          source: 'test_case'
+        });
+      }
+
       await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
 
       // Automatically complete today's revision by skipping any overdue revisions
