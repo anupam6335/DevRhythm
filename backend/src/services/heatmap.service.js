@@ -192,7 +192,7 @@ const generateCachedRenderData = (dailyData) => {
   const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const tooltipData = dailyData.map((day) => ({
     date: day.date,
-    summary: `${day.totalActivities} activity${day.totalActivities !== 1 ? 'ies' : ''} on ${formatDate(day.date)}`,
+    summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${formatDate(day.date)}`,
     details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Time: ${day.totalTimeSpent}min`,
   }));
   const today = getStartOfDay(new Date());

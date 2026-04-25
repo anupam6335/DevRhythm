@@ -3150,19 +3150,6 @@ const runCode = async (req, res, next) => {
         passed = normalizedActual === normalizedExpected;
       }
 
-      // --- NEW: emit background job for each test case execution (pass or fail) ---
-      if (jobQueue) {
-        jobQueue.add({
-          type: 'test_case.executed',
-          userId: req.user._id,
-          questionId,
-          passed,
-          executedAt: new Date(),
-          language,
-        }).catch(err => console.error('Failed to queue test_case.executed:', err));
-      }
-      // -----------------------------------------------------------------------
-
       return {
         input: testCase.stdin,
         output: actualOutput,
@@ -3172,6 +3159,25 @@ const runCode = async (req, res, next) => {
         passed,
       };
     });
+
+    // --- EMIT ONE AGGREGATED JOB FOR THE ENTIRE SUBMISSION (not per test case) ---
+    if (jobQueue) {
+      const passedCount = results.filter(r => r.passed).length;
+      const failedCount = results.filter(r => !r.passed).length;
+      const totalTestCases = results.length;
+      await jobQueue.add({
+        type: 'test_case.executed',
+        userId: req.user._id,
+        questionId,
+        passedCount,
+        failedCount,
+        totalTestCases,
+        allPassed: passedCount === totalTestCases,
+        executedAt: new Date(),
+        language,
+      });
+    }
+    // ---------------------------------------------------------------------------
 
     const passedCount = results.filter((r) => r.passed).length;
     const totalCount = finalTestCases.length;

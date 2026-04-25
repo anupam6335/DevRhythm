@@ -19,7 +19,7 @@ const { client: redisClient } = require('../config/redis');
 const generateTooltipData = (dailyData) => {
   return dailyData.map(day => ({
     date: day.date,
-    summary: `${day.totalActivities} activit${day.totalActivities !== 1 ? 'ies' : 'y'} on ${formatDate(day.date)}`,
+    summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${formatDate(day.date)}`,
     details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Submissions: ${day.totalSubmissions}, Study: ${day.studyGroupActivity}, Time: ${day.totalTimeSpent}min`
   }));
 };
