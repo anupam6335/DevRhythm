@@ -93,13 +93,6 @@ router.get("/planned",
   goalController.getPlannedGoals
 );
 
-// router.patch("/planned/:id/complete-question",
-//   auth,
-//   rateLimiters.progressUpdateLimiter,
-//   validate(Joi.object({ id: Joi.string().hex().length(24).required() }), "params"),
-//   validate(Joi.object({ questionId: Joi.string().hex().length(24).required() }), "body"),
-//   goalController.completeQuestionInPlannedGoal
-// );
 
 router.delete("/planned/:id",
   auth,

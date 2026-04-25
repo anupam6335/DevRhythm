@@ -14,6 +14,7 @@ const {
 const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
+const { DateTime } = require("luxon");
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
@@ -31,14 +32,23 @@ const handleQuestionSolved = async (job) => {
 
     const userTimeZone = user.preferences?.timezone || "UTC";
 
-    // Determine if this is a first-time solve
-    const existingProgress = await UserQuestionProgress.findOne({
-      userId,
-      questionId,
-    }).select("status");
-    const isFirstSolve = !existingProgress || existingProgress.status !== "Solved";
+    // --- Update UserQuestionProgress with solvedToday logic ---
+    let progress = await UserQuestionProgress.findOne({ userId, questionId });
+    const todayStartUTC = getStartOfDay(new Date(), userTimeZone);
+    const wasSolvedToday = progress?.solvedToday && progress?.lastActivityDate >= todayStartUTC;
 
-    // --- 1. Update UserStats and Streak (using user timezone) ---
+    let solvedTodayChanged = false;
+    if (!wasSolvedToday) {
+      if (progress) {
+        progress.solvedToday = true;
+        progress.lastActivityDate = solvedDate;
+        solvedTodayChanged = true;
+      }
+    }
+
+    const isFirstSolve = !progress || progress.status !== "Solved";
+
+    // --- 1. Update UserStats and Streak ---
     if (isFirstSolve) {
       user.stats.totalSolved += 1;
     }
@@ -50,39 +60,36 @@ const handleQuestionSolved = async (job) => {
     if (rawMasteryRate > 100) rawMasteryRate = 100;
     user.stats.masteryRate = rawMasteryRate;
 
-    // Update streak and active days using user timezone
     await updateUserActivity(userId, solvedDate, userTimeZone);
-
     await user.save();
     await invalidateUserCache(userId);
 
-    // --- 2. Update UserQuestionProgress ---
-    await UserQuestionProgress.findOneAndUpdate(
-      { userId, questionId },
-      {
-        $inc: {
-          totalTimeSpent: timeSpent,
-          ...(isFirstSolve ? { "attempts.count": 1 } : {}),
-        },
-        $set: {
-          status: "Solved",
-          "attempts.solvedAt": solvedDate,
-          "attempts.lastAttemptAt": solvedDate,
-          updatedAt: solvedDate,
-        },
-        $setOnInsert: {
-          "attempts.firstAttemptAt": solvedDate,
-        },
+    // --- 2. Save/Update UserQuestionProgress ---
+    const updateData = {
+      $inc: {
+        totalTimeSpent: timeSpent,
+        ...(isFirstSolve ? { "attempts.count": 1 } : {}),
       },
+      $set: {
+        status: "Solved",
+        "attempts.solvedAt": solvedDate,
+        "attempts.lastAttemptAt": solvedDate,
+        updatedAt: solvedDate,
+        solvedToday: true,
+        lastActivityDate: solvedDate,
+      },
+      $setOnInsert: {
+        "attempts.firstAttemptAt": solvedDate,
+      },
+    };
+    progress = await UserQuestionProgress.findOneAndUpdate(
+      { userId, questionId },
+      updateData,
       { upsert: true, new: true }
     );
 
-    // --- 3. Update PatternMastery for each pattern ---
-    if (
-      question.pattern &&
-      Array.isArray(question.pattern) &&
-      question.pattern.length > 0
-    ) {
+    // --- 3. Update PatternMastery ---
+    if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
         let pattern = await PatternMastery.findOne({ userId, patternName });
         if (!pattern) {
@@ -94,8 +101,7 @@ const handleQuestionSolved = async (job) => {
           });
         } else {
           if (!pattern.title) pattern.title = patternName;
-          if (!pattern.description)
-            pattern.description = `Problems using the ${patternName} pattern`;
+          if (!pattern.description) pattern.description = `Problems using the ${patternName} pattern`;
         }
 
         if (isFirstSolve) {
@@ -114,33 +120,12 @@ const handleQuestionSolved = async (job) => {
           pattern.successfulAttempts = pattern.totalAttempts;
         }
 
-        pattern.successRate =
-          pattern.totalAttempts > 0
-            ? Math.min(100, (pattern.successfulAttempts / pattern.totalAttempts) * 100)
-            : 0;
-
-        const totalPatternQuestions = await Question.countDocuments({
-          pattern: patternName,
-        });
-        pattern.masteryRate =
-          totalPatternQuestions > 0
-            ? Math.min(100, (pattern.masteredCount / totalPatternQuestions) * 100)
-            : 0;
-
-        pattern.confidenceLevel =
-          pattern.masteryRate >= 80
-            ? 5
-            : pattern.masteryRate >= 60
-            ? 4
-            : pattern.masteryRate >= 40
-            ? 3
-            : pattern.masteryRate >= 20
-            ? 2
-            : 1;
-
+        pattern.successRate = pattern.totalAttempts > 0 ? (pattern.successfulAttempts / pattern.totalAttempts) * 100 : 0;
+        const totalPatternQuestions = await Question.countDocuments({ pattern: patternName });
+        pattern.masteryRate = totalPatternQuestions > 0 ? (pattern.masteredCount / totalPatternQuestions) * 100 : 0;
+        pattern.confidenceLevel = pattern.masteryRate >= 80 ? 5 : pattern.masteryRate >= 60 ? 4 : pattern.masteryRate >= 40 ? 3 : pattern.masteryRate >= 20 ? 2 : 1;
         pattern.lastPracticed = solvedDate;
         pattern.lastUpdated = new Date();
-
         pattern.recentQuestions.unshift({
           questionProgressId: progressId,
           questionId,
@@ -154,20 +139,25 @@ const handleQuestionSolved = async (job) => {
           timeSpent,
         });
         if (pattern.recentQuestions.length > 10) pattern.recentQuestions.pop();
-
         await pattern.save();
       }
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
 
     // --- 4. Update Planned Goals ---
+    const solvedLocal = DateTime.fromJSDate(solvedDate, { zone: userTimeZone });
+    const solvedLocalMidnight = solvedLocal.startOf('day');
+    const solvedLocalEnd = solvedLocal.endOf('day');
+    const startUTC = solvedLocalMidnight.toUTC().toJSDate();
+    const endUTC = solvedLocalEnd.toUTC().toJSDate();
+
     const activePlannedGoals = await Goal.find({
       userId,
       goalType: "planned",
       status: "active",
       targetQuestions: questionId,
-      startDate: { $lte: solvedDate },
-      endDate: { $gte: solvedDate },
+      startDate: { $lte: endUTC },
+      endDate: { $gte: startUTC },
     });
 
     for (const goal of activePlannedGoals) {
@@ -178,16 +168,22 @@ const handleQuestionSolved = async (job) => {
         goal.completedQuestions.push({ questionId, completedAt: solvedDate });
         await goal.save();
 
-        if (goal.status === "completed") {
+        if (goal.completedQuestions.length === goal.targetQuestions.length) {
+          const completedQuestionDetails = {
+            questionId: questionId.toString(),
+            platformQuestionId: question.platformQuestionId,
+            title: question.title,
+          };
           const { jobQueue } = require("../queue.service");
           await jobQueue.add({
             type: "goal.completed",
             userId,
             goalId: goal._id,
-            completedAt: goal.achievedAt,
+            completedAt: goal.achievedAt || new Date(),
             goalType: goal.goalType,
             targetCount: goal.targetCount,
             completedCount: goal.completedCount,
+            completedQuestionDetails,
           });
         }
       }
@@ -195,10 +191,7 @@ const handleQuestionSolved = async (job) => {
 
     // --- 5. RevisionSchedule (auto‑complete first revision) ---
     if (isFirstSolve) {
-      const existingRevision = await RevisionSchedule.findOne({
-        userId,
-        questionId,
-      });
+      const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
       if (!existingRevision) {
         const baseDate = solvedDate;
         const schedule = [1, 3, 7, 14, 30].map((days) => {
@@ -207,7 +200,6 @@ const handleQuestionSolved = async (job) => {
           d.setHours(0, 0, 0, 0);
           return d;
         });
-
         await RevisionSchedule.create({
           userId,
           questionId,
@@ -215,20 +207,14 @@ const handleQuestionSolved = async (job) => {
           baseDate,
           status: "active",
           currentRevisionIndex: 1,
-          completedRevisions: [
-            {
-              date: schedule[0],
-              completedAt: new Date(),
-              status: "completed",
-            },
-          ],
+          completedRevisions: [{ date: schedule[0], completedAt: new Date(), status: "completed" }],
         });
       }
       await invalidateCache(`revisions:*:user:${userId}:*`);
     }
 
-    // --- 6. Update daily/weekly goals ---
-    if (isFirstSolve) {
+    // --- 6. Update daily/weekly goals (only once per day) ---
+    if (!wasSolvedToday) {
       const dayStart = getStartOfDay(solvedDate, userTimeZone);
       const dailyGoal = await Goal.findOne({
         userId,
@@ -274,7 +260,7 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    // --- 8. HeatmapData (using user timezone) ---
+    // --- 8. HeatmapData ---
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -282,16 +268,12 @@ const handleQuestionSolved = async (job) => {
     }
     if (heatmap) {
       const activityDateStr = solvedDate.toISOString().split("T")[0];
-      const dayEntry = heatmap.dailyData.find(
-        (d) => d.date.toISOString().split("T")[0] === activityDateStr
-      );
+      const dayEntry = heatmap.dailyData.find((d) => d.date.toISOString().split("T")[0] === activityDateStr);
       if (dayEntry) {
         dayEntry.totalActivities += 1;
         dayEntry.totalSubmissions += 1;
         dayEntry.totalTimeSpent += timeSpent;
-        if (isFirstSolve) {
-          dayEntry.newProblemsSolved += 1;
-        }
+        if (isFirstSolve) dayEntry.newProblemsSolved += 1;
         dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
       }
       heatmap.lastUpdated = new Date();

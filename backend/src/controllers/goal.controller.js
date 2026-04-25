@@ -1,3 +1,4 @@
+// src/controllers/goal.controller.js
 const Goal = require("../models/Goal");
 const User = require("../models/User");
 const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, formatDate } = require("../utils/helpers");
@@ -532,7 +533,7 @@ const createPlannedGoal = async (req, res, next) => {
     }
 
     const Question = require("../models/Question");
-    const questions = await Question.find({ _id: { $in: questionIds }, isActive: true }).select("_id");
+    const questions = await Question.find({ _id: { $in: questionIds }, isActive: true }).select("_id title platformQuestionId platform difficulty");
     if (questions.length !== questionIds.length) {
       throw new AppError("One or more question IDs are invalid or inactive", 400);
     }
@@ -556,7 +557,6 @@ const createPlannedGoal = async (req, res, next) => {
       }
     } else if (timeframe) {
       const { getDateRangeFromTimeframe } = require("../services/timeframe.service");
-      // FIX: Pass timeZone to the service
       const range = getDateRangeFromTimeframe(timeframe, timeZone);
       goalStartDate = range.startDate;
       goalEndDate = range.endDate;
@@ -598,6 +598,9 @@ const createPlannedGoal = async (req, res, next) => {
       endDate: goalEndDate,
       status: "active",
     });
+
+    // Populate targetQuestions before sending response
+    await goal.populate('targetQuestions', '_id title platformQuestionId platform difficulty');
 
     await invalidateCache(`goals:*:user:${userId}:*`);
     res.status(201).json(formatResponse("Planned goal created successfully", { goal }));
@@ -676,7 +679,6 @@ const copyGoal = async (req, res, next) => {
       }
     } else if (timeframe) {
       const { getDateRangeFromTimeframe } = require('../services/timeframe.service');
-      // FIX: Pass timeZone to the service
       const range = getDateRangeFromTimeframe(timeframe, timeZone);
       newStartDate = range.startDate;
       newEndDate = range.endDate;
@@ -737,6 +739,12 @@ const copyGoal = async (req, res, next) => {
     }
 
     const newGoal = await Goal.create(newGoalData);
+    
+    // Populate targetQuestions if it's a planned goal before sending response
+    if (newGoal.goalType === 'planned') {
+      await newGoal.populate('targetQuestions', '_id title platformQuestionId platform difficulty');
+    }
+    
     await invalidateCache(`goals:*:user:${userId}:*`);
     res.status(201).json(formatResponse('Goal copied successfully', { goal: newGoal }));
   } catch (error) {

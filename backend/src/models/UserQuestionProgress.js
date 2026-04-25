@@ -65,10 +65,19 @@ const UserQuestionProgressSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
   }],
+  solvedToday: {
+    type: Boolean,
+    default: false,
+  },
+  lastActivityDate: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });
 
+// Indexes (unchanged)
 UserQuestionProgressSchema.index({ userId: 1, questionId: 1 }, { unique: true });
 UserQuestionProgressSchema.index({ userId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, updatedAt: -1 });
@@ -78,8 +87,9 @@ UserQuestionProgressSchema.index({ questionId: 1, status: 1 });
 UserQuestionProgressSchema.index({ userId: 1, confidenceLevel: -1 });
 UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
 UserQuestionProgressSchema.index({ userId: 1, personalDifficulty: 1 });
+UserQuestionProgressSchema.index({ userId: 1, lastActivityDate: 1 });
 
-// ----- Auto‑recalculation hooks -----
+// Auto‑recalculation hooks (unchanged)
 UserQuestionProgressSchema.post('save', async function(doc) {
   if (doc.__recursing) return;
   doc.__recursing = true;
@@ -111,7 +121,7 @@ UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
   }
 });
 
-// ----- Existing pattern‑mastery hooks -----
+// Pattern‑mastery hooks (unchanged)
 UserQuestionProgressSchema.post('save', async function(doc) {
   try {
     const patternMasteryService = require('../services/patternMastery.service');
