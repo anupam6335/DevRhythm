@@ -52,5 +52,14 @@ router.get('/:userId/groups',
 router.get('/:username', validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
 router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);
 router.get('/:userId/pattern-mastery', optionalAuth, getUserPatternMastery);
+router.put('/me/timezone',
+  auth,
+  rateLimiters.userLimiter,
+  validate(Joi.object({
+    newTimezone: Joi.string().required(),
+    confirm: Joi.boolean().default(false)
+  })),
+  userController.changeTimezone
+);
 
 module.exports = router;

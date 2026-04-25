@@ -3,7 +3,7 @@ const Share = require('../models/Share');
 const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
-const { formatResponse, paginate, getPaginationParams, formatDate } = require('../utils/helpers');
+const { formatResponse, paginate, getPaginationParams, formatDate, getStartOfDay, getEndOfDay } = require('../utils/helpers');
 const { invalidateCache } = require('../middleware/cache');
 const AppError = require('../utils/errors/AppError');
 
@@ -45,10 +45,10 @@ const getShareById = async (req, res, next) => {
 const createShare = async (req, res, next) => {
   try {
     const { shareType, periodType, startDate, endDate, customPeriodName, privacy, expiresInDays, includeQuestions, questionLimit } = req.body;
+    const timeZone = req.userTimeZone; 
     const user = await User.findById(req.user._id).select('username displayName avatarUrl').lean();
     if (!user) throw new AppError('User not found', 404);
     
-    // Initialize shared data with user info
     const sharedData = {
       userInfo: {
         username: user.username,
@@ -63,23 +63,24 @@ const createShare = async (req, res, next) => {
     };
     
     if (shareType === 'period') {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      let start = new Date(startDate);
+      let end = new Date(endDate);
       
-      // Build base query - ONE TIME
+      // Convert start and end to UTC timestamps using user timezone to get the correct day boundaries
+      const startUtc = getStartOfDay(start, timeZone);
+      const endUtc = getEndOfDay(end, timeZone);
+      
       const progressQuery = { 
         userId: req.user._id, 
         status: { $in: ['Solved', 'Mastered'] } 
       };
       
       if (includeQuestions) {
-        progressQuery.updatedAt = { $gte: start, $lte: end };
+        progressQuery.updatedAt = { $gte: startUtc, $lte: endUtc };
       }
       
-      // SINGLE QUERY: Get all progress with question data in one go
       const solvedProgress = await UserQuestionProgress.aggregate([
         { $match: progressQuery },
-        // Join with questions collection
         {
           $lookup: {
             from: 'questions',
@@ -89,13 +90,10 @@ const createShare = async (req, res, next) => {
           }
         },
         { $unwind: { path: '$question', preserveNullAndEmptyArrays: false } },
-        // Sort for pagination
         { $sort: { updatedAt: -1 } },
-        // Limit if we only need limited list for questions
         ...(includeQuestions ? [{ $limit: questionLimit || 50 }] : [])
       ]);
       
-      // Process the solved progress records in memory - much faster
       const solvedQuestions = [];
       const breakdown = { easy: 0, medium: 0, hard: 0 };
       const platformBreakdown = { LeetCode: 0, HackerRank: 0, CodeForces: 0, Other: 0 };
@@ -103,7 +101,6 @@ const createShare = async (req, res, next) => {
       solvedProgress.forEach(p => {
         const question = p.question;
         if (question) {
-          // Build question object for the list
           if (includeQuestions) {
             solvedQuestions.push({
               title: question.title || '',
@@ -116,13 +113,11 @@ const createShare = async (req, res, next) => {
             });
           }
           
-          // Difficulty breakdown
           const difficulty = question.difficulty;
           if (difficulty === 'Easy') breakdown.easy++;
           else if (difficulty === 'Medium') breakdown.medium++;
           else if (difficulty === 'Hard') breakdown.hard++;
           
-          // Platform breakdown
           const platform = question.platform || '';
           if (platform === 'LeetCode') platformBreakdown.LeetCode++;
           else if (platform === 'HackerRank') platformBreakdown.HackerRank++;
@@ -131,21 +126,19 @@ const createShare = async (req, res, next) => {
         }
       });
       
-      // Get total count SEPARATELY but without populate (much faster)
       const totalSolvedCount = includeQuestions 
         ? solvedProgress.length 
         : await UserQuestionProgress.countDocuments(progressQuery);
       
-      // Assign data
       sharedData.questions = solvedQuestions;
       sharedData.totalSolved = totalSolvedCount;
       sharedData.breakdown = breakdown;
       sharedData.platformBreakdown = platformBreakdown;
-      sharedData.dateRange = { start, end };
+      sharedData.dateRange = { start: startUtc, end: endUtc };
       sharedData.userInfo.totalSolved = totalSolvedCount;
       
     } else {
-      // Profile share - optimized single query
+      // Profile share
       const solvedProgress = await UserQuestionProgress.aggregate([
         { 
           $match: { 
@@ -153,7 +146,6 @@ const createShare = async (req, res, next) => {
             status: { $in: ['Solved', 'Mastered'] } 
           } 
         },
-        // Join with questions collection
         {
           $lookup: {
             from: 'questions',
@@ -171,13 +163,11 @@ const createShare = async (req, res, next) => {
       solvedProgress.forEach(p => {
         const question = p.question;
         if (question) {
-          // Difficulty breakdown
           const difficulty = question.difficulty;
           if (difficulty === 'Easy') breakdown.easy++;
           else if (difficulty === 'Medium') breakdown.medium++;
           else if (difficulty === 'Hard') breakdown.hard++;
           
-          // Platform breakdown
           const platform = question.platform || '';
           if (platform === 'LeetCode') platformBreakdown.LeetCode++;
           else if (platform === 'HackerRank') platformBreakdown.HackerRank++;
@@ -194,7 +184,6 @@ const createShare = async (req, res, next) => {
       sharedData.userInfo.totalSolved = totalSolvedCount;
     }
     
-    // Generate token and create share
     const shareToken = generateShareToken();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + (expiresInDays || 30));
@@ -203,8 +192,8 @@ const createShare = async (req, res, next) => {
       userId: req.user._id,
       shareType,
       periodType,
-      startDate,
-      endDate,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
       customPeriodName,
       sharedData,
       privacy,
@@ -212,7 +201,6 @@ const createShare = async (req, res, next) => {
       expiresAt
     });
     
-    // Cache invalidation - non-blocking
     invalidateCache(`shares:*:user:${req.user._id}:*`).catch(console.error);
     
     res.status(201).json(formatResponse('Share created successfully', {
@@ -269,7 +257,6 @@ const getShareByToken = async (req, res, next) => {
     if (share.privacy === 'private') throw new AppError('Share is private', 403);
     if (share.expiresAt && new Date() > share.expiresAt) throw new AppError('Share has expired', 410);
     
-    // Non-blocking update for access count
     Share.updateOne({ _id: share._id }, { 
       $inc: { accessCount: 1 }, 
       $set: { lastAccessedAt: new Date() } 
@@ -304,14 +291,15 @@ const getUserPublicShares = async (req, res, next) => {
 const refreshShare = async (req, res, next) => {
   try {
     const { includeQuestions, questionLimit } = req.body;
+    const timeZone = req.userTimeZone; 
     const share = await Share.findOne({ _id: req.params.id, userId: req.user._id });
     if (!share) throw new AppError('Share not found', 404);
     
     if (share.shareType === 'period') {
-      const start = share.startDate;
-      const end = share.endDate;
+      let start = share.startDate;
+      let end = share.endDate;
       
-      // Build base query
+      // Use existing stored dates (already UTC) – no need to convert again
       const progressQuery = { 
         userId: req.user._id, 
         status: { $in: ['Solved', 'Mastered'] } 
@@ -321,7 +309,6 @@ const refreshShare = async (req, res, next) => {
         progressQuery.updatedAt = { $gte: start, $lte: end };
       }
       
-      // SINGLE QUERY with aggregation
       const solvedProgress = await UserQuestionProgress.aggregate([
         { $match: progressQuery },
         {
@@ -337,7 +324,6 @@ const refreshShare = async (req, res, next) => {
         ...(includeQuestions ? [{ $limit: questionLimit || 50 }] : [])
       ]);
       
-      // Process in memory
       const solvedQuestions = [];
       const breakdown = { easy: 0, medium: 0, hard: 0 };
       const platformBreakdown = { LeetCode: 0, HackerRank: 0, CodeForces: 0, Other: 0 };
@@ -357,13 +343,11 @@ const refreshShare = async (req, res, next) => {
             });
           }
           
-          // Difficulty breakdown
           const difficulty = question.difficulty;
           if (difficulty === 'Easy') breakdown.easy++;
           else if (difficulty === 'Medium') breakdown.medium++;
           else if (difficulty === 'Hard') breakdown.hard++;
           
-          // Platform breakdown
           const platform = question.platform || '';
           if (platform === 'LeetCode') platformBreakdown.LeetCode++;
           else if (platform === 'HackerRank') platformBreakdown.HackerRank++;
@@ -376,7 +360,6 @@ const refreshShare = async (req, res, next) => {
         ? solvedProgress.length 
         : await UserQuestionProgress.countDocuments(progressQuery);
       
-      // Update share data
       share.sharedData.questions = solvedQuestions;
       share.sharedData.totalSolved = totalSolvedCount;
       share.sharedData.breakdown = breakdown;
@@ -387,7 +370,6 @@ const refreshShare = async (req, res, next) => {
     share.updatedAt = new Date();
     await share.save();
     
-    // Non-blocking cache invalidation
     invalidateCache(`shares:*:user:${req.user._id}:*`).catch(console.error);
     invalidateCache(`share:${req.params.id}`).catch(console.error);
     

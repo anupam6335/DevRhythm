@@ -4,6 +4,7 @@ const progressService = require('../services/progress.service');
 const patternMasteryService = require('../services/patternMastery.service');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
+const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
 const AppError = require('../utils/errors/AppError');
 const { invalidateProgressCache, invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('../services/queue.service'); 
@@ -19,11 +20,8 @@ const updateProgressPatternMastery = async (userId, questionId) => {
   }
 };
 
-// Helper to invalidate the question details cache for both ID and platform routes
 const invalidateQuestionDetailsCache = async (userId, questionId) => {
-  // Invalidate the ID-based details cache (pattern: question-details:user:...)
   await invalidateCache(`question-details:user:${userId}:*/questions/${questionId}/details`);
-  // Also invalidate any platform-based cache (more broad, but short TTL anyway)
   await invalidateCache(`question-details:platform:*`);
 };
 
@@ -74,23 +72,19 @@ const getQuestionProgress = async (req, res, next) => {
 
 const createOrUpdateProgress = async (req, res, next) => {
   try {
-    const { status, notes, keyInsights, savedCode, confidenceLevel, timeSpent } = req.body;
+    const { status, notes, keyInsights, savedCode, timeSpent } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
 
-    // Prevent manual setting to Mastered
     if (status === 'Mastered') {
       throw new AppError('Mastered status is automatically assigned and cannot be set manually', 400);
     }
-
-    console.log(`[createOrUpdateProgress] Called for user ${userId}, question ${questionId}, status=${status}`); // LOG
 
     const question = await Question.findById(questionId);
     if (!question) throw new AppError('Question not found', 404);
 
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
     const oldStatus = progress ? progress.status : null;
-    console.log(`[createOrUpdateProgress] oldStatus=${oldStatus}`); // LOG
 
     const updateData = {
       updatedAt: new Date()
@@ -99,11 +93,9 @@ const createOrUpdateProgress = async (req, res, next) => {
     if (notes !== undefined) updateData.notes = notes;
     if (keyInsights !== undefined) updateData.keyInsights = keyInsights;
     if (savedCode) updateData.savedCode = { ...savedCode, lastUpdated: new Date() };
-    // confidenceLevel from request is ignored – it will be recalculated automatically
     if (req.body.personalDifficulty !== undefined) updateData.personalDifficulty = req.body.personalDifficulty;
     if (req.body.personalContentRef !== undefined) updateData.personalContentRef = req.body.personalContentRef;
 
-    // If status is being set to Solved and it wasn't Solved before, set solvedAt
     if (status === 'Solved' && (!progress || progress.status !== 'Solved')) {
       updateData['attempts.solvedAt'] = new Date();
     }
@@ -137,20 +129,17 @@ const createOrUpdateProgress = async (req, res, next) => {
         notes,
         keyInsights,
         savedCode: savedCode ? { ...savedCode, lastUpdated: new Date() } : undefined,
-        // confidenceLevel not set – will be recalculated by hook
         totalTimeSpent: timeSpent || 0,
         personalDifficulty: req.body.personalDifficulty,
       });
     }
 
-    // Emit events after the progress is saved
     if (newProgress) {
       if (status === 'Solved' && oldStatus !== 'Solved') {
-        console.log(`[createOrUpdateProgress] Condition met: adding question.solved job`); // LOG
         if (!jobQueue) {
           console.error('jobQueue is not available, cannot add job');
         } else {
-          const job = await jobQueue.add({
+          await jobQueue.add({
             type: 'question.solved',
             userId,
             questionId,
@@ -158,25 +147,7 @@ const createOrUpdateProgress = async (req, res, next) => {
             timeSpent: timeSpent || 0,
             solvedAt: new Date(),
           });
-          console.log(`[createOrUpdateProgress] Job added successfully, jobId=${job.id}`); // LOG
         }
-      } else if (status === 'Mastered' && oldStatus !== 'Mastered') {
-        // This block will never be reached because we prevent manual Mastered
-        console.log(`[createOrUpdateProgress] Condition met: adding question.mastered job`); // LOG
-        if (!jobQueue) {
-          console.error('jobQueue is not available, cannot add job');
-        } else {
-          const job = await jobQueue.add({
-            type: 'question.mastered',
-            userId,
-            questionId,
-            progressId: newProgress._id,
-            masteredAt: new Date(),
-          });
-          console.log(`[createOrUpdateProgress] Job added successfully, jobId=${job.id}`); // LOG
-        }
-      } else {
-        console.log(`[createOrUpdateProgress] No job added. status=${status}, oldStatus=${oldStatus}`); // LOG
       }
     }
 
@@ -190,7 +161,7 @@ const createOrUpdateProgress = async (req, res, next) => {
       { progress: newProgress }
     ));
   } catch (error) {
-    console.error('[createOrUpdateProgress] Error:', error); // LOG
+    console.error('[createOrUpdateProgress] Error:', error);
     next(error);
   }
 };
@@ -219,7 +190,6 @@ const updateStatus = async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
-    // Emit events
     if (req.body.status === 'Solved' && oldStatus !== 'Solved') {
       if (!jobQueue) {
         console.error('jobQueue is not available, cannot add job');
@@ -295,7 +265,6 @@ const updateNotes = async (req, res, next) => {
 };
 
 const updateConfidence = async (req, res, next) => {
-  // This endpoint is now disabled – confidence is automatically calculated
   next(new AppError('Confidence level is automatically calculated and cannot be set manually', 400));
 };
 
@@ -314,7 +283,6 @@ const recordAttempt = async (req, res, next) => {
     };
 
     if (successful) {
-      // Successful attempt → mark as solved
       update.$set.status = 'Solved';
       update.$set['attempts.solvedAt'] = new Date();
     } else {
@@ -332,7 +300,6 @@ const recordAttempt = async (req, res, next) => {
       await progress.save();
     }
 
-    // Add job to queue
     if (jobQueue) {
       if (successful) {
         await jobQueue.add({
@@ -367,7 +334,7 @@ const recordAttempt = async (req, res, next) => {
 
 const recordRevision = async (req, res, next) => {
   try {
-    const { timeSpent } = req.body; // confidenceLevel from request is ignored – it will be recalculated
+    const { timeSpent } = req.body;
     const userId = req.user._id;
     const questionId = req.params.questionId;
     
@@ -425,9 +392,6 @@ const getRecentProgress = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-/**
- * Get questions sorted by the user's personal difficulty rating
- */
 const getQuestionsByPersonalDifficulty = async (req, res, next) => {
   try {
     const userId = req.user._id;
@@ -454,7 +418,6 @@ const getQuestionsByPersonalDifficulty = async (req, res, next) => {
       UserQuestionProgress.countDocuments(query),
     ]);
 
-    // Format response: include question details and personal difficulty
     const questions = progressRecords.map(record => ({
       question: record.questionId,
       personalDifficulty: record.personalDifficulty,

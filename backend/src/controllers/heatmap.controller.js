@@ -28,6 +28,7 @@ const getHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const includeCache = req.query.includeCache !== 'false';
+    const timeZone = req.userTimeZone; 
 
     let heatmap = await HeatmapData.findOne({
       userId: req.user._id,
@@ -35,7 +36,7 @@ const getHeatmap = async (req, res, next) => {
     }).lean();
 
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
+      heatmap = await heatmapService.generateHeatmapData(req.user._id, year, timeZone);
     }
 
     if (!heatmap) {
@@ -56,17 +57,14 @@ const getHeatmap = async (req, res, next) => {
       statsPanel: heatmap.statsPanel
     };
 
-    // Always generate fresh tooltip data from current dailyData
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
 
     if (includeCache && heatmap.cachedRenderData) {
-      // Preserve other cached render data (color scale, month labels, etc.) but replace tooltipData
       response.cachedRenderData = {
         ...heatmap.cachedRenderData,
         tooltipData: freshTooltipData
       };
     } else {
-      // If no cachedRenderData, still provide tooltips
       response.cachedRenderData = {
         tooltipData: freshTooltipData,
         colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
@@ -89,6 +87,7 @@ const getHeatmapByYear = async (req, res, next) => {
   try {
     const year = parseInt(req.params.year);
     const includeCache = req.query.includeCache !== 'false';
+    const timeZone = req.userTimeZone; 
 
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
@@ -100,7 +99,7 @@ const getHeatmapByYear = async (req, res, next) => {
     }).lean();
 
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(req.user._id, year);
+      heatmap = await heatmapService.generateHeatmapData(req.user._id, year, timeZone);
     }
 
     if (!heatmap) {
@@ -122,7 +121,6 @@ const getHeatmapByYear = async (req, res, next) => {
       statsPanel: heatmap.statsPanel
     };
 
-    // Always generate fresh tooltip data from current dailyData
     const freshTooltipData = generateTooltipData(heatmap.dailyData);
 
     if (includeCache && heatmap.cachedRenderData) {
@@ -153,6 +151,7 @@ const refreshHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const forceFullRefresh = req.body.forceFullRefresh === true;
+    const timeZone = req.userTimeZone; 
 
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
@@ -165,7 +164,7 @@ const refreshHeatmap = async (req, res, next) => {
     await invalidateCache(`heatmap:stats:${req.user._id}:${year}`);
     await invalidateCache(`heatmap:filter:${req.user._id}:${year}:*`);
 
-    heatmapService.regenerateHeatmapData(req.user._id, year, forceFullRefresh)
+    heatmapService.regenerateHeatmapData(req.user._id, year, forceFullRefresh, timeZone)
       .catch(err => console.error('Heatmap regeneration failed:', err));
 
     res.status(202).json(formatResponse('Heatmap recalculation started', {
@@ -183,6 +182,7 @@ const refreshHeatmap = async (req, res, next) => {
 const getHeatmapStats = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
+    const timeZone = req.userTimeZone; 
 
     const heatmap = await HeatmapData.findOne({
       userId: req.user._id,
@@ -190,7 +190,7 @@ const getHeatmapStats = async (req, res, next) => {
     }).lean();
 
     if (!heatmap || !heatmap.statsPanel) {
-      const generated = await heatmapService.generateHeatmapData(req.user._id, year);
+      const generated = await heatmapService.generateHeatmapData(req.user._id, year, timeZone);
       if (!generated) {
         throw new AppError('Heatmap data not found', 404);
       }
@@ -217,6 +217,7 @@ const getFilteredHeatmap = async (req, res, next) => {
     const viewType = req.query.viewType || 'all';
     const weekStart = parseInt(req.query.weekStart) || 1;
     const weekEnd = parseInt(req.query.weekEnd) || 53;
+    const timeZone = req.userTimeZone; 
 
     const validViewTypes = [
       'all', 'new_problems', 'revisions', 'study_group',
@@ -249,7 +250,7 @@ const getFilteredHeatmap = async (req, res, next) => {
         intensityLevel: heatmapService.calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
       }));
     } else {
-      filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType);
+      filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType, timeZone);
     }
 
     filteredData.forEach(day => {
@@ -393,10 +394,13 @@ const getPublicUserHeatmap = async (req, res, next) => {
       throw new AppError('Invalid year', 400);
     }
 
-    const user = await User.findById(userId).select('_id');
+    const user = await User.findById(userId).select('_id preferences.timezone');
     if (!user) throw new AppError('User not found', 404);
 
-    const heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear);
+    // Use the user's own timezone for public heatmap (or fallback to UTC)
+    const userTimeZone = user.preferences?.timezone || 'UTC';
+
+    const heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear, userTimeZone);
     if (!heatmap) throw new AppError('Heatmap data not found', 404);
 
     let response;
@@ -413,7 +417,6 @@ const getPublicUserHeatmap = async (req, res, next) => {
         consistency: heatmap.consistency,
         statsPanel: heatmap.statsPanel,
       };
-      // For public heatmap, also provide fresh tooltips
       const freshTooltipData = generateTooltipData(heatmap.dailyData);
       if (includeCache && heatmap.cachedRenderData) {
         response.cachedRenderData = {

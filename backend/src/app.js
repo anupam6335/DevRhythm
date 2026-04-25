@@ -9,6 +9,7 @@ const passport = require('./config/oauth');
 const config = require('./config');
 const middleware = require('./middleware');
 const routes = require('./routes');
+const { attachUserTimeZone } = require('./middleware/timezone'); 
 
 const app = express();
 
@@ -38,6 +39,9 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Attach user timezone to every request (UTC if not logged in)
+app.use(attachUserTimeZone);
 
 const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,

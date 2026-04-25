@@ -223,9 +223,9 @@ const markRevisionComplete = async (revisionId, completedAt = new Date(), status
   return revision;
 };
 
-const getPendingRevisionsForDate = async (userId, date) => {
-  const dateStart = getStartOfDay(date);
-  const dateEnd = getEndOfDay(date);
+const getPendingRevisionsForDate = async (userId, date, timeZone = 'UTC') => {
+  const dateStart = getStartOfDay(date, timeZone);
+  const dateEnd = getEndOfDay(date, timeZone);
   const pending = await RevisionSchedule.find({
     userId,
     schedule: { $elemMatch: { $gte: dateStart, $lte: dateEnd } },
@@ -237,8 +237,8 @@ const getPendingRevisionsForDate = async (userId, date) => {
   return pending;
 };
 
-const updateOverdueRevisions = async () => {
-  const today = getStartOfDay();
+const updateOverdueRevisions = async (timeZone = 'UTC') => {
+  const today = getStartOfDay(new Date(), timeZone);
   const result = await RevisionSchedule.updateMany(
     {
       status: 'active',
@@ -257,7 +257,7 @@ const updateOverdueRevisions = async () => {
   return result.modifiedCount;
 };
 
-const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => {
+const getRevisionStatusLabel = (revision, index = null, mode = 'actionable', timeZone = 'UTC') => {
   const idx = index !== null ? index : revision.currentRevisionIndex;
   if (revision.status === 'completed') return 'Completed';
 
@@ -269,17 +269,17 @@ const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => 
   if (isCompleted) return 'Completed';
 
   const dueDate = revision.schedule[idx];
-  const todayStart = getStartOfDay();
+  const todayStart = getStartOfDay(new Date(), timeZone);
   if (mode === 'display') {
     if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate)) return 'Pending';
+    if (isToday(dueDate, timeZone)) return 'Pending';
     return 'Upcoming';
   }
 
   if (idx < revision.currentRevisionIndex) return 'Completed';
   if (idx === revision.currentRevisionIndex) {
     if (dueDate < todayStart) return 'Overdue';
-    if (isToday(dueDate)) return 'Pending';
+    if (isToday(dueDate, timeZone)) return 'Pending';
     return 'Upcoming';
   }
   return 'Upcoming';
@@ -287,11 +287,12 @@ const getRevisionStatusLabel = (revision, index = null, mode = 'actionable') => 
 
 /**
  * Get detailed revision statistics (trends, breakdowns, etc.)
+ * Now accepts timeZone parameter for date comparisons
  */
-const getDetailedRevisionStats = async (userId) => {
+const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   const baseStats = await calculateRevisionStats(userId);
 
-  // ---------- 2. Trends (daily, weekly, monthly) ----------
+  // Trends (daily, weekly, monthly)
   const trends = await RevisionSchedule.aggregate([
     { $match: { userId, status: { $in: ['active', 'completed'] } } },
     { $unwind: '$completedRevisions' },
@@ -316,12 +317,11 @@ const getDetailedRevisionStats = async (userId) => {
       : null
   }));
 
-  // Weekly & monthly (simplified – can be expanded as needed)
   const weeklyTrends = [];
   const monthlyTrends = [];
 
-  // ---------- 3. Overdue distribution ----------
-  const today = getStartOfDay();
+  // Overdue distribution using timezone
+  const today = getStartOfDay(new Date(), timeZone);
   const overdueSchedules = await RevisionSchedule.find({
     userId,
     status: 'active',
@@ -344,12 +344,11 @@ const getDetailedRevisionStats = async (userId) => {
     else distribution['30+days']++;
   }
 
-  // ---------- 4. By difficulty, platform, pattern ----------
+  // By difficulty, platform, pattern
   const allSchedules = await RevisionSchedule.find({ userId })
     .populate('questionId', 'difficulty platform pattern')
     .lean();
 
-  // Initialize byDifficulty
   const byDifficulty = {
     Easy: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 },
     Medium: { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 },
@@ -366,7 +365,6 @@ const getDetailedRevisionStats = async (userId) => {
     const platform = q.platform || 'Unknown';
     const patterns = Array.isArray(q.pattern) ? q.pattern : (q.pattern ? [q.pattern] : []);
 
-    // Increment total revisions
     if (!byDifficulty[diff]) byDifficulty[diff] = { totalRevisions: 0, completed: 0, totalTimeSpent: 0, confidenceSum: 0, confidenceCount: 0, overdueCount: 0 };
     byDifficulty[diff].totalRevisions += 1;
 
@@ -379,7 +377,6 @@ const getDetailedRevisionStats = async (userId) => {
       byPattern[pattern].totalRevisions += 1;
     }
 
-    // Completed revisions
     for (const cr of schedule.completedRevisions) {
       if (cr.status !== 'completed') continue;
       byDifficulty[diff].completed += 1;
@@ -407,7 +404,6 @@ const getDetailedRevisionStats = async (userId) => {
       }
     }
 
-    // Overdue count for current revision
     const currentDue = schedule.schedule[schedule.currentRevisionIndex];
     if (currentDue && currentDue < today) {
       byDifficulty[diff].overdueCount += 1;
@@ -418,7 +414,6 @@ const getDetailedRevisionStats = async (userId) => {
     }
   }
 
-  // Compute averages and rates
   const computeStats = (obj) => {
     obj.completionRate = obj.totalRevisions ? (obj.completed / obj.totalRevisions) * 100 : 0;
     obj.averageTimeSpent = obj.completed ? (obj.totalTimeSpent / obj.completed).toFixed(1) : '0.0';
@@ -429,7 +424,7 @@ const getDetailedRevisionStats = async (userId) => {
   for (const plat in byPlatform) computeStats(byPlatform[plat]);
   for (const pat in byPattern) computeStats(byPattern[pat]);
 
-  // ---------- 5. Time stats ----------
+  // Time stats
   const allCompleted = allSchedules.flatMap(s => s.completedRevisions.filter(cr => cr.status === 'completed'));
   const totalMinutesSpent = allCompleted.reduce((sum, cr) => sum + (cr.timeSpent || 0), 0);
   const avgMinutesPerRevision = allCompleted.length ? totalMinutesSpent / allCompleted.length : 0;
@@ -444,15 +439,14 @@ const getDetailedRevisionStats = async (userId) => {
     if (minutes > mostMinutes) { mostMinutes = minutes; mostProductiveDay = day; }
   }
 
-  // ---------- 6. Confidence stats ----------
+  // Confidence stats
   const confidenceAfterValues = allCompleted.map(cr => cr.confidenceAfter).filter(v => v != null);
   const overallAvgConfidence = confidenceAfterValues.length ? (confidenceAfterValues.reduce((a,b)=>a+b,0) / confidenceAfterValues.length).toFixed(1) : null;
   const confidenceDist = { 1:0, 2:0, 3:0, 4:0, 5:0 };
   for (const val of confidenceAfterValues) confidenceDist[val]++;
 
-  const improvementByIndex = []; // can be implemented later
+  const improvementByIndex = [];
 
-  // ---------- 7. Build final object ----------
   const detailedStats = {
     summary: {
       totalActiveSchedules: baseStats.totalActive,

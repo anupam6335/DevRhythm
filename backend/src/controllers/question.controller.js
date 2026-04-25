@@ -8,24 +8,19 @@ const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { applySorting } = require('../utils/helpers/sort');
 const { slugify } = require('../utils/helpers/string');
+const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
 const AppError = require('../utils/errors/AppError');
 const { invalidateQuestionCache } = require('../middleware/cache');
 const { fetchProblemDetails, searchProblems } = require('../services/leetcode.service');
 const { jobQueue } = require('../services/queue.service');
 const revisionService = require('../services/revision.service');
 
-// generate a pattern name from tags
 const generatePatternFromTags = (tags) => {
   if (!tags || tags.length === 0) return '';
   const firstTag = tags[0];
   return firstTag.charAt(0).toUpperCase() + firstTag.slice(1);
 };
 
-/**
- * POST /api/v1/questions/fetch-leetcode
- * Body: { url: "https://leetcode.com/problems/..." }
- * Returns { title, difficulty, tags, link, codeSnippets } if found.
- */
 const fetchLeetCodeQuestion = async (req, res, next) => {
   try {
     const { url } = req.body;
@@ -38,10 +33,6 @@ const fetchLeetCodeQuestion = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/v1/questions/search-leetcode?q=three%20sum&type=name
- * GET /api/v1/questions/search-leetcode?q=binary%20search&type=tag
- */
 const searchLeetCodeQuestions = async (req, res, next) => {
   try {
     const { q, type = 'name' } = req.query;
@@ -61,7 +52,6 @@ const getQuestions = async (req, res, next) => {
     const { page, limit, skip } = getPaginationParams(req);
     const { platform, difficulty, pattern, tags, search, status } = req.query;
     
-    // Base query for active questions
     let query = { isActive: true };
     if (platform) query.platform = platform;
     if (difficulty) query.difficulty = difficulty;
@@ -69,7 +59,6 @@ const getQuestions = async (req, res, next) => {
     if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
     if (search) query.$text = { $search: search };
 
-    // If filtering by solved status, restrict to user's solved questions
     if (status === 'solved' && req.user) {
       const solvedProgress = await UserQuestionProgress.find({
         userId: req.user._id,
@@ -85,7 +74,6 @@ const getQuestions = async (req, res, next) => {
       query._id = { $in: solvedIds };
     }
 
-    // Apply sorting
     let dbQuery = Question.find(query).skip(skip).limit(limit).select('-__v');
     dbQuery = applySorting(dbQuery, req.query, { createdAt: -1 });
 
@@ -94,7 +82,6 @@ const getQuestions = async (req, res, next) => {
       Question.countDocuments(query)
     ]);
 
-    // Attach solved status (skip when status=solved because all are solved)
     let solvedMap = new Map();
     if (questions.length > 0 && req.user && status !== 'solved') {
       const questionIds = questions.map(q => q._id);
@@ -131,7 +118,6 @@ const getQuestionById = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-// Helper function to fetch all details for a question (shared between ID and platform routes)
 const fetchQuestionDetails = async (userId, questionId) => {
   const [
     question,
@@ -161,9 +147,7 @@ const fetchQuestionDetails = async (userId, questionId) => {
       .lean()
   ]);
 
-  if (!question) {
-    return null;
-  }
+  if (!question) return null;
 
   return {
     question,
@@ -187,9 +171,7 @@ const getQuestionDetails = async (req, res, next) => {
     const userId = req.user._id;
 
     const details = await fetchQuestionDetails(userId, questionId);
-    if (!details) {
-      throw new AppError('Question not found', 404);
-    }
+    if (!details) throw new AppError('Question not found', 404);
 
     res.json(formatResponse('Question details retrieved successfully', details));
   } catch (error) {
@@ -205,9 +187,7 @@ const getQuestionDetailsByPlatform = async (req, res, next) => {
     const question = await Question.findOne({ platform, platformQuestionId, isActive: true })
       .select('_id')
       .lean();
-    if (!question) {
-      throw new AppError('Question not found', 404);
-    }
+    if (!question) throw new AppError('Question not found', 404);
 
     const details = await fetchQuestionDetails(userId, question._id);
     res.json(formatResponse('Question details retrieved successfully', details));
@@ -220,7 +200,6 @@ const createQuestion = async (req, res, next) => {
   try {
     const { isManual = false, contentRef, testCases, starterCode } = req.body;
 
-    // Auto‑generate platformQuestionId if not provided
     let platformQuestionId = req.body.platformQuestionId;
     if (!platformQuestionId || platformQuestionId.trim() === '') {
       if (!req.body.title) {
@@ -231,7 +210,6 @@ const createQuestion = async (req, res, next) => {
       let slug = baseSlug;
       let counter = 1;
 
-      // Ensure uniqueness for this platform
       while (await Question.findOne({ platform: req.body.platform, platformQuestionId: slug })) {
         slug = `${baseSlug}-${counter}`;
         counter++;
@@ -241,24 +219,20 @@ const createQuestion = async (req, res, next) => {
       req.body.platformQuestionId = slug;
     }
 
-    // Check duplicate
     const existing = await Question.findOne({ platform: req.body.platform, platformQuestionId: req.body.platformQuestionId });
     if (existing) throw new AppError('Question with same platform and ID already exists', 409);
 
-    // Auto‑generate pattern if not provided
     let { pattern, tags } = req.body;
     if (!pattern || pattern === '') {
       pattern = generatePatternFromTags(tags || []);
     }
 
-    // Normalize pattern to array
     if (pattern && !Array.isArray(pattern)) {
       req.body.pattern = [pattern];
     } else {
       req.body.pattern = pattern;
     }
 
-    // Set source and createdBy based on manual flag
     if (isManual) {
       req.body.source = 'manual';
       req.body.createdBy = req.user._id;
@@ -269,7 +243,6 @@ const createQuestion = async (req, res, next) => {
       req.body.createdBy = null;
     }
 
-    // Filter starterCode to allowed languages
     let filteredStarterCode = null;
     if (starterCode) {
       const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
@@ -285,14 +258,12 @@ const createQuestion = async (req, res, next) => {
 
     const question = await Question.create(req.body);
 
-    // If this is a LeetCode question and starterCode is missing, fetch it as a fallback
     if (!isManual && (!starterCode || Object.keys(starterCode).length === 0)) {
       try {
         const problemUrl = req.body.problemLink;
         if (problemUrl) {
           const details = await fetchProblemDetails(problemUrl);
           if (details.codeSnippets && Object.keys(details.codeSnippets).length > 0) {
-            // Apply language filter on fetched snippets as well
             const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
             const filteredSnippets = {};
             for (const [lang, code] of Object.entries(details.codeSnippets)) {
@@ -310,7 +281,6 @@ const createQuestion = async (req, res, next) => {
       }
     }
 
-    // Extract test cases if contentRef exists and there are no test cases yet
     if (question.contentRef && (!question.testCases || question.testCases.length === 0)) {
       await jobQueue.add({
         type: 'question.extract_testcases',
@@ -318,7 +288,6 @@ const createQuestion = async (req, res, next) => {
       });
     }
 
-    // Create revision schedule (if needed)
     await jobQueue.add({
       type: 'revision.schedule',
       userId: req.user._id,
@@ -340,19 +309,16 @@ const updateQuestion = async (req, res, next) => {
     const question = await Question.findById(id);
     if (!question) throw new AppError('Question not found', 404);
 
-    // Check if this is a LeetCode-fetched question
     if (question.source === 'leetcode') {
       throw new AppError('LeetCode-fetched questions cannot be updated', 403);
     }
 
-    // Check ownership for manual questions
     if (question.source === 'manual') {
       if (!question.createdBy || question.createdBy.toString() !== req.user._id.toString()) {
         throw new AppError('Only the creator can update this question', 403);
       }
     }
 
-    // Build allowed updates
     const allowedUpdates = {};
     if (req.body.difficulty !== undefined) allowedUpdates.difficulty = req.body.difficulty;
     if (req.body.tags !== undefined) allowedUpdates.tags = req.body.tags;
@@ -366,7 +332,6 @@ const updateQuestion = async (req, res, next) => {
       throw new AppError('No allowed fields to update', 400);
     }
 
-    // Normalize pattern (if provided)
     if (allowedUpdates.pattern !== undefined) {
       let pattern = allowedUpdates.pattern;
       if (!Array.isArray(pattern)) {
@@ -375,7 +340,6 @@ const updateQuestion = async (req, res, next) => {
       allowedUpdates.pattern = pattern;
     }
 
-    // Filter starterCode languages if updated
     if (allowedUpdates.starterCode) {
       const allowedLanguages = ['cpp', 'javascript', 'java', 'python', 'python3'];
       const filteredCode = {};
@@ -402,7 +366,6 @@ const updateQuestion = async (req, res, next) => {
   }
 };
 
-// Delete methods are kept but will not be exposed via routes
 const deleteQuestion = async (req, res, next) => {
   next(new AppError('Delete operation is not allowed', 405));
 };
@@ -427,10 +390,6 @@ const getQuestionByPlatformId = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-/**
- * GET /api/v1/questions/similar/:id?limit=10
- * Returns questions similar to the given one based on pattern, tags, and title.
- */
 const getSimilarQuestions = async (req, res, next) => {
   try {
     const targetId = req.params.id;
@@ -585,31 +544,22 @@ const getStatistics = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-
-/**
- * GET /api/v1/questions/daily
- * Returns LeetCode Problem of the Day, user's daily goal for today, and current/longest streak.
- */
 const getDailyProblemAndGoal = async (req, res, next) => {
   try {
     const userId = req.user._id;
+    const timeZone = req.userTimeZone; // used for daily goal boundaries
 
-    // 1. Get user's current and max streak directly from the user object (already populated by auth middleware)
     const currentStreak = req.user.streak.current;
     const longestStreak = req.user.streak.longest;
 
-    // 2. Get today's daily goal (if any)
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setUTCHours(23, 59, 59, 999);
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    const todayEnd = getEndOfDay(new Date(), timeZone);
 
     const dailyGoal = await Goal.findOne({
       userId,
       goalType: 'daily',
-      startDate: { $lte: startOfDay },
-      endDate: { $gte: endOfDay },
+      startDate: { $lte: todayStart },
+      endDate: { $gte: todayEnd },
       status: 'active'
     }).lean();
 
@@ -620,13 +570,11 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       status: dailyGoal.status
     } : null;
 
-    // 3. Fetch LeetCode daily problem (cached)
     let dailyProblem = null;
     try {
       dailyProblem = await require('../services/leetcode.service').getDailyProblem();
     } catch (error) {
       console.error('Failed to fetch LeetCode daily problem:', error.message);
-      // Continue without daily problem, but still return streak and goal
     }
 
     const responseData = {
@@ -641,7 +589,6 @@ const getDailyProblemAndGoal = async (req, res, next) => {
     next(error);
   }
 };
-
 
 module.exports = {
   getQuestions,
@@ -661,5 +608,5 @@ module.exports = {
   getStatistics,
   fetchLeetCodeQuestion,
   searchLeetCodeQuestions,
-  getDailyProblemAndGoal, 
+  getDailyProblemAndGoal,
 };

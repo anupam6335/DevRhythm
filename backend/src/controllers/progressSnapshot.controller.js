@@ -11,11 +11,18 @@ const getSnapshots = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
     const { period, startDate, endDate } = req.query;
+    const timeZone = req.userTimeZone; 
 
     const query = { userId: req.user._id };
     if (period) query.snapshotPeriod = period;
-    if (startDate) query.snapshotDate = { $gte: getStartOfDay(new Date(startDate)) };
-    if (endDate) query.snapshotDate = { ...query.snapshotDate, $lte: getEndOfDay(new Date(endDate)) };
+    if (startDate) {
+      const start = getStartOfDay(new Date(startDate), timeZone);
+      query.snapshotDate = { $gte: start };
+    }
+    if (endDate) {
+      const end = getEndOfDay(new Date(endDate), timeZone);
+      query.snapshotDate = { ...query.snapshotDate, $lte: end };
+    }
 
     const [snapshots, total] = await Promise.all([
       ProgressSnapshot.find(query)
@@ -65,8 +72,7 @@ const refreshSnapshot = async (req, res, next) => {
       throw new AppError('Invalid period', 400);
     }
 
-    // This could call a service method to generate snapshot
-    // For now, just acknowledge
+    // Trigger background job (placeholder – actual implementation would queue)
     res.json(formatResponse('Snapshot refresh triggered', { period }));
   } catch (error) {
     next(error);

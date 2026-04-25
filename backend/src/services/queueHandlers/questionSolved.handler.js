@@ -13,6 +13,7 @@ const {
 } = require("../../middleware/cache");
 const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
+const { updateUserActivity } = require("../user.service");
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
@@ -28,15 +29,16 @@ const handleQuestionSolved = async (job) => {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
+    const userTimeZone = user.preferences?.timezone || "UTC";
+
     // Determine if this is a first-time solve
     const existingProgress = await UserQuestionProgress.findOne({
       userId,
       questionId,
     }).select("status");
-    const isFirstSolve =
-      !existingProgress || existingProgress.status !== "Solved";
+    const isFirstSolve = !existingProgress || existingProgress.status !== "Solved";
 
-    // --- 1. Update UserStats ---
+    // --- 1. Update UserStats and Streak (using user timezone) ---
     if (isFirstSolve) {
       user.stats.totalSolved += 1;
     }
@@ -48,28 +50,8 @@ const handleQuestionSolved = async (job) => {
     if (rawMasteryRate > 100) rawMasteryRate = 100;
     user.stats.masteryRate = rawMasteryRate;
 
-    const today = new Date();
-    const todayStr = today.toDateString();
-    const lastActive = user.streak.lastActiveDate
-      ? new Date(user.streak.lastActiveDate).toDateString()
-      : null;
-    if (!lastActive) {
-      user.streak.current = 1;
-      user.streak.longest = 1;
-      user.stats.activeDays = 1;
-    } else if (lastActive !== todayStr) {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (lastActive === yesterday.toDateString()) {
-        user.streak.current += 1;
-        if (user.streak.current > user.streak.longest)
-          user.streak.longest = user.streak.current;
-      } else {
-        user.streak.current = 1;
-      }
-      user.stats.activeDays += 1;
-    }
-    user.streak.lastActiveDate = today;
+    // Update streak and active days using user timezone
+    await updateUserActivity(userId, solvedDate, userTimeZone);
 
     await user.save();
     await invalidateUserCache(userId);
@@ -125,7 +107,6 @@ const handleQuestionSolved = async (job) => {
           pattern.successfulAttempts += 1;
         }
 
-        // Defensive check for data inconsistency
         if (pattern.successfulAttempts > pattern.totalAttempts) {
           console.warn(
             `[pattern] Data inconsistency for ${patternName}: successfulAttempts=${pattern.successfulAttempts}, totalAttempts=${pattern.totalAttempts}. Correcting.`
@@ -179,7 +160,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
 
-    // --- 4. Update Planned Goals (new feature) ---
+    // --- 4. Update Planned Goals ---
     const activePlannedGoals = await Goal.find({
       userId,
       goalType: "planned",
@@ -198,7 +179,7 @@ const handleQuestionSolved = async (job) => {
         await goal.save();
 
         if (goal.status === "completed") {
-          const { jobQueue } = require("../services/queue.service");
+          const { jobQueue } = require("../queue.service");
           await jobQueue.add({
             type: "goal.completed",
             userId,
@@ -246,9 +227,9 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`revisions:*:user:${userId}:*`);
     }
 
-    // --- 6. Update daily/weekly goals (existing) ---
+    // --- 6. Update daily/weekly goals ---
     if (isFirstSolve) {
-      const dayStart = getStartOfDay(solvedDate);
+      const dayStart = getStartOfDay(solvedDate, userTimeZone);
       const dailyGoal = await Goal.findOne({
         userId,
         goalType: "daily",
@@ -260,7 +241,7 @@ const handleQuestionSolved = async (job) => {
         dailyGoal.completedCount += 1;
         await dailyGoal.save();
         if (dailyGoal.completedCount >= dailyGoal.targetCount) {
-          const { jobQueue } = require("../services/queue.service");
+          const { jobQueue } = require("../queue.service");
           await jobQueue.add({
             type: "goal.completed",
             userId,
@@ -275,7 +256,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
-    // --- 7. ActivityLog (with platformQuestionId) ---
+    // --- 7. ActivityLog ---
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -293,11 +274,11 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    // --- 8. HeatmapData ---
+    // --- 8. HeatmapData (using user timezone) ---
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(userId, year);
+      heatmap = await heatmapService.generateHeatmapData(userId, year, userTimeZone);
     }
     if (heatmap) {
       const activityDateStr = solvedDate.toISOString().split("T")[0];
@@ -318,7 +299,7 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`heatmap:*:user:${userId}:*`);
     }
 
-    // --- 9. Notifications (with platformQuestionId) ---
+    // --- 9. Notifications ---
     if (isFirstSolve) {
       await Notification.create({
         userId,
@@ -355,6 +336,7 @@ const handleQuestionSolved = async (job) => {
     }
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
+    console.log(`Question solved event processed for user ${userId}`);
   } catch (error) {
     console.error(`[question.solved] Error processing for user ${userId}:`, error);
     throw error;

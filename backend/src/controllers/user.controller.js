@@ -284,6 +284,48 @@ const getUserPublicProgress = async (req, res, next) => {
   }
 };
 
+const changeTimezone = async (req, res, next) => {
+  try {
+    const { newTimezone, confirm } = req.body;
+    const userId = req.user._id;
+    const oldTimezone = req.user.preferences?.timezone || 'UTC';
+
+    if (oldTimezone === newTimezone) {
+      return res.json(formatResponse('Timezone already set to ' + newTimezone, { timezone: newTimezone }));
+    }
+
+    if (!confirm) {
+      return res.status(400).json(formatResponse(
+        'Changing timezone may affect revision schedules and goals. All due dates will be adjusted to keep the same local dates in the new timezone. This operation may take a few seconds. Please confirm with { confirm: true }',
+        { requiredConfirmation: true, oldTimezone, newTimezone }
+      ));
+    }
+
+    // Queue background job to recalc all date‑sensitive data
+    const { jobQueue } = require('../services/queue.service');
+    await jobQueue.add({
+      type: 'user.timezone_change',
+      userId,
+      oldTimezone,
+      newTimezone,
+      triggeredAt: new Date(),
+    });
+
+    // Immediately update user's timezone (future requests use new zone)
+    if (!req.user.preferences) req.user.preferences = {};
+    req.user.preferences.timezone = newTimezone;
+    await req.user.save();
+    await invalidateUserCache(userId);
+
+    res.json(formatResponse('Timezone change queued. Data adjustment will complete shortly.', {
+      oldTimezone,
+      newTimezone,
+    }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
@@ -295,5 +337,6 @@ module.exports = {
   getTopSolved,
   deleteCurrentUser,
   checkUsernameAvailability,
-  getUserPublicProgress
+  getUserPublicProgress,
+  changeTimezone,
 };

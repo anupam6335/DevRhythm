@@ -47,24 +47,31 @@ const getGoals = async (req, res, next) => {
 const getCurrentGoals = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const dateParam = req.query.date ? new Date(req.query.date) : new Date();
-    
+    const timeZone = req.userTimeZone; 
+    let dateParam = req.query.date ? new Date(req.query.date) : new Date();
+
+    const dailyStart = getStartOfDay(dateParam, timeZone);
+    const dailyEnd = getEndOfDay(dateParam, timeZone);
+
     const dailyGoal = await Goal.findOne({
       userId,
       goalType: "daily",
-      startDate: { $lte: dateParam },
-      endDate: { $gte: dateParam },
+      startDate: { $lte: dailyEnd },
+      endDate: { $gte: dailyStart },
       status: "active"
     }).lean();
-    
+
+    const weeklyStart = getStartOfWeek(dateParam, timeZone);
+    const weeklyEnd = getEndOfWeek(dateParam, timeZone);
+
     const weeklyGoal = await Goal.findOne({
       userId,
       goalType: "weekly",
-      startDate: { $lte: getStartOfWeek(dateParam) },
-      endDate: { $gte: getEndOfWeek(dateParam) },
+      startDate: { $lte: weeklyEnd },
+      endDate: { $gte: weeklyStart },
       status: "active"
     }).lean();
-    
+
     const stats = {
       dailyProgress: dailyGoal?.completedCount || 0,
       dailyTarget: dailyGoal?.targetCount || 0,
@@ -75,7 +82,7 @@ const getCurrentGoals = async (req, res, next) => {
       dailyCompletion: dailyGoal?.completionPercentage || 0,
       weeklyCompletion: weeklyGoal?.completionPercentage || 0
     };
-    
+
     res.json(formatResponse("Current goals retrieved", { currentGoals: { daily: dailyGoal, weekly: weeklyGoal }, stats }));
   } catch (error) {
     next(error);
@@ -98,11 +105,12 @@ const createGoal = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const { goalType, targetCount, startDate, endDate } = req.body;
+    const timeZone = req.userTimeZone;
     
     const start = new Date(startDate);
     const end = new Date(endDate);
-    //  Reject start dates earlier than today (midnight)
-    if (start < getStartOfDay(new Date())) {
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    if (start < todayStart) {
       throw new AppError("Start date cannot be in the past", 400);
     }
     
@@ -253,7 +261,8 @@ const setGoalProgress = async (req, res, next) => {
 const autoCreateGoals = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const dateParam = req.query.date ? new Date(req.query.date) : new Date();
+    const timeZone = req.userTimeZone; 
+    let dateParam = req.query.date ? new Date(req.query.date) : new Date();
     const goalType = req.query.goalType;
     
     const user = await User.findById(userId).select("preferences");
@@ -296,14 +305,14 @@ const autoCreateGoals = async (req, res, next) => {
     };
     
     if (!goalType || goalType === "daily") {
-      const start = getStartOfDay(dateParam);
-      const end = getEndOfDay(dateParam);
+      const start = getStartOfDay(dateParam, timeZone);
+      const end = getEndOfDay(dateParam, timeZone);
       await createGoalIfNotExists("daily", start, end);
     }
     
     if (!goalType || goalType === "weekly") {
-      const start = getStartOfWeek(dateParam);
-      const end = getEndOfWeek(dateParam);
+      const start = getStartOfWeek(dateParam, timeZone);
+      const end = getEndOfWeek(dateParam, timeZone);
       await createGoalIfNotExists("weekly", start, end);
     }
     
@@ -516,6 +525,7 @@ const createPlannedGoal = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const { questionIds, timeframe, startDate, endDate } = req.body;
+    const timeZone = req.userTimeZone;
 
     if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
       throw new AppError('At least one question ID is required', 400);
@@ -539,27 +549,26 @@ const createPlannedGoal = async (req, res, next) => {
         throw new AppError("End date must be after start date", 400);
       }
       
-      //  Reject past end dates
       const now = new Date();
-      if (goalEndDate < now) {
+      const todayStart = getStartOfDay(now, timeZone);
+      if (goalEndDate < todayStart) {
         throw new AppError("End date cannot be in the past", 400);
       }
     } else if (timeframe) {
       const { getDateRangeFromTimeframe } = require("../services/timeframe.service");
-      const range = getDateRangeFromTimeframe(timeframe);
+      // FIX: Pass timeZone to the service
+      const range = getDateRangeFromTimeframe(timeframe, timeZone);
       goalStartDate = range.startDate;
       goalEndDate = range.endDate;
-      // Timeframe presets already ensure future dates (today, tomorrow, nextWeek, withinMonth)
     } else {
       throw new AppError("Either timeframe or startDate/endDate must be provided", 400);
     }
 
-    // Start date cannot be in the past
-    if (goalStartDate < getStartOfDay(new Date())) {
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    if (goalStartDate < todayStart) {
       throw new AppError("Start date cannot be in the past", 400);
     }
 
-    // Check for overlapping goals
     const overlappingGoals = await Goal.find({
       userId,
       goalType: "planned",
@@ -648,6 +657,7 @@ const copyGoal = async (req, res, next) => {
     const userId = req.user._id;
     const goalId = req.params.id;
     const { timeframe, startDate, endDate } = req.body;
+    const timeZone = req.userTimeZone;
 
     const originalGoal = await Goal.findOne({ _id: goalId, userId });
     if (!originalGoal) {
@@ -666,15 +676,15 @@ const copyGoal = async (req, res, next) => {
       }
     } else if (timeframe) {
       const { getDateRangeFromTimeframe } = require('../services/timeframe.service');
-      const range = getDateRangeFromTimeframe(timeframe);
+      // FIX: Pass timeZone to the service
+      const range = getDateRangeFromTimeframe(timeframe, timeZone);
       newStartDate = range.startDate;
       newEndDate = range.endDate;
     } else {
       throw new AppError('Either timeframe or startDate/endDate must be provided', 400);
     }
 
-     //  Start date cannot be in the past
-    if (newStartDate < getStartOfDay(new Date())) {
+    if (newStartDate < getStartOfDay(new Date(), timeZone)) {
       throw new AppError("Start date cannot be in the past", 400);
     }
 

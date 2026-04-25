@@ -33,22 +33,18 @@ const getPatternMasteryList = async (req, res, next) => {
 
 const getPatternMastery = async (req, res, next) => {
   try {
-    // Get the raw pattern name from the URL parameter
     let rawPatternName = req.params.patternName;
     if (!rawPatternName) {
       throw new AppError('Pattern name is required', 400);
     }
     
-    // Convert to slug for database lookup
     const patternSlug = slugify(rawPatternName);
     
-    // Find by slug (or fallback to patternName for backward compatibility)
     let pattern = await PatternMastery.findOne({
       userId: req.user._id,
       patternSlug: patternSlug
     }).lean();
     
-    // If not found by slug, try by exact patternName (for old data without slug)
     if (!pattern) {
       pattern = await PatternMastery.findOne({
         userId: req.user._id,
@@ -256,10 +252,6 @@ const syncPatternMastery = async (userId, questionProgress) => {
   }
 };
 
-/**
- * GET /api/v1/users/:userId/pattern-mastery
- * Public – returns pattern mastery data for a specific user (paginated)
- */
 const getUserPatternMastery = async (req, res, next) => {
   try {
     const { userId } = req.params;

@@ -1,6 +1,7 @@
 const { client: redisClient } = require('../config/redis');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
+const User = require('../models/User');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('./queue.service');
@@ -32,17 +33,23 @@ const getRevisionActivity = async (userId, questionId, date) => {
 };
 
 /**
+ * Get user's timezone from database
+ */
+const getUserTimeZone = async (userId) => {
+  const user = await User.findById(userId).select('preferences.timezone');
+  return user?.preferences?.timezone || 'UTC';
+};
+
+/**
  * Complete a revision (or a specific revision by date) for a given question.
- * @param {string} userId
- * @param {string} questionId
- * @param {Date} date - current date (used for overdue checks)
- * @param {string} source - 'auto' or 'manual'
- * @param {Object} options - { targetDate: Date, allowOverdue: boolean }
- * @returns {Object} { completed: boolean, message: string, skippedCount: number, overdueCompleted: boolean }
+ * Now uses user's timezone for date calculations.
  */
 const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto', options = {}) => {
   const { targetDate = null, allowOverdue = false } = options;
-  const todayStart = getStartOfDay(date);
+  
+  // Fetch user's timezone
+  const timeZone = await getUserTimeZone(userId);
+  const todayStart = getStartOfDay(date, timeZone);
 
   const revision = await RevisionSchedule.findOne({
     userId,
@@ -57,10 +64,9 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   // Determine which revision to complete
   let targetIndex = null;
   if (targetDate) {
-    const targetDayStart = getStartOfDay(targetDate);
-    // Find the index whose schedule date matches the target day
+    const targetDayStart = getStartOfDay(targetDate, timeZone);
     for (let i = 0; i < revision.schedule.length; i++) {
-      if (getStartOfDay(revision.schedule[i]).getTime() === targetDayStart.getTime()) {
+      if (getStartOfDay(revision.schedule[i], timeZone).getTime() === targetDayStart.getTime()) {
         targetIndex = i;
         break;
       }
@@ -69,13 +75,12 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
       return { completed: false, message: 'No revision scheduled for the given date', skippedCount: 0 };
     }
   } else {
-    // Default: complete the current pending revision
     targetIndex = revision.currentRevisionIndex;
   }
 
-  // Check if this revision is already completed
+  // Check if already completed
   const alreadyCompleted = revision.completedRevisions.some(rev =>
-    getStartOfDay(rev.date).getTime() === getStartOfDay(revision.schedule[targetIndex]).getTime()
+    getStartOfDay(rev.date, timeZone).getTime() === getStartOfDay(revision.schedule[targetIndex], timeZone).getTime()
   );
   if (alreadyCompleted) {
     return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
@@ -83,7 +88,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
 
   const isOverdue = revision.schedule[targetIndex] < todayStart;
 
-  // For manual completion, check conditions (unless it's an auto completion from code submission)
+  // For manual completion, check activity conditions
   if (source === 'manual' && targetIndex === revision.currentRevisionIndex) {
     const activity = await getRevisionActivity(userId, questionId, date);
     const conditionsMet = activity.timeSpent > 20 || activity.codeSubmitted;
@@ -96,7 +101,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     }
   }
 
-  // If the target revision is overdue and allowOverdue is false, reject
+  // If overdue and not allowed, reject
   if (isOverdue && !allowOverdue) {
     return {
       completed: false,
@@ -110,7 +115,6 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   const confidenceAfter = progress?.confidenceLevel || null;
   const activity = await getRevisionActivity(userId, questionId, date);
 
-  // Push completed entry
   const outOfOrder = (targetIndex !== revision.currentRevisionIndex);
   revision.completedRevisions.push({
     date: revision.schedule[targetIndex],
@@ -123,12 +127,11 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     outOfOrder: outOfOrder
   });
 
-  // If the completed revision is the current pending one, advance the index
   if (targetIndex === revision.currentRevisionIndex) {
-    // Find the next pending revision (not already completed)
+    // Find next pending revision
     let nextIndex = revision.currentRevisionIndex + 1;
     while (nextIndex < revision.schedule.length &&
-           revision.completedRevisions.some(rev => getStartOfDay(rev.date).getTime() === getStartOfDay(revision.schedule[nextIndex]).getTime())) {
+           revision.completedRevisions.some(rev => getStartOfDay(rev.date, timeZone).getTime() === getStartOfDay(revision.schedule[nextIndex], timeZone).getTime())) {
       nextIndex++;
     }
     if (nextIndex < revision.schedule.length) {
@@ -137,13 +140,10 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
       revision.status = 'completed';
     }
   }
-  // If completed out of order, do not change currentRevisionIndex
 
   revision.updatedAt = new Date();
   await revision.save();
 
-  // Emit event
-  const { jobQueue } = require('./queue.service');
   if (jobQueue) {
     await jobQueue.add({
       type: 'revision.completed',
@@ -163,7 +163,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   return {
     completed: true,
     message: outOfOrder
-      ? `Completed revision for ${getStartOfDay(revision.schedule[targetIndex]).toDateString()} (out of order).`
+      ? `Completed revision for ${getStartOfDay(revision.schedule[targetIndex], timeZone).toDateString()} (out of order).`
       : 'Great, your revision is done.',
     skippedCount: 0,
     overdueCompleted: isOverdue,

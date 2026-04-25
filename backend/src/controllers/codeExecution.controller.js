@@ -7,6 +7,7 @@ const CodeExecutionHistory = require("../models/CodeExecutionHistory");
 const RevisionSchedule = require("../models/RevisionSchedule"); 
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require("../services/revisionActivity.service");
+const { jobQueue } = require('../services/queue.service');
 
 const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript"];
 const normalize = (str) => (str || "").replace(/\s/g, "");
@@ -3131,7 +3132,6 @@ const runCode = async (req, res, next) => {
       const normalizedExpected = normalize(expectedOutput);
 
       let passed = false;
-
       if (isOrderIrrelevant) {
         try {
           const actualParsed = JSON.parse(actualOutput);
@@ -3139,8 +3139,7 @@ const runCode = async (req, res, next) => {
           if (Array.isArray(actualParsed) && Array.isArray(expectedParsed)) {
             const actualSorted = [...actualParsed].sort((a, b) => a - b);
             const expectedSorted = [...expectedParsed].sort((a, b) => a - b);
-            passed =
-              JSON.stringify(actualSorted) === JSON.stringify(expectedSorted);
+            passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted);
           } else {
             passed = normalizedActual === normalizedExpected;
           }
@@ -3150,6 +3149,19 @@ const runCode = async (req, res, next) => {
       } else {
         passed = normalizedActual === normalizedExpected;
       }
+
+      // --- NEW: emit background job for each test case execution (pass or fail) ---
+      if (jobQueue) {
+        jobQueue.add({
+          type: 'test_case.executed',
+          userId: req.user._id,
+          questionId,
+          passed,
+          executedAt: new Date(),
+          language,
+        }).catch(err => console.error('Failed to queue test_case.executed:', err));
+      }
+      // -----------------------------------------------------------------------
 
       return {
         input: testCase.stdin,

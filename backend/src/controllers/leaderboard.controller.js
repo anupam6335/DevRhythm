@@ -11,8 +11,9 @@ const AppError = require('../utils/errors/AppError');
 const getLeaderboard = async (req, res, next) => {
   try {
     const { type } = req.params;
-    const { date } = req.query; // optional date to get specific week/month
+    const { date } = req.query;
     const { page, limit } = getPaginationParams(req);
+    const timeZone = req.userTimeZone; 
 
     if (!['weekly', 'monthly'].includes(type)) {
       throw new AppError('Invalid leaderboard type', 400);
@@ -21,11 +22,11 @@ const getLeaderboard = async (req, res, next) => {
     let periodStart, periodEnd;
     const referenceDate = date ? new Date(date) : new Date();
     if (type === 'weekly') {
-      periodStart = getStartOfWeek(referenceDate);
-      periodEnd = getEndOfWeek(referenceDate);
+      periodStart = getStartOfWeek(referenceDate, timeZone);
+      periodEnd = getEndOfWeek(referenceDate, timeZone);
     } else {
-      periodStart = getStartOfMonth(referenceDate);
-      periodEnd = getEndOfMonth(referenceDate);
+      periodStart = getStartOfMonth(referenceDate, timeZone);
+      periodEnd = getEndOfMonth(referenceDate, timeZone);
     }
 
     let snapshot = await LeaderboardSnapshot.findOne({
@@ -35,11 +36,9 @@ const getLeaderboard = async (req, res, next) => {
     }).populate('rankings.userId', 'username displayName avatarUrl').lean();
 
     if (!snapshot) {
-      // Calculate on the fly and store
       snapshot = await leaderboardService.calculateLeaderboard(type, periodStart, periodEnd);
     }
 
-    // Paginate rankings
     const start = (page - 1) * limit;
     const paginatedRankings = snapshot.rankings.slice(start, start + limit);
     const total = snapshot.rankings.length;
@@ -62,13 +61,15 @@ const getUserRank = async (req, res, next) => {
   try {
     const { type } = req.params;
     const { date } = req.query;
+    const timeZone = req.userTimeZone; 
+
     if (!['weekly', 'monthly'].includes(type)) {
       throw new AppError('Invalid leaderboard type', 400);
     }
 
     const referenceDate = date ? new Date(date) : new Date();
-    const periodStart = type === 'weekly' ? getStartOfWeek(referenceDate) : getStartOfMonth(referenceDate);
-    const periodEnd = type === 'weekly' ? getEndOfWeek(referenceDate) : getEndOfMonth(referenceDate);
+    const periodStart = type === 'weekly' ? getStartOfWeek(referenceDate, timeZone) : getStartOfMonth(referenceDate, timeZone);
+    const periodEnd = type === 'weekly' ? getEndOfWeek(referenceDate, timeZone) : getEndOfMonth(referenceDate, timeZone);
 
     let snapshot = await LeaderboardSnapshot.findOne({ leaderboardType: type, periodStart, periodEnd });
     if (!snapshot) {
@@ -93,15 +94,17 @@ const refreshLeaderboard = async (req, res, next) => {
   try {
     const { type } = req.params;
     const { date } = req.query;
+    const timeZone = req.userTimeZone; 
+
     if (!['weekly', 'monthly'].includes(type)) {
       throw new AppError('Invalid leaderboard type', 400);
     }
 
     const referenceDate = date ? new Date(date) : new Date();
-    const periodStart = type === 'weekly' ? getStartOfWeek(referenceDate) : getStartOfMonth(referenceDate);
-    const periodEnd = type === 'weekly' ? getEndOfWeek(referenceDate) : getEndOfMonth(referenceDate);
+    const periodStart = type === 'weekly' ? getStartOfWeek(referenceDate, timeZone) : getStartOfMonth(referenceDate, timeZone);
+    const periodEnd = type === 'weekly' ? getEndOfWeek(referenceDate, timeZone) : getEndOfMonth(referenceDate, timeZone);
 
-    const snapshot = await leaderboardService.calculateLeaderboard(type, periodStart, periodEnd, true); // force recalc
+    const snapshot = await leaderboardService.calculateLeaderboard(type, periodStart, periodEnd, true);
     res.json(formatResponse('Leaderboard refreshed', { snapshot }));
   } catch (error) {
     next(error);

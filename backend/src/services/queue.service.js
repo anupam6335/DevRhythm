@@ -39,12 +39,13 @@ jobQueue.on('failed', (job, err) => {
 // Import the main processor that will dispatch based on job type
 const { processJob } = require('./queueHandlers');
 
-const startQueueWorkers = () => {
+const startQueueWorkers = async () => {
   if (!jobQueue) {
     console.error('Queue not available, workers not started');
     return;
   }
   try {
+    // Process all jobs using the dispatcher
     jobQueue.process(processJob);
     console.log('Queue workers started');
   } catch (error) {

@@ -3,6 +3,7 @@ const User = require('../../models/User');
 const { invalidateCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
 const { parseDate } = require('../../utils/helpers/date');
+const { updateUserActivity } = require('../user.service');
 
 const handleQuestionAttempted = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, attemptedAt } = job.data;
@@ -15,37 +16,19 @@ const handleQuestionAttempted = async (job) => {
   console.log(`[question.attempted] Started for user ${userId}, question ${questionId}`);
 
   try {
-    // --- Update user streak and active days ---
-    const today = new Date();
-    const todayStr = today.toDateString();
+    // Fetch user and timezone
     const user = await User.findById(userId);
-    if (user) {
-      const lastActive = user.streak.lastActiveDate ? new Date(user.streak.lastActiveDate).toDateString() : null;
-      if (!lastActive) {
-        user.streak.current = 1;
-        user.streak.longest = 1;
-        user.stats.activeDays = 1;
-      } else if (lastActive !== todayStr) {
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (lastActive === yesterday.toDateString()) {
-          user.streak.current += 1;
-          if (user.streak.current > user.streak.longest) user.streak.longest = user.streak.current;
-        } else {
-          user.streak.current = 1;
-        }
-        user.stats.activeDays += 1;
-      }
-      user.streak.lastActiveDate = today;
-      await user.save();
-      await invalidateCache(`user:${userId}:profile`);
-    }
+    if (!user) throw new Error('User not found');
+    const userTimeZone = user.preferences?.timezone || 'UTC';
 
-    // --- Update heatmap – FIX: create if missing ---
-    const year = attemptDate.getFullYear();
+    // --- Update user streak and active days using user timezone ---
+    await updateUserActivity(userId, attemptDate, userTimeZone);
+
+    // --- Update heatmap – create if missing, using user timezone ---
+    const year = attemptDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(userId, year);
+      heatmap = await heatmapService.generateHeatmapData(userId, year, userTimeZone);
     }
     if (heatmap) {
       const dayEntry = heatmap.dailyData.find(d => new Date(d.date).toDateString() === attemptDate.toDateString());

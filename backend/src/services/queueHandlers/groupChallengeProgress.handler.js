@@ -1,29 +1,29 @@
 const ActivityLog = require('../../models/ActivityLog');
 const HeatmapData = require('../../models/HeatmapData');
+const User = require('../../models/User');
 const heatmapService = require('../heatmap.service');
 const { updateUserActivity } = require('../user.service');
 const { invalidateCache } = require('../../middleware/cache');
 const { parseDate } = require('../../utils/helpers/date');
 
 const handleGroupChallengeProgress = async (job) => {
-  const {
-    userId,
-    groupId,
-    challengeId,
-    delta,
-    newProgress,
-    target,
-    timestamp,
-  } = job.data;
+  const { userId, groupId, challengeId, delta, newProgress, target, timestamp } = job.data;
   const activityDate = parseDate(timestamp || new Date());
 
   try {
-    await updateUserActivity(userId, activityDate);
+    // Fetch user and timezone
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+    const userTimeZone = user.preferences?.timezone || 'UTC';
 
-    const year = activityDate.getFullYear();
+    // --- Update user streak and active days using user timezone ---
+    await updateUserActivity(userId, activityDate, userTimeZone);
+
+    // --- Update heatmap – create if missing, using user timezone ---
+    const year = activityDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(userId, year);
+      heatmap = await heatmapService.generateHeatmapData(userId, year, userTimeZone);
     }
     if (heatmap) {
       const dayEntry = heatmap.dailyData.find(
@@ -39,6 +39,7 @@ const handleGroupChallengeProgress = async (job) => {
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
 
+    // --- Create activity log ---
     await ActivityLog.create({
       userId,
       action: 'group_challenge_progress',
@@ -48,7 +49,7 @@ const handleGroupChallengeProgress = async (job) => {
         challengeId,
         delta,
         newProgress,
-        target,
+        target
       },
       timestamp: activityDate,
     });

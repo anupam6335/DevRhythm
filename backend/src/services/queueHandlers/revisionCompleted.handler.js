@@ -6,6 +6,7 @@ const Notification = require('../../models/Notification');
 const { invalidateCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
 const { parseDate } = require('../../utils/helpers/date');
+const { updateUserActivity } = require('../user.service');
 
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
@@ -13,34 +14,18 @@ const handleRevisionCompleted = async (job) => {
   const revisionDate = parseDate(completedAt);
 
   try {
-    // --- Update user streak and revision count ---
+    // Fetch user and timezone
     const user = await User.findById(userId);
-    if (user) {
-      user.stats.totalRevisions += 1;
+    if (!user) throw new Error('User not found');
+    const userTimeZone = user.preferences?.timezone || 'UTC';
 
-      const today = new Date();
-      const todayStr = today.toDateString();
-      const lastActive = user.streak.lastActiveDate ? new Date(user.streak.lastActiveDate).toDateString() : null;
-      if (!lastActive) {
-        user.streak.current = 1;
-        user.streak.longest = 1;
-        user.stats.activeDays = 1;
-      } else if (lastActive !== todayStr) {
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (lastActive === yesterday.toDateString()) {
-          user.streak.current += 1;
-          if (user.streak.current > user.streak.longest) user.streak.longest = user.streak.current;
-        } else {
-          user.streak.current = 1;
-        }
-        user.stats.activeDays += 1;
-      }
-      user.streak.lastActiveDate = today;
+    // --- Update user streak and revision count (using user timezone) ---
+    await updateUserActivity(userId, revisionDate, userTimeZone);
 
-      await user.save();
-      await invalidateCache(`user:${userId}:profile`);
-    }
+    // Update user stats (total revisions)
+    user.stats.totalRevisions = (user.stats.totalRevisions || 0) + 1;
+    await user.save();
+    await invalidateCache(`user:${userId}:profile`);
 
     // --- Update question progress (revision count) ---
     const progress = await UserQuestionProgress.findOne({ userId, questionId });
@@ -51,11 +36,11 @@ const handleRevisionCompleted = async (job) => {
       await invalidateCache(`progress:*:user:${userId}:*`);
     }
 
-    // --- Update heatmap – FIX: create if missing ---
-    const year = revisionDate.getFullYear();
+    // --- Update heatmap – create if missing, using user timezone ---
+    const year = revisionDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(userId, year);
+      heatmap = await heatmapService.generateHeatmapData(userId, year, userTimeZone);
     }
     if (heatmap) {
       const dayEntry = heatmap.dailyData.find(d => new Date(d.date).toDateString() === revisionDate.toDateString());
@@ -73,7 +58,7 @@ const handleRevisionCompleted = async (job) => {
     const question = await Question.findById(questionId).select('title');
     const questionTitle = question ? question.title : 'a question';
 
-    // --- Create in-app notification for this completed revision ---
+    // --- Create in-app notification ---
     await Notification.create({
       userId,
       type: 'revision_completed',
