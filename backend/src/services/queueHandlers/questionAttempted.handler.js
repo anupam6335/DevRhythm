@@ -13,18 +13,13 @@ const handleQuestionAttempted = async (job) => {
     throw new Error(`Invalid attemptedAt date: ${attemptedAt}`);
   }
 
-  console.log(`[question.attempted] Started for user ${userId}, question ${questionId}`);
-
   try {
-    // Fetch user and timezone
     const user = await User.findById(userId);
     if (!user) throw new Error('User not found');
     const userTimeZone = user.preferences?.timezone || 'UTC';
 
-    // --- Update user streak and active days using user timezone ---
     await updateUserActivity(userId, attemptDate, userTimeZone);
 
-    // --- Update heatmap – create if missing, using user timezone ---
     const year = attemptDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -42,10 +37,8 @@ const handleQuestionAttempted = async (job) => {
       await heatmap.save();
       await invalidateCache(`heatmap:${userId}:${year}:*`);
     }
-
-    console.log(`[question.attempted] Completed for user ${userId}`);
   } catch (error) {
-    console.error(`[question.attempted] Error:`, error);
+    console.error('Error in questionAttempted handler:', error);
     throw error;
   }
 };

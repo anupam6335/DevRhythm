@@ -12,26 +12,21 @@ const handleTestCaseExecuted = async (job) => {
     if (!user) throw new Error(`User ${userId} not found`);
     const timeZone = user.preferences?.timezone || 'UTC';
 
-    // Update user streak and active days (once per submission)
     await updateUserActivity(userId, activityDate, timeZone);
 
-    // Increment heatmap counters
-    // totalActivities: +1 (one activity per submission)
-    // totalSubmissions: +1
-    // testCaseExecutions: +totalTestCases (for detailed analytics)
-    // passedCount: +passedCount
-    // failedCount: +failedCount
+    const increments = {
+      totalActivities: 1,
+      totalSubmissions: 1,
+      testCaseExecutions: totalTestCases,
+      passedCount: passedCount,
+      failedCount: failedCount,
+    };
+
     await heatmapService.incrementDailyActivity({
       userId,
       date: activityDate,
       timeZone,
-      increments: {
-        totalActivities: 1,
-        totalSubmissions: 1,
-        testCaseExecutions: totalTestCases,
-        passedCount: passedCount,
-        failedCount: failedCount,
-      },
+      increments,
     });
   } catch (error) {
     console.error('Error handling testCase.executed:', error);

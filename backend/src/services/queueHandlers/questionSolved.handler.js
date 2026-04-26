@@ -15,6 +15,9 @@ const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
 const { updateUserActivity } = require("../user.service");
 const { DateTime } = require("luxon");
+const { client: redisClient } = require("../../config/redis");
+
+const getGoalDailySolveKey = (userId, dateStr) => `goal:solved:daily:${userId}:${dateStr}`;
 
 const handleQuestionSolved = async (job) => {
   const { userId, questionId, progressId, timeSpent = 0, solvedAt } = job.data;
@@ -32,7 +35,6 @@ const handleQuestionSolved = async (job) => {
 
     const userTimeZone = user.preferences?.timezone || "UTC";
 
-    // --- Update UserQuestionProgress with solvedToday logic ---
     let progress = await UserQuestionProgress.findOne({ userId, questionId });
     const todayStartUTC = getStartOfDay(new Date(), userTimeZone);
     const wasSolvedToday = progress?.solvedToday && progress?.lastActivityDate >= todayStartUTC;
@@ -48,15 +50,13 @@ const handleQuestionSolved = async (job) => {
 
     const isFirstSolve = !progress || progress.status !== "Solved";
 
-    // --- 1. Update UserStats and Streak ---
     if (isFirstSolve) {
       user.stats.totalSolved += 1;
     }
     user.stats.totalTimeSpent += timeSpent;
 
     const totalQuestions = await Question.countDocuments();
-    let rawMasteryRate =
-      totalQuestions > 0 ? (user.stats.totalSolved / totalQuestions) * 100 : 0;
+    let rawMasteryRate = totalQuestions > 0 ? (user.stats.totalSolved / totalQuestions) * 100 : 0;
     if (rawMasteryRate > 100) rawMasteryRate = 100;
     user.stats.masteryRate = rawMasteryRate;
 
@@ -64,7 +64,6 @@ const handleQuestionSolved = async (job) => {
     await user.save();
     await invalidateUserCache(userId);
 
-    // --- 2. Save/Update UserQuestionProgress ---
     const updateData = {
       $inc: {
         totalTimeSpent: timeSpent,
@@ -88,7 +87,6 @@ const handleQuestionSolved = async (job) => {
       { upsert: true, new: true }
     );
 
-    // --- 3. Update PatternMastery ---
     if (question.pattern && Array.isArray(question.pattern) && question.pattern.length > 0) {
       for (const patternName of question.pattern) {
         let pattern = await PatternMastery.findOne({ userId, patternName });
@@ -114,9 +112,6 @@ const handleQuestionSolved = async (job) => {
         }
 
         if (pattern.successfulAttempts > pattern.totalAttempts) {
-          console.warn(
-            `[pattern] Data inconsistency for ${patternName}: successfulAttempts=${pattern.successfulAttempts}, totalAttempts=${pattern.totalAttempts}. Correcting.`
-          );
           pattern.successfulAttempts = pattern.totalAttempts;
         }
 
@@ -144,7 +139,6 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`pattern-mastery:*:user:${userId}:*`);
     }
 
-    // --- 4. Update Planned Goals ---
     const solvedLocal = DateTime.fromJSDate(solvedDate, { zone: userTimeZone });
     const solvedLocalMidnight = solvedLocal.startOf('day');
     const solvedLocalEnd = solvedLocal.endOf('day');
@@ -189,7 +183,6 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
-    // --- 5. RevisionSchedule (auto‑complete first revision) ---
     if (isFirstSolve) {
       const existingRevision = await RevisionSchedule.findOne({ userId, questionId });
       if (!existingRevision) {
@@ -213,9 +206,42 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`revisions:*:user:${userId}:*`);
     }
 
-    // --- 6. Update daily/weekly goals (only once per day) ---
     if (!wasSolvedToday) {
+      let isGoalRelated = false;
+
       const dayStart = getStartOfDay(solvedDate, userTimeZone);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+      dayEnd.setUTCMilliseconds(-1);
+
+      const activeDailyWeekly = await Goal.findOne({
+        userId,
+        goalType: { $in: ["daily", "weekly"] },
+        status: "active",
+        startDate: { $lte: dayEnd },
+        endDate: { $gte: dayStart },
+      });
+      if (activeDailyWeekly) {
+        isGoalRelated = true;
+      } else {
+        const plannedGoal = await Goal.findOne({
+          userId,
+          goalType: "planned",
+          status: "active",
+          targetQuestions: questionId,
+          startDate: { $lte: dayEnd },
+          endDate: { $gte: dayStart },
+        });
+        if (plannedGoal) isGoalRelated = true;
+      }
+
+      if (isGoalRelated) {
+        const dateStr = solvedLocal.toFormat('yyyy-MM-dd');
+        const redisKey = getGoalDailySolveKey(userId, dateStr);
+        await redisClient.incr(redisKey);
+        await redisClient.expire(redisKey, 90 * 86400);
+      }
+
       const dailyGoal = await Goal.findOne({
         userId,
         goalType: "daily",
@@ -242,7 +268,6 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`goals:*:user:${userId}:*`);
     }
 
-    // --- 7. ActivityLog ---
     await ActivityLog.create({
       userId,
       action: "question_solved",
@@ -260,7 +285,6 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    // --- 8. HeatmapData ---
     const year = solvedDate.getUTCFullYear();
     let heatmap = await HeatmapData.findOne({ userId, year });
     if (!heatmap) {
@@ -281,7 +305,6 @@ const handleQuestionSolved = async (job) => {
       await invalidateCache(`heatmap:*:user:${userId}:*`);
     }
 
-    // --- 9. Notifications ---
     if (isFirstSolve) {
       await Notification.create({
         userId,
@@ -318,7 +341,6 @@ const handleQuestionSolved = async (job) => {
     }
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
-    console.log(`Question solved event processed for user ${userId}`);
   } catch (error) {
     console.error(`[question.solved] Error processing for user ${userId}:`, error);
     throw error;

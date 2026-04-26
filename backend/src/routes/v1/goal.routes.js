@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const goalController = require("../../controllers/goal.controller");
+const goalChartController = require("../../controllers/goalChart.controller");
 const { auth } = require("../../middleware/auth");
 const validate = require("../../middleware/validator");
 const { cache } = require("../../middleware/cache");
@@ -8,7 +9,31 @@ const rateLimiters = require("../../middleware/rateLimiter");
 const progressValidator = require("../../utils/validators/progress.validator");
 const Joi = require("joi");
 
-// ========== STATIC ROUTES ==========
+// ========== STATIC ROUTES (must come before /:id) ==========
+
+// Goal chart data (new)
+router.get("/chart-data",
+  auth,
+  rateLimiters.userLimiter,
+  cache(3600, "goal-chart"),
+  validate(Joi.object({
+    periodType: Joi.string().valid('monthly', 'yearly').default('monthly'),
+    range: Joi.string().pattern(/^(last12months|year=\d{4})$/).default('last12months'),
+    includeComparison: Joi.boolean().default(true)
+  }), 'query'),
+  goalChartController.getGoalChartData
+);
+
+// Manually refresh snapshots (new)
+router.post("/refresh-snapshots",
+  auth,
+  rateLimiters.progressUpdateLimiter,
+  validate(Joi.object({
+    monthsBack: Joi.number().integer().min(1).max(36).default(12)
+  }), 'body'),
+  goalChartController.refreshUserSnapshots
+);
+
 router.get("/",
   auth,
   rateLimiters.userLimiter,
@@ -93,7 +118,6 @@ router.get("/planned",
   goalController.getPlannedGoals
 );
 
-
 router.delete("/planned/:id",
   auth,
   rateLimiters.progressUpdateLimiter,
@@ -101,7 +125,7 @@ router.delete("/planned/:id",
   goalController.deletePlannedGoal
 );
 
-// ========== DYNAMIC ROUTES ==========
+// ========== DYNAMIC ROUTES (must come after static routes) ==========
 router.get("/:id",
   auth,
   rateLimiters.userLimiter,
