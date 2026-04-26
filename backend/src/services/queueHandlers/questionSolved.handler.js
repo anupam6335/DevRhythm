@@ -159,7 +159,11 @@ const handleQuestionSolved = async (job) => {
         (cq) => cq.questionId.toString() === questionId.toString()
       );
       if (!alreadyCompleted) {
-        goal.completedQuestions.push({ questionId, completedAt: solvedDate });
+        goal.completedQuestions.push({
+          questionId,
+          platformQuestionId: question.platformQuestionId,
+          completedAt: solvedDate
+        });
         await goal.save();
 
         if (goal.completedQuestions.length === goal.targetQuestions.length) {

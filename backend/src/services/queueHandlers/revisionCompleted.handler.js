@@ -53,6 +53,7 @@ const handleRevisionCompleted = async (job) => {
 
     const question = await Question.findById(questionId).select('title platformQuestionId');
     const questionTitle = question ? question.title : 'a question';
+    const platformQuestionId = question ? question.platformQuestionId : null;
 
     await Notification.create({
       userId,
@@ -70,7 +71,7 @@ const handleRevisionCompleted = async (job) => {
       scheduledAt: new Date(),
     });
 
-    // Bidirectional sync: update planned goals if revision completed
+    // Update planned goals if revision completed
     const revisionLocal = DateTime.fromJSDate(revisionDate, { zone: userTimeZone });
     const revisionLocalMidnight = revisionLocal.startOf('day');
     const revisionLocalEnd = revisionLocal.endOf('day');
@@ -91,13 +92,17 @@ const handleRevisionCompleted = async (job) => {
         (cq) => cq.questionId.toString() === questionId.toString()
       );
       if (!alreadyCompleted) {
-        goal.completedQuestions.push({ questionId, completedAt: revisionDate });
+        goal.completedQuestions.push({
+          questionId,
+          platformQuestionId,   // NEW
+          completedAt: revisionDate
+        });
         await goal.save();
 
         if (goal.completedQuestions.length === goal.targetQuestions.length) {
           const completedQuestionDetails = {
             questionId: questionId.toString(),
-            platformQuestionId: question?.platformQuestionId || null,
+            platformQuestionId,
             title: questionTitle,
           };
           const { jobQueue } = require('../queue.service');
@@ -116,7 +121,6 @@ const handleRevisionCompleted = async (job) => {
     }
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
-    console.log(`Revision completed event processed for user ${userId}`);
   } catch (error) {
     console.error('Error processing revision.completed:', error);
     throw error;

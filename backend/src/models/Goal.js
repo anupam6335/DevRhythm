@@ -59,6 +59,7 @@ const GoalSchema = new mongoose.Schema(
     completedQuestions: [
       {
         questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question" },
+        platformQuestionId: { type: String, trim: true }, // NEW
         completedAt: Date,
       },
     ],
@@ -79,7 +80,6 @@ GoalSchema.index({ userId: 1, goalType: "planned", status: 1, startDate: 1, endD
 GoalSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
 
-  // For planned goals, derive targetCount and completedCount from arrays
   if (this.goalType === "planned") {
     this.targetCount = this.targetQuestions.length;
     this.completedCount = this.completedQuestions.length;
