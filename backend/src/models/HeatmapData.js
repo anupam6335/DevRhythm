@@ -27,110 +27,38 @@ const HeatmapDataSchema = new mongoose.Schema({
     required: true
   },
   dailyData: [{
-    date: {
-      type: Date,
-      required: true
-    },
-    dayOfWeek: {
-      type: Number,
-      min: 0,
-      max: 6,
-      required: true
-    },
-    totalActivities: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    newProblemsSolved: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    revisionProblems: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    totalSubmissions: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    totalTimeSpent: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
+    date: { type: Date, required: true },
+    dayOfWeek: { type: Number, min: 0, max: 6, required: true },
+    totalActivities: { type: Number, default: 0, min: 0 },
+    newProblemsSolved: { type: Number, default: 0, min: 0 },
+    revisionProblems: { type: Number, default: 0, min: 0 },
+    totalSubmissions: { type: Number, default: 0, min: 0 },
+    totalTimeSpent: { type: Number, default: 0, min: 0 },
+    
+    // --- NEW FIELDS for test cases and time events ---
+    testCaseExecutions: { type: Number, default: 0, min: 0 },
+    passedCount: { type: Number, default: 0, min: 0 },
+    failedCount: { type: Number, default: 0, min: 0 },
+    timeSpentEvents: { type: Number, default: 0, min: 0 },
+    // -------------------------------------------------
+    
     difficultyBreakdown: {
-      easy: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      medium: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      hard: {
-        type: Number,
-        default: 0,
-        min: 0
-      }
+      easy: { type: Number, default: 0, min: 0 },
+      medium: { type: Number, default: 0, min: 0 },
+      hard: { type: Number, default: 0, min: 0 }
     },
     platformBreakdown: {
-      leetcode: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      hackerrank: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      codeforces: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      other: {
-        type: Number,
-        default: 0,
-        min: 0
-      }
+      leetcode: { type: Number, default: 0, min: 0 },
+      hackerrank: { type: Number, default: 0, min: 0 },
+      codeforces: { type: Number, default: 0, min: 0 },
+      other: { type: Number, default: 0, min: 0 }
     },
-    studyGroupActivity: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    dailyGoalAchieved: {
-      type: Boolean,
-      default: false
-    },
-    goalTarget: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    goalCompletion: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100
-    },
-    intensityLevel: {
-      type: Number,
-      enum: [0, 1, 2, 3, 4],
-      default: 0
-    },
-    streakCount: {
-      type: Number,
-      default: 0,
-      min: 0
-    }
+    studyGroupActivity: { type: Number, default: 0, min: 0 },
+    dailyGoalAchieved: { type: Boolean, default: false },
+    goalTarget: { type: Number, default: 0, min: 0 },
+    goalCompletion: { type: Number, default: 0, min: 0, max: 100 },
+    intensityLevel: { type: Number, enum: [0, 1, 2, 3, 4], default: 0 },
+    streakCount: { type: Number, default: 0, min: 0 }
   }],
   performance: {
     totalYearlyActivities: {

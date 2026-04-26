@@ -1,5 +1,5 @@
 const ActivityLog = require('../models/ActivityLog');
-const Follow = require('../models/Follow'); // <-- ADD THIS LINE
+const Follow = require('../models/Follow');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
@@ -12,11 +12,18 @@ const getActivityLogs = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
     const { action, startDate, endDate, sortBy = 'timestamp', sortOrder = 'desc' } = req.query;
+    const timeZone = req.userTimeZone; 
 
     const query = { userId: req.user._id };
     if (action) query.action = action;
-    if (startDate) query.timestamp = { $gte: getStartOfDay(new Date(startDate)) };
-    if (endDate) query.timestamp = { ...query.timestamp, $lte: getEndOfDay(new Date(endDate)) };
+    if (startDate) {
+      const start = getStartOfDay(new Date(startDate), timeZone);
+      query.timestamp = { $gte: start };
+    }
+    if (endDate) {
+      const end = getEndOfDay(new Date(endDate), timeZone);
+      query.timestamp = { ...query.timestamp, $lte: end };
+    }
 
     const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
 
@@ -25,7 +32,7 @@ const getActivityLogs = async (req, res, next) => {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .populate('targetId') // populate based on targetModel? we'll keep generic
+        .populate('targetId')
         .lean(),
       ActivityLog.countDocuments(query)
     ]);
@@ -42,6 +49,7 @@ const getActivityLogs = async (req, res, next) => {
 const getActivityFeed = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
+    // No date filtering in feed, so timezone not needed here
     const following = await Follow.find({ followerId: req.user._id, isActive: true }).distinct('followedId');
     if (following.length === 0) {
       return res.json(formatResponse('No activity from followed users', { logs: [] }));

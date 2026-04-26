@@ -11,6 +11,9 @@ const { handleGroupChallengeProgress } = require('./groupChallengeProgress.handl
 const { handleGroupChallengeCompleted } = require('./groupChallengeCompleted.handler');
 const { handleRevisionSchedule } = require('./revisionSchedule.hanlder');
 const { handleQuestionExtractTestCases } = require('./questionExtractTestCases.hanlder');
+const { handleUserTimezoneChange } = require('./userTimezoneChange.handler');
+const { handleTestCaseExecuted } = require('./testCaseExecuted.handler');
+const { handleTimeThresholdReached } = require('./timeThresholdReached.handler');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -56,6 +59,14 @@ const processJob = async (job) => {
     case 'question.extract_testcases':
       await handleQuestionExtractTestCases(job);
       break;
+    case 'user.timezone_change':
+      await handleUserTimezoneChange(job);
+      break;
+    case 'test_case.executed':
+      await handleTestCaseExecuted(job);
+      break;
+    case 'time.threshold_reached':
+      await handleTimeThresholdReached(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);

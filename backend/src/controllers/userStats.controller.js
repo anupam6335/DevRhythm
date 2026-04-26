@@ -130,10 +130,8 @@ const getPublicUserStats = async (req, res, next) => {
     if (!user) throw new AppError('User not found', 404);
     if (user.privacy !== 'public') throw new AppError('User stats are private', 403);
 
-    // Compute detailed stats for this user
     const computed = await computeDetailedStats(userId);
 
-    // Build public stats object – identical to own stats but without preferences
     const publicStats = {
       totalSolved: computed.totalSolved,
       totalMastered: computed.totalMastered,
@@ -146,12 +144,10 @@ const getPublicUserStats = async (req, res, next) => {
       platformBreakdown: computed.platformBreakdown
     };
 
-    // Round masteryRate to two decimals
     if (publicStats.masteryRate) {
       publicStats.masteryRate = Math.round(publicStats.masteryRate * 100) / 100;
     }
 
-    // Return only stats and user ID
     res.json(formatResponse('Public user stats retrieved', {
       stats: publicStats,
       userId: user._id

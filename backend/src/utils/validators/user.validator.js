@@ -3,7 +3,9 @@ const Joi = require('joi');
 const updateUser = Joi.object({
   displayName: Joi.string().trim().min(2).max(50),
   preferences: Joi.object({
-    timezone: Joi.string().pattern(/^UTC[+-]\d{1,2}:\d{2}$/),
+    timezone: Joi.forbidden().messages({
+      'any.unknown': 'Timezone cannot be changed here. Use PUT /users/me/timezone endpoint.'
+    }),
     notifications: Joi.object({
       revisionReminders: Joi.boolean(),
       goalTracking: Joi.boolean(),

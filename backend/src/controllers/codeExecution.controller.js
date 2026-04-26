@@ -7,6 +7,7 @@ const CodeExecutionHistory = require("../models/CodeExecutionHistory");
 const RevisionSchedule = require("../models/RevisionSchedule"); 
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require("../services/revisionActivity.service");
+const { jobQueue } = require('../services/queue.service');
 
 const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript"];
 const normalize = (str) => (str || "").replace(/\s/g, "");
@@ -3131,7 +3132,6 @@ const runCode = async (req, res, next) => {
       const normalizedExpected = normalize(expectedOutput);
 
       let passed = false;
-
       if (isOrderIrrelevant) {
         try {
           const actualParsed = JSON.parse(actualOutput);
@@ -3139,8 +3139,7 @@ const runCode = async (req, res, next) => {
           if (Array.isArray(actualParsed) && Array.isArray(expectedParsed)) {
             const actualSorted = [...actualParsed].sort((a, b) => a - b);
             const expectedSorted = [...expectedParsed].sort((a, b) => a - b);
-            passed =
-              JSON.stringify(actualSorted) === JSON.stringify(expectedSorted);
+            passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted);
           } else {
             passed = normalizedActual === normalizedExpected;
           }
@@ -3160,6 +3159,25 @@ const runCode = async (req, res, next) => {
         passed,
       };
     });
+
+    // --- EMIT ONE AGGREGATED JOB FOR THE ENTIRE SUBMISSION (not per test case) ---
+    if (jobQueue) {
+      const passedCount = results.filter(r => r.passed).length;
+      const failedCount = results.filter(r => !r.passed).length;
+      const totalTestCases = results.length;
+      await jobQueue.add({
+        type: 'test_case.executed',
+        userId: req.user._id,
+        questionId,
+        passedCount,
+        failedCount,
+        totalTestCases,
+        allPassed: passedCount === totalTestCases,
+        executedAt: new Date(),
+        language,
+      });
+    }
+    // ---------------------------------------------------------------------------
 
     const passedCount = results.filter((r) => r.passed).length;
     const totalCount = finalTestCases.length;
@@ -3320,6 +3338,19 @@ const runCode = async (req, res, next) => {
       }
       await progress.save();
       await invalidateProgressCache(req.user._id);
+
+      // --- Queue question.solved job for goal and revision sync ---
+      if (jobQueue) {
+        await jobQueue.add({
+          type: 'question.solved',
+          userId: req.user._id,
+          questionId,
+          progressId: progress._id,
+          timeSpent: 0,
+          solvedAt: new Date(),
+          source: 'test_case'
+        });
+      }
 
       await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
 

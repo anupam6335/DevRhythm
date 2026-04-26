@@ -83,6 +83,7 @@ const markAllAsRead = async (req, res, next) => {
       { userId: req.user._id, readAt: null },
       { readAt: new Date() }
     );
+
     await invalidateCache(`notifications:${req.user._id}:*`);
     res.json(formatResponse(`All ${result.modifiedCount} notifications marked as read`));
   } catch (error) {

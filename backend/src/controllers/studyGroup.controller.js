@@ -1,7 +1,7 @@
 const StudyGroup = require('../models/StudyGroup');
 const User = require('../models/User');
 const AppError = require('../utils/errors/AppError');
-const { formatResponse, paginate } = require('../utils/helpers');
+const { formatResponse, paginate, getStartOfDay, getEndOfDay } = require('../utils/helpers');
 const { invalidateCache } = require('../middleware/cache');
 const { jobQueue } = require('../services/queue.service');
 
@@ -128,7 +128,6 @@ const joinGroup = async (req, res, next) => {
     group.lastActivityAt = new Date();
     await group.save();
 
-    // 🔔 Emit job for activity log
     await jobQueue.add({
       type: 'group.joined',
       userId: req.user._id,
@@ -190,8 +189,17 @@ const createGoal = async (req, res, next) => {
   try {
     const { groupId } = req.params;
     const { description, targetCount, deadline } = req.body;
+    const timeZone = req.userTimeZone; 
     const { group } = await checkGroupAccess(groupId, req.user._id, true);
-    group.goals.push({ description, targetCount, deadline });
+    
+    // Validate deadline is not in the past using user timezone
+    const deadlineDate = new Date(deadline);
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    if (deadlineDate < todayStart) {
+      throw new AppError('Deadline cannot be in the past', 400);
+    }
+    
+    group.goals.push({ description, targetCount, deadline: deadlineDate });
     group.lastActivityAt = new Date();
     await group.save();
     await invalidateCache(`study-group:${groupId}`);
@@ -223,6 +231,7 @@ const updateGoalProgress = async (req, res, next) => {
   try {
     const { groupId, goalId } = req.params;
     const { progress } = req.body;
+    const timeZone = req.userTimeZone; 
     const { group } = await checkGroupAccess(groupId, req.user._id);
     const goal = group.goals.id(goalId);
     if (!goal) throw new AppError('Goal not found', 404);
@@ -232,6 +241,15 @@ const updateGoalProgress = async (req, res, next) => {
       throw new AppError(`Progress must be between 0 and ${goal.targetCount}`, 400);
     }
 
+    // Check if deadline has passed (using user timezone)
+    if (goal.deadline) {
+      const deadlineStart = getStartOfDay(goal.deadline, timeZone);
+      const todayStart = getStartOfDay(new Date(), timeZone);
+      if (todayStart > deadlineStart && goal.status === 'active' && !participant.completed) {
+        throw new AppError('Goal deadline has passed. Cannot update progress.', 400);
+      }
+    }
+
     const oldProgress = participant.progress;
     const wasCompleted = participant.completed;
 
@@ -239,7 +257,6 @@ const updateGoalProgress = async (req, res, next) => {
     group.lastActivityAt = new Date();
     await group.save();
 
-    // If progress increased, emit progress job
     if (progress > oldProgress) {
       await jobQueue.add({
         type: 'group.goal_progress',
@@ -253,7 +270,6 @@ const updateGoalProgress = async (req, res, next) => {
       });
     }
 
-    // If completion status changed to true, emit completion job
     if (!wasCompleted && participant.completed) {
       await jobQueue.add({
         type: 'group.goal_completed',
@@ -277,8 +293,17 @@ const createChallenge = async (req, res, next) => {
   try {
     const { groupId } = req.params;
     const { name, description, challengeType, target, startDate, endDate } = req.body;
+    const timeZone = req.userTimeZone; 
     const { group } = await checkGroupAccess(groupId, req.user._id, true);
-    group.challenges.push({ name, description, challengeType, target, startDate, endDate });
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    
+    if (start < todayStart) throw new AppError('Start date cannot be in the past', 400);
+    if (end <= start) throw new AppError('End date must be after start date', 400);
+    
+    group.challenges.push({ name, description, challengeType, target, startDate: start, endDate: end });
     group.lastActivityAt = new Date();
     await group.save();
     await invalidateCache(`study-group:${groupId}`);
@@ -310,6 +335,7 @@ const updateChallengeProgress = async (req, res, next) => {
   try {
     const { groupId, challengeId } = req.params;
     const { progress } = req.body;
+    const timeZone = req.userTimeZone; 
     const { group } = await checkGroupAccess(groupId, req.user._id);
     const challenge = group.challenges.id(challengeId);
     if (!challenge) throw new AppError('Challenge not found', 404);
@@ -319,6 +345,16 @@ const updateChallengeProgress = async (req, res, next) => {
       throw new AppError('Progress must be between 0 and 100', 400);
     }
 
+    // Check if challenge is still active (using user timezone)
+    const todayStart = getStartOfDay(new Date(), timeZone);
+    const challengeEnd = getEndOfDay(challenge.endDate, timeZone);
+    if (todayStart > challengeEnd && challenge.status === 'active' && !participant.completed) {
+      throw new AppError('Challenge end date has passed. Cannot update progress.', 400);
+    }
+    if (todayStart < getStartOfDay(challenge.startDate, timeZone)) {
+      throw new AppError('Challenge has not started yet.', 400);
+    }
+
     const oldProgress = participant.progress;
     const wasCompleted = participant.completed;
 
@@ -326,7 +362,6 @@ const updateChallengeProgress = async (req, res, next) => {
     group.lastActivityAt = new Date();
     await group.save();
 
-    // If progress increased, emit progress job
     if (progress > oldProgress) {
       await jobQueue.add({
         type: 'group.challenge_progress',
@@ -340,7 +375,6 @@ const updateChallengeProgress = async (req, res, next) => {
       });
     }
 
-    // If completion status changed to true, emit completion job
     if (!wasCompleted && participant.completed) {
       await jobQueue.add({
         type: 'group.challenge_completed',
@@ -473,22 +507,14 @@ const getGroupStats = async (req, res, next) => {
   }
 };
 
-/**
- * Get public groups that a user is a member of (for profile snapshot)
- * Accessible without authentication, but respects group privacy
- */
 const getUserPublicGroups = async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { page = 1, limit = 5, sortBy = 'lastActivityAt', sortOrder = 'desc' } = req.query;
 
-    // Check if user exists (optional but good practice)
     const userExists = await User.exists({ _id: userId });
-    if (!userExists) {
-      throw new AppError('User not found', 404);
-    }
+    if (!userExists) throw new AppError('User not found', 404);
 
-    // Build query: user is a member and group is public or invite-only
     const query = {
       'members.userId': userId,
       privacy: { $in: ['public', 'invite-only'] }
@@ -498,7 +524,7 @@ const getUserPublicGroups = async (req, res, next) => {
 
     const [groups, total] = await Promise.all([
       StudyGroup.find(query)
-        .select('name description members privacy lastActivityAt createdAt') // only needed fields
+        .select('name description members privacy lastActivityAt createdAt')
         .sort(sort)
         .skip((page - 1) * limit)
         .limit(parseInt(limit))
@@ -506,7 +532,6 @@ const getUserPublicGroups = async (req, res, next) => {
       StudyGroup.countDocuments(query)
     ]);
 
-    // Add memberCount to each group (from members array length)
     const groupsWithCount = groups.map(group => ({
       _id: group._id,
       name: group.name,
@@ -523,7 +548,6 @@ const getUserPublicGroups = async (req, res, next) => {
     next(error);
   }
 };
-
 
 module.exports = {
   getGroups,
