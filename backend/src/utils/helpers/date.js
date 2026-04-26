@@ -1,39 +1,111 @@
 const { DateTime } = require('luxon');
 
+/**
+ * All date functions now accept a timeZone parameter but use UTC‐based
+ * date objects internally to avoid local timezone shifts.
+ */
+
 const getStartOfDay = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.startOf('day');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.startOf('day');
+    return dt.toJSDate();
+  }
+  // For UTC, directly use UTC methods
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  const utcMonth = d.getUTCMonth();
+  const utcDay = d.getUTCDate();
+  return new Date(Date.UTC(utcYear, utcMonth, utcDay, 0, 0, 0, 0));
 };
 
 const getEndOfDay = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.endOf('day');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.endOf('day');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  const utcMonth = d.getUTCMonth();
+  const utcDay = d.getUTCDate();
+  return new Date(Date.UTC(utcYear, utcMonth, utcDay, 23, 59, 59, 999));
 };
 
 const getStartOfWeek = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.startOf('week');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.startOf('week');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  const utcMonth = d.getUTCMonth();
+  const utcDay = d.getUTCDate();
+  const dayOfWeek = d.getUTCDay(); // 0 = Sunday
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  const monday = new Date(Date.UTC(utcYear, utcMonth, utcDay + diffToMonday, 0, 0, 0, 0));
+  return monday;
 };
 
 const getEndOfWeek = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.endOf('week');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.endOf('week');
+    return dt.toJSDate();
+  }
+  const startOfWeek = getStartOfWeek(date, 'UTC');
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6);
+  endOfWeek.setUTCHours(23, 59, 59, 999);
+  return endOfWeek;
 };
 
 const getStartOfMonth = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.startOf('month');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.startOf('month');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  const utcMonth = d.getUTCMonth();
+  return new Date(Date.UTC(utcYear, utcMonth, 1, 0, 0, 0, 0));
 };
 
 const getEndOfMonth = (date = new Date(), timeZone = 'UTC') => {
-  let dt = DateTime.fromJSDate(date, { zone: timeZone });
-  dt = dt.endOf('month');
-  return dt.toJSDate();
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.endOf('month');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  const utcMonth = d.getUTCMonth();
+  const lastDay = new Date(Date.UTC(utcYear, utcMonth + 1, 0, 23, 59, 59, 999));
+  return lastDay;
+};
+
+const getStartOfYear = (date = new Date(), timeZone = 'UTC') => {
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.startOf('year');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  return new Date(Date.UTC(utcYear, 0, 1, 0, 0, 0, 0));
+};
+
+const getEndOfYear = (date = new Date(), timeZone = 'UTC') => {
+  if (timeZone !== 'UTC') {
+    let dt = DateTime.fromJSDate(date, { zone: timeZone });
+    dt = dt.endOf('year');
+    return dt.toJSDate();
+  }
+  const d = new Date(date);
+  const utcYear = d.getUTCFullYear();
+  return new Date(Date.UTC(utcYear, 11, 31, 23, 59, 59, 999));
 };
 
 const formatDate = (date) => {
@@ -86,6 +158,8 @@ module.exports = {
   getEndOfWeek,
   getStartOfMonth,
   getEndOfMonth,
+  getStartOfYear,
+  getEndOfYear,
   formatDate,
   isSameDay,
   isToday,

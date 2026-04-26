@@ -470,10 +470,7 @@ const extractMinimalHeatmap = (heatmap) => {
 const getDailyRedisKey = (userId, dateStr) => `heatmap:daily:${userId}:${dateStr}`;
 
 const incrementDailyActivity = async ({ userId, date, timeZone, increments }) => {
-  if (!redisClient) {
-    console.warn('Redis not available, skipping daily activity increment');
-    return;
-  }
+  if (!redisClient) return;
   const dateStr = DateTime.fromJSDate(date, { zone: timeZone }).toFormat('yyyy-MM-dd');
   const key = getDailyRedisKey(userId, dateStr);
   const multi = redisClient.multi();
@@ -578,10 +575,7 @@ const ensureDayExists = async (userId, year, localDate, timeZone) => {
 };
 
 const flushDailyActivitiesToMongoDB = async () => {
-  if (!redisClient) {
-    console.warn('Redis not available, cannot flush daily activities');
-    return;
-  }
+  if (!redisClient) return;
 
   const pattern = 'heatmap:daily:*';
   let cursor = 0;
@@ -673,8 +667,6 @@ const flushDailyActivitiesToMongoDB = async () => {
     const [userId, year] = userKey.split(':');
     await recalculateConsistency(userId, parseInt(year));
   }
-
-  console.log(`Flushed ${processed} daily activity keys to MongoDB`);
 };
 
 module.exports = {

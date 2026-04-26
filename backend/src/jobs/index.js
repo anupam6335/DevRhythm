@@ -4,7 +4,8 @@ const progressSnapshotJobs = require('./progressSnapshot.job');
 const digestJob = require('./digestEmail.job');
 const plannedGoalExpiry = require('./plannedGoalExpiry.job');
 const expiredGoalsJob = require('./expiredGoals.job');
-const heatmapFlushJob = require('./heatmapFlush.job');   
+const heatmapFlushJob = require('./heatmapFlush.job');
+const goalSnapshotJob = require('./goalSnapshot.job');  
 
 const startAllJobs = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -14,7 +15,8 @@ const startAllJobs = () => {
     digestJob.startDigestJob();
     plannedGoalExpiry.startPlannedGoalExpiryJob();
     expiredGoalsJob.startExpiredGoalsJob();
-    heatmapFlushJob.startHeatmapFlushJob();             
+    heatmapFlushJob.startHeatmapFlushJob();
+    goalSnapshotJob.startGoalSnapshotJob();            
   }
 };
 
@@ -25,7 +27,8 @@ const stopAllJobs = () => {
   digestJob.stopDigestJob();
   plannedGoalExpiry.stopPlannedGoalExpiryJob();
   expiredGoalsJob.stopExpiredGoalsJob();
-  heatmapFlushJob.stopHeatmapFlushJob();               
+  heatmapFlushJob.stopHeatmapFlushJob();
+  goalSnapshotJob.stopGoalSnapshotJob();              
 };
 
 module.exports = {
@@ -37,5 +40,6 @@ module.exports = {
   digestJob,
   plannedGoalExpiry,
   expiredGoalsJob,
-  heatmapFlushJob,                                   
+  heatmapFlushJob,
+  goalSnapshotJob,                                   
 };
