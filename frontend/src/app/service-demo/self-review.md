@@ -1,5 +1,5 @@
 
-## Self‑Review 2: Service Layers & Error Handling in Next.js
+## Self‑Review 2: Service Layers & Error Handling in Next.js ( [CODE](https://github.com/anupam6335/DevRhythm/tree/feat-temp-smart-goal-task/frontend/src/app/service-demo) )
 
 ### What I built
 I created a service layer (`userServiceTemp.ts`) that wraps API calls with a single, reusable `apiRequest` helper. I then built a demo page (`/service-demo`) that uses this layer in two ways:  
