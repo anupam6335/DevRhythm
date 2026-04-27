@@ -1,7 +1,7 @@
-## Self-Review 1: JavaScript Fundamentals Demonstration
+## Self-Review 1: JavaScript Fundamentals Demonstration ( [CODE](https://github.com/anupam6335/DevRhythm/blob/feat-temp-smart-goal-task/frontend/src/app/page.tsx) )
 
 ### What I built
-I created a single-page demo in our Next.js project that shows four core JavaScript concepts: nested destructuring, safe property access, functional array methods, and complex object operations. The live page runs inside our existing `devRhythmContainer` and uses the project’s theme variables so it blends right in. I’ve attached the Git link to the full code so you can see everything in context.
+I created a single-page demo in our Next.js project that shows four core JavaScript concepts: nested destructuring, safe property access, functional array methods, and complex object operations.
 
 ### 1. Nested destructuring – how it improved readability
 Before this task I would have written several lines like `company.departments.engineering.manager.name` and `company.departments.engineering.manager.contact.email` to get deep values. Now I’m using a single `const` block that destructures all of them in one place. In the code, you can see this:
