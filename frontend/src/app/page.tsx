@@ -1,126 +1,225 @@
 "use client";
 
 import { useState } from "react";
-import CodeBlock from "@/shared/components/CodeBlock";
-import Button from "@/shared/components/Button";
-import ThemeToggle from "@/shared/components/ThemeToggle";
-import {
-  FaInfo,
-  FaCheck,
-  FaExclamationCircle,
-  FaExclamationTriangle,
-} from "react-icons/fa";
-import { toast } from "@/shared/components/Toast";
-import NoRecordFound from "@/shared/components/NoRecordFound";
+import { company } from "./data";
+import styles from "./page.module.css";
 
-export default function HomePage() {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [pythonCode, setPythonCode] = useState(`def fibonacci(n):
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
+function useCompanyData() {
+  // 1. Nested destructuring
+  const {
+    name: companyName,
+    departments: {
+      engineering: {
+        manager: {
+          name: engManagerName,
+          contact: { email: engManagerEmail },
+        },
+      },
+    },
+  } = company;
 
-# Generate first 10 Fibonacci numbers
-for i in range(10):
-    print(f"F({i}) = {fibonacci(i)}")`);
+  // 2. Safe property access
+  const hrManagerName = company.departments?.hr?.manager?.name ?? "Vacant";
+  const financeManager = company.departments?.finance?.manager?.name ?? "Not found";
 
-  const [jsCode, setJsCode] = useState(`function quickSort(arr) {
-  if (arr.length <= 1) return arr;
-  const pivot = arr[0];
-  const left = arr.slice(1).filter(x => x < pivot);
-  const right = arr.slice(1).filter(x => x >= pivot);
-  return [...quickSort(left), pivot, ...quickSort(right)];
+  // 3. Functional array methods
+  const allEmployees = Object.values(company.departments).flatMap(dept => dept.employees);
+  const developerNames = allEmployees
+    .filter(emp => emp.role === "Developer")
+    .map(emp => emp.name);
+  const totalSalary = allEmployees.reduce((sum, emp) => sum + emp.salary, 0);
+  const firstQA = allEmployees.find(emp => emp.role === "QA");
+  const allWellPaid = allEmployees.every(emp => emp.salary > 60000);
+  const hasRecruiter = allEmployees.some(emp => emp.role === "Recruiter");
+  const highestPaid = [...allEmployees].sort((a, b) => b.salary - a.salary)[0];
+  const employeesByDept = Object.entries(company.departments).reduce(
+    (acc, [deptName, dept]) => ({
+      ...acc,
+      [deptName]: dept.employees.map(e => e.name),
+    }),
+    {} as Record<string, string[]>
+  );
+
+  // 4. Complex object operations – new simple examples built directly in the UI
+  return {
+    companyName,
+    engManagerName,
+    engManagerEmail,
+    hrManagerName,
+    financeManager,
+    developerNames,
+    totalSalary,
+    firstQA,
+    allWellPaid,
+    hasRecruiter,
+    highestPaid,
+    employeesByDept,
+  };
 }
 
-const unsorted = [3, 6, 8, 10, 1, 2, 1];
-console.log(quickSort(unsorted));`);
+export default function Home() {
+  const data = useCompanyData();
 
-  const [htmlCode, setHtmlCode] = useState(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Sample</title>
-</head>
-<body>
-    <h1>Hello World</h1>
-    <p>This is a test.</p>
-</body>
-</html>`);
+  // ---- Simple clone demo with a user object ----
+  const originalUser = { name: "Alice", age: 30 };
+  const [userCopy, setUserCopy] = useState<typeof originalUser | null>(null);
 
-  const [lastAction, setLastAction] = useState<string>("");
-
-  const handleSavePython = (newCode: string) => {
-    setPythonCode(newCode);
-    setLastAction(`✅ Python code saved at ${new Date().toLocaleTimeString()}`);
-    toast.success("Python code saved successfully!");
+  const createUserCopy = () => {
+    // deep clone (though this object is flat, structuredClone works everywhere)
+    setUserCopy(structuredClone(originalUser));
   };
 
-  const handleSaveJs = (newCode: string) => {
-    setJsCode(newCode);
-    setLastAction(`✅ JavaScript code saved at ${new Date().toLocaleTimeString()}`);
-    toast.success("JavaScript code saved successfully!");
+  const makeCopyOlder = () => {
+    if (!userCopy) return;
+    // immutable update – create a new object based on the copy
+    setUserCopy({ ...userCopy, age: userCopy.age + 5 });
   };
 
-  const handleDeletePython = () => {
-    if (confirm("Are you sure you want to delete the Python code?")) {
-      setPythonCode("# Code deleted");
-      setLastAction(`🗑️ Python code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("Python code deleted");
-    }
-  };
-
-  const handleDeleteJs = () => {
-    if (confirm("Are you sure you want to delete the JavaScript code?")) {
-      setJsCode("// Code deleted");
-      setLastAction(`🗑️ JavaScript code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("JavaScript code deleted");
-    }
-  };
-
-  const handleDeleteHtml = () => {
-    if (confirm("Are you sure you want to delete the HTML code?")) {
-      setHtmlCode("<!-- Code deleted -->");
-      setLastAction(`🗑️ HTML code deleted at ${new Date().toLocaleTimeString()}`);
-      toast.warning("HTML code deleted");
-    }
+  // ---- Immutable nested example (manager rename) ----
+  const updatedCompany = {
+    ...company,
+    departments: {
+      ...company.departments,
+      engineering: {
+        ...company.departments.engineering,
+        manager: {
+          ...company.departments.engineering.manager,
+          name: "Alexandra Rivera",
+        },
+      },
+    },
   };
 
   return (
-    <main>
-      <style>{`
-        .custom-code-block {
-          border: 2px solid red;
-          border-radius: 12px;
-          box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
-        }
-        .custom-code-block .header {
-          background-color: rgba(255, 0, 0, 0.1);
-        }
-        .theme-demo-card {
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: 1.5rem;
-          margin-bottom: 1.5rem;
-        }
-        .theme-demo-row {
-          display: flex;
-          gap: 2rem;
-          flex-wrap: wrap;
-          align-items: center;
-          margin-top: 1rem;
-        }
-      `}</style>
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-      Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolores a at minima temporibus sapiente consequuntur quaerat omnis asperiores odio possimus quia fuga illum totam nisi rem est iure, eos quibusdam.
-    </main>
+    <div className={styles.page}>
+      <h1 className={styles.title}>JavaScript Fundamentals - Examples</h1>
+      <div className={styles.grid}>
+        {/* ---------- 1. Nested Destructuring ---------- */}
+        <section className={styles.card}>
+          <h2>1. Nested Destructuring</h2>
+          <p className={styles.desc}>
+            Instead of repeating long paths like{" "}
+            <code>company.departments.engineering.manager.name</code>, unpack everything in one go.
+          </p>
+          <pre className={styles.pre}>{`const {
+  name: companyName,
+  departments: {
+    engineering: {
+      manager: {
+        name: engManagerName,
+        contact: { email: engManagerEmail }
+      }
+    }
+  }
+} = company;`}</pre>
+          <ul className={styles.list}>
+            <li>Company: <strong>{data.companyName}</strong></li>
+            <li>Manager: <strong>{data.engManagerName}</strong> ({data.engManagerEmail})</li>
+          </ul>
+        </section>
+
+        {/* ---------- 2. Safe Property Access ---------- */}
+        <section className={styles.card}>
+          <h2>2. Safe Property Access</h2>
+          <p className={styles.desc}>
+            Use <code>?.</code> and <code>??</code> so your code never breaks when data is missing.
+          </p>
+          <pre className={styles.pre}>{`// Unsafe (crashes if hr is missing):
+// company.departments.hr.manager.name
+
+// Safe with fallback:
+company.departments?.hr?.manager?.name ?? "Vacant"
+company.departments?.finance?.manager?.name ?? "Not found"`}</pre>
+          <ul className={styles.list}>
+            <li>HR Manager: <strong>{data.hrManagerName}</strong></li>
+            <li>Finance Manager: <strong>{data.financeManager}</strong></li>
+          </ul>
+        </section>
+
+        {/* ---------- 3. Functional Array Methods ---------- */}
+        <section className={styles.card}>
+          <h2>3. Functional Array Methods</h2>
+          <p className={styles.desc}>
+            Replace long <code>for</code> loops with short, readable methods that can be chained together.
+          </p>
+
+          <div className={styles.example}>
+            <strong>Old way (loops):</strong>
+            <pre className={styles.pre}>{`const devs = [];
+for (let i = 0; i < all.length; i++) {
+  if (all[i].role === 'Developer') {
+    devs.push(all[i].name);
+  }
+}`}</pre>
+          </div>
+          <div className={styles.example}>
+            <strong>New way (functional):</strong>
+            <pre className={styles.pre}>{`const devs = all
+  .filter(e => e.role === 'Developer')
+  .map(e => e.name);`}</pre>
+          </div>
+
+          <ul className={styles.list}>
+            <li>Developers: {data.developerNames.join(", ")}</li>
+            <li>Total Salary: ${data.totalSalary.toLocaleString("en-US")}</li>
+            <li>First QA: {data.firstQA?.name ?? "None"} (${data.firstQA?.salary})</li>
+            <li>Highest Paid: {data.highestPaid.name} (${data.highestPaid.salary})</li>
+            <li>Everyone earns &gt; 60k: {data.allWellPaid ? "Yes" : "No"}</li>
+            <li>Has Recruiter: {data.hasRecruiter ? "Yes" : "No"}</li>
+            <li>By department: {JSON.stringify(data.employeesByDept)}</li>
+          </ul>
+        </section>
+
+        {/* ---------- 4. Complex Object Operations (simplified) ---------- */}
+        <section className={styles.card}>
+          <h2>4. Complex Object Operations</h2>
+          <p className={styles.desc}>
+            How to copy and update objects without changing the original – like using a photocopy.
+          </p>
+
+          {/* --- Simple user copy demo --- */}
+          <div className={styles.cloneDemo}>
+            <h3>Copy a simple object</h3>
+            <p>
+              Original user: <strong>{originalUser.name}</strong>, age{" "}
+              <strong>{originalUser.age}</strong>
+            </p>
+
+            {!userCopy ? (
+              <button className={styles.btn} onClick={createUserCopy}>
+                Create a copy
+              </button>
+            ) : (
+              <>
+                <p>
+                  Copy: <strong>{userCopy.name}</strong>, age{" "}
+                  <strong>{userCopy.age}</strong>
+                </p>
+                <button className={styles.btn} onClick={makeCopyOlder}>
+                  Make copy 5 years older
+                </button>
+                <p className={styles.muted}>
+                  After the change, the original is still <strong>{originalUser.name}</strong>, age{" "}
+                  <strong>{originalUser.age}</strong> – untouched.
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* --- Nested immutable update example --- */}
+          <div className={styles.cloneDemo}>
+            <h3>Nested object – changing a manager’s name</h3>
+            <p>
+              Original manager: <strong>Alex Rivera</strong>
+              <br />
+              Copy (updated): <strong>Alexandra Rivera</strong>
+            </p>
+            <p className={styles.muted}>
+              The original company object still says “Alex Rivera”. The change only lives in the copy.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
