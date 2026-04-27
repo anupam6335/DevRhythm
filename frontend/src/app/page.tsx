@@ -92,6 +92,12 @@ export default function Home() {
 
   return (
     <div className={styles.page}>
+      <p className={styles.console}>
+        <a href="/service-demo" style={{ color: 'var(--accent-moss)' }}>
+          View the Service Layers & Error Handling Demo →
+        </a>
+      </p>
+
       <h1 className={styles.title}>JavaScript Fundamentals - Examples</h1>
       <div className={styles.grid}>
         {/* ---------- 1. Nested Destructuring ---------- */}

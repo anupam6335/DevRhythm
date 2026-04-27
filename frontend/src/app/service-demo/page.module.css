@@ -1,0 +1,127 @@
+.page {
+  padding: 2rem 0;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.mainTitle {
+  font-size: 2rem;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.title {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.desc {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.list {
+  list-style: disc;
+  padding-left: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: var(--accent-moss);
+  color: white;
+  border: none;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.error {
+  color: var(--error);
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+  background: var(--error-soft);
+  border-radius: var(--radius);
+}
+
+.single {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.guide {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-top: 2rem;
+}
+
+.guide h2 {
+  margin-bottom: 0.75rem;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.table th {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.table td {
+  color: var(--text-secondary);
+}
