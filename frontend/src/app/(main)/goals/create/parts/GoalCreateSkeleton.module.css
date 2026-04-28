@@ -1,0 +1,127 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.buttonRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.buttonSkeleton {
+  width: 100px;
+  height: 36px;
+  border-radius: 30px;
+  background: var(--bg-elevated);
+  animation: pulse 1.5s infinite;
+}
+
+.section {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.typeButtons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.typeSkeleton {
+  width: 80px;
+  height: 36px;
+  border-radius: 30px;
+  background: var(--bg-elevated);
+  animation: pulse 1.5s infinite;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.inputSkeleton {
+  width: 100%;
+  height: 42px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+.dateRow {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dateRow .field {
+  flex: 1;
+}
+
+.searchSkeleton {
+  width: 100%;
+  height: 42px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  animation: pulse 1.5s infinite;
+}
+
+.questionListSkeleton {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.questionItemSkeleton {
+  height: 60px;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+.radioSkeleton {
+  display: flex;
+  gap: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.radioOption {
+  width: 100px;
+  height: 20px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.selectSkeleton {
+  width: 100%;
+  height: 42px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (max-width: 767px) {
+  .buttonRow {
+    justify-content: stretch;
+  }
+  .buttonSkeleton {
+    width: 100%;
+  }
+  .dateRow {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

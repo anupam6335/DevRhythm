@@ -1,0 +1,239 @@
+.container {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  flex-wrap: wrap;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px var(--shadow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.container:hover {
+  border-color: var(--accent-moss);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.leftColumn {
+  flex: 2;
+  min-width: 200px;
+}
+
+.rightColumn {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Problem header row */
+.problemHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* POD Badge – rectangular, left side */
+.podBadge {
+  background: linear-gradient(135deg, #f5b042, #e67e22);
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.podBadge span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* Date badge */
+.dateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 0.25rem 0.5rem;
+  border-radius: 20px;
+}
+
+/* Title */
+.problemTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.75rem 0;
+}
+
+.titleLink {
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.titleLink:hover {
+  color: var(--accent-moss);
+}
+
+/* Tags row */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.75rem 0;
+}
+
+.tag {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background-color: var(--bg-elevated);
+  padding: 0.25rem 0.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+
+.tag:hover {
+  background-color: var(--hover-surface);
+  color: var(--text-primary);
+  cursor: default;
+}
+
+/* LeetCode button wrapper */
+.externalLinkWrapper {
+  margin-top: 0.5rem;
+}
+
+.leetcodeButton {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.leetcodeButton:hover {
+  transform: translateY(-1px);
+}
+
+/* Goal card */
+.goalCard {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.goalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.icon {
+  color: var(--accent-moss);
+  font-size: 1rem;
+}
+
+.goalLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.goalProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.goalCount {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Skeletons */
+.skeletonCard {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  min-height: 120px;
+  background: var(--bg-elevated);
+}
+
+.skeletonLeft {
+  flex: 2;
+}
+
+.skeletonRight {
+  flex: 1;
+}
+
+.skeletonTitle {
+  width: 80%;
+  height: 20px;
+  background: var(--border);
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonTags {
+  width: 60%;
+  height: 24px;
+  background: var(--border);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonGoal {
+  width: 100%;
+  height: 90px;
+  background: var(--border);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.errorCard {
+  padding: 1rem;
+  text-align: center;
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 12px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .rightColumn {
+    flex-direction: row;
+  }
+  .goalCard {
+    flex: 1;
+  }
+}

@@ -570,11 +570,13 @@ const getDailyProblemAndGoal = async (req, res, next) => {
       status: dailyGoal.status
     } : null;
 
+    const forceRefresh = req.query.refresh === 'true';
     let dailyProblem = null;
     try {
-      dailyProblem = await require('../services/leetcode.service').getDailyProblem();
+      const leetcodeService = require('../services/leetcode.service');
+      dailyProblem = await leetcodeService.getDailyProblem(forceRefresh);
     } catch (error) {
-      console.error('Failed to fetch LeetCode daily problem:', error.message);
+        console.error('Failed to fetch LeetCode daily problem:', error.message);
     }
 
     const responseData = {

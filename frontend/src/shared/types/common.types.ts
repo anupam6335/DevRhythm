@@ -33,7 +33,7 @@ export type Platform =
 export type QuestionStatus = 'Not Started' | 'Attempted' | 'Solved' | 'Mastered';
 
 /** Goal type: daily or weekly */
-export type GoalType = 'daily' | 'weekly';
+export type GoalType = 'daily' | 'weekly' | 'planned';
 
 /** Goal status */
 export type GoalStatus = 'active' | 'completed' | 'failed';

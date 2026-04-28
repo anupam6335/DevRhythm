@@ -1,0 +1,282 @@
+.container {
+  margin: 2rem 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-elevated);
+  border-radius: 30px;
+  padding: 0.25rem;
+}
+
+.filterChip {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  border: none;
+  background: transparent;
+  border-radius: 30px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.filterChip:hover {
+  background: var(--hover-surface);
+}
+
+.filterChip.active {
+  background: var(--accent-moss);
+  color: var(--primary-text-on-action);
+}
+
+.sortGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.sortButton:hover {
+  border-color: var(--accent-moss);
+}
+
+.sortButton.active {
+  border-color: var(--accent-moss);
+  color: var(--text-primary);
+}
+
+.sortIconInactive {
+  opacity: 0.4;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.historyCard {
+  margin-bottom: 0.5rem;
+  transition: all 0.2s;
+  padding: 0; /* reset Card's default padding */
+  overflow: hidden;
+}
+
+.historyCard:hover {
+  border-color: var(--accent-moss);
+}
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  gap: 1rem;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.itemLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.expandIcon {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.itemInfo {
+  flex: 1;
+}
+
+.itemTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.itemTitle {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.itemMeta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.dateRange {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.progress {
+  color: var(--text-secondary);
+}
+
+.itemRight {
+  text-align: right;
+}
+
+.percentageBadge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+}
+
+.expandedContent {
+  padding: 0 1rem 1rem 2rem;
+  border-top: 1px solid var(--divider);
+  overflow: visible;
+}
+
+.questionsList {
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+  border-left: 2px dashed var(--border);
+  overflow: visible;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.skeletonItem {
+  height: 80px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.errorContainer {
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeletonControls {
+  width: 250px;
+  height: 32px;
+  background: var(--bg-elevated);
+  border-radius: 30px;
+  animation: pulse 1.5s infinite;
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 939px) {
+  .questionsList {
+    padding-left: 0.75rem;
+  }
+  .expandedContent {
+    padding: 0 0.75rem 0.75rem 1rem;
+  }
+  .itemHeader {
+    padding: 0.5rem 0.75rem;
+  }
+  .itemTitle {
+    font-size: 0.85rem;
+  }
+  .itemMeta {
+    font-size: 0.65rem;
+    gap: 0.75rem;
+  }
+  .percentageBadge {
+    font-size: 0.75rem;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .controls {
+    flex-direction: column;
+  }
+  .filterGroup, .sortGroup {
+    justify-content: center;
+  }
+  .itemHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  .itemRight {
+    width: 100%;
+    text-align: left;
+  }
+  .expandedContent {
+    padding: 0 0.5rem 0.5rem 0.5rem;
+  }
+  .questionsList {
+    padding-left: 0.5rem;
+  }
+  .itemTitle {
+    font-size: 0.8rem;
+  }
+  .itemMeta {
+    font-size: 0.6rem;
+    gap: 0.5rem;
+  }
+  .percentageBadge {
+    font-size: 0.7rem;
+  }
+}

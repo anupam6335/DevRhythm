@@ -76,6 +76,11 @@ export const goalKeys = {
   stats: (filters?: Record<string, any>) => [...goalKeys.all, 'stats', filters] as const,
   history: (period: string) => [...goalKeys.all, 'history', period] as const,
   detail: (id: string) => [...goalKeys.all, 'detail', id] as const,
+  chartData: (params?: Record<string, any>) => [...goalKeys.all, 'chartData', params] as const,
+  plannedLists: () => [...goalKeys.all, 'planned', 'list'] as const,
+  plannedList: (filters?: Record<string, any>) => [...goalKeys.plannedLists(), filters] as const,
+  plannedDetail: (id: string) => [...goalKeys.all, 'planned', 'detail', id] as const,
+  completedFailed: (params?: Record<string, any>) => [...goalKeys.all, 'completedFailed', params] as const,
 };
 
 export const heatmapKeys = {

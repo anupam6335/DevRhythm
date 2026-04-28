@@ -1,11 +1,38 @@
-import React from 'react'
+import { Metadata } from 'next';
+import { Suspense } from 'react';
+import Breadcrumb from '@/shared/components/Breadcrumb';
+import { ROUTES } from '@/shared/config';
+import Link from 'next/link';
+import GoalCreateForm from './parts/GoalCreateForm';
+import GoalCreateSkeleton from './parts/GoalCreateSkeleton';
 
-const page = () => {
+
+export const metadata: Metadata = {
+  title: 'Create New Goal | DevRhythm',
+  description: 'Set a new daily, weekly, or planned coding goal. Define target questions and deadlines to stay on track.',
+  robots: 'noindex, follow', // avoid duplicate content, but let crawlers follow links
+};
+
+const breadcrumbItems = [
+  { label: 'Home', href: ROUTES.HOME },
+  { label: 'Goals', href: ROUTES.GOALS.ROOT },
+  { label: 'Create' },
+];
+
+export default function GoalCreatePage() {
   return (
-    <div>
-      
-    </div>
-  )
+    <>
+      <Breadcrumb
+        items={breadcrumbItems}
+        renderLink={(item, props) => (
+          <Link href={item.href!} className={props.className}>
+            {props.children}
+          </Link>
+        )}
+      />
+      <Suspense fallback={<GoalCreateSkeleton />}>
+        <GoalCreateForm />
+      </Suspense>
+    </>
+  );
 }
-
-export default page
