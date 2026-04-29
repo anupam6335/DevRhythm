@@ -7,6 +7,7 @@ const PatternMastery = require('../models/PatternMastery');
 const Question = require('../models/Question');
 const GoalSnapshotService = require('./goalSnapshot.service');
 const leetcodeService = require('./leetcode.service');
+const { calculateIntensityLevel } = require('./heatmap.service');
 const { getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek } = require('../utils/helpers/date');
 const { slugify } = require('../utils/helpers/string');
 
@@ -652,10 +653,13 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
   const resultMap = new Map();
   for (const day of monthData) {
     const dateStr = day.date.toISOString().split('T')[0];
+    // Recalculate intensity level based on activityCount (totalActivities)
+    const activityCount = day.totalActivities || 0;
+    const intensity = calculateIntensityLevel(activityCount);
     resultMap.set(dateStr, {
       date: day.date,
-      activityCount: day.totalActivities,
-      intensityLevel: day.intensityLevel
+      activityCount: activityCount,
+      intensityLevel: intensity
     });
   }
 
