@@ -1,3 +1,11 @@
+
+.headerLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  cursor: pointer;
+}
+
 .card {
   margin-bottom: 1rem;
   transition: all 0.2s ease;
@@ -169,6 +177,12 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+.linkWrapper {
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 /* Tablet */

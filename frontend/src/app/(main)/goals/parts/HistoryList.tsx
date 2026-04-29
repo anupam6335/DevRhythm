@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { FiChevronDown, FiChevronRight, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import clsx from 'clsx';
@@ -49,7 +50,8 @@ export default function HistoryList({ itemsPerPage = 10 }: HistoryListProps) {
     limit: itemsPerPage,
   });
 
-  const toggleExpand = (goalId: string) => {
+  const toggleExpand = (goalId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(goalId)) next.delete(goalId);
@@ -197,81 +199,101 @@ export default function HistoryList({ itemsPerPage = 10 }: HistoryListProps) {
               const title = getGoalDisplayTitle(goal);
 
               return (
-                <Card key={goal._id} className={styles.historyCard} noHover>
-                  <div
-                    className={clsx(styles.itemHeader, {
-                      [styles.clickable]: isPlanned,
-                    })}
-                    onClick={() => isPlanned && toggleExpand(goal._id)}
-                  >
-                    <div className={styles.itemLeft}>
-                      {isPlanned && (
-                        <span className={styles.expandIcon}>
-                          {isExpanded ? <FiChevronDown /> : <FiChevronRight />}
-                        </span>
-                      )}
-                      <div className={styles.itemInfo}>
-                        <div className={styles.itemTitleRow}>
-                          <span className={styles.itemTitle}>{title}</span>
-                          <Badge
-                            variant={status === 'completed' ? 'success' : 'error'}
-                            size="sm"
+                <Link
+                  key={goal._id}
+                  href={`/goals/${goal._id}`}
+                  className={styles.linkWrapper}
+                >
+                  <Card className={styles.historyCard} noHover>
+                    <div
+                      className={clsx(styles.itemHeader, {
+                        [styles.clickable]: isPlanned,
+                      })}
+                      onClick={(e) => {
+                        if (isPlanned) {
+                          e.stopPropagation();
+                          toggleExpand(goal._id, e);
+                        }
+                      }}
+                    >
+                      <div className={styles.itemLeft}>
+                        {isPlanned && (
+                          <span
+                            className={styles.expandIcon}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(goal._id, e);
+                            }}
                           >
-                            {status}
-                          </Badge>
-                        </div>
-                        <div className={styles.itemMeta}>
-                          <span className={styles.dateRange}>{dateRange}</span>
-                          <span className={styles.progress}>
-                            {goal.completedCount} / {goal.targetCount} ({percentage}%)
+                            {isExpanded ? <FiChevronDown /> : <FiChevronRight />}
                           </span>
+                        )}
+                        <div className={styles.itemInfo}>
+                          <div className={styles.itemTitleRow}>
+                            <span className={styles.itemTitle}>{title}</span>
+                            <Badge
+                              variant={status === 'completed' ? 'success' : 'error'}
+                              size="sm"
+                            >
+                              {status}
+                            </Badge>
+                          </div>
+                          <div className={styles.itemMeta}>
+                            <span className={styles.dateRange}>{dateRange}</span>
+                            <span className={styles.progress}>
+                              {goal.completedCount} / {goal.targetCount} ({percentage}%)
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className={styles.itemRight}>
-                      <span className={styles.percentageBadge}>{percentage}%</span>
-                    </div>
-                  </div>
-
-                  {isPlanned && isExpanded && (
-                    <div className={styles.expandedContent}>
-                      <div className={styles.questionsList}>
-                        {((goal as any).targetQuestions || []).map((question: any) => {
-                          const completed = ((goal as any).completedQuestions || []).some(
-                            (cq: any) => {
-                              const qid = cq.questionId?._id || cq.questionId || cq;
-                              return qid.toString() === question._id.toString();
-                            }
-                          );
-                          const completedData = ((goal as any).completedQuestions || []).find(
-                            (cq: any) => {
-                              const qid = cq.questionId?._id || cq.questionId || cq;
-                              return qid.toString() === question._id.toString();
-                            }
-                          );
-                          return (
-                            <GoalQuestionItem
-                              key={question._id}
-                              questionId={question._id}
-                              questionMetadata={{
-                                _id: question._id,
-                                title: question.title,
-                                platformQuestionId: question.platformQuestionId,
-                                platform: question.platform,
-                                difficulty: question.difficulty,
-                                tags: question.tags,
-                                pattern: question.pattern,
-                              }}
-                              completed={completed}
-                              completedAt={completedData?.completedAt}
-                              showMetrics={true}
-                            />
-                          );
-                        })}
+                      <div className={styles.itemRight}>
+                        <span className={styles.percentageBadge}>{percentage}%</span>
                       </div>
                     </div>
-                  )}
-                </Card>
+
+                    {isPlanned && isExpanded && (
+                      <div
+                        className={styles.expandedContent}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className={styles.questionsList}>
+                          {((goal as any).targetQuestions || []).map((question: any) => {
+                            const completed = ((goal as any).completedQuestions || []).some(
+                              (cq: any) => {
+                                const qid = cq.questionId?._id || cq.questionId || cq;
+                                return qid.toString() === question._id.toString();
+                              }
+                            );
+                            const completedData = ((goal as any).completedQuestions || []).find(
+                              (cq: any) => {
+                                const qid = cq.questionId?._id || cq.questionId || cq;
+                                return qid.toString() === question._id.toString();
+                              }
+                            );
+                            return (
+                              <GoalQuestionItem
+                                key={question._id}
+                                questionId={question._id}
+                                questionMetadata={{
+                                  _id: question._id,
+                                  title: question.title,
+                                  platformQuestionId: question.platformQuestionId,
+                                  platform: question.platform,
+                                  difficulty: question.difficulty,
+                                  tags: question.tags,
+                                  pattern: question.pattern,
+                                }}
+                                completed={completed}
+                                completedAt={completedData?.completedAt}
+                                showMetrics={true}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </Link>
               );
             })}
           </div>

@@ -218,6 +218,12 @@
   animation: pulse 1.5s infinite;
 }
 
+.linkWrapper {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 /* Tablet */
 @media (min-width: 768px) and (max-width: 939px) {
   .questionsList {

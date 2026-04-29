@@ -8,5 +8,6 @@ export * from './hooks/usePlannedGoals';
 export * from './hooks/useCopyGoal';
 export * from './hooks/useDeletePlannedGoal';
 export * from './hooks/useCompletedFailedGoals';
+export * from './hooks/useDeleteGoal';
 export * from './hooks/useDailyProblem';
 export { goalService } from './services/goalService';

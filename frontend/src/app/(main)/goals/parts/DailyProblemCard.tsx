@@ -58,7 +58,10 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
             <FiCalendar size={14} />
             <span>{formattedDate}</span>
           </div>
-          <Badge variant={dailyProblem.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard'} size="sm">
+          <Badge
+            variant={dailyProblem.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard'}
+            size="sm"
+          >
             {dailyProblem.difficulty}
           </Badge>
         </div>
@@ -69,7 +72,9 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
         </h3>
         <div className={styles.tags}>
           {dailyProblem.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className={styles.tag}>#{tag}</span>
+            <span key={tag} className={styles.tag}>
+              #{tag}
+            </span>
           ))}
           {dailyProblem.tags.length > 4 && (
             <Tooltip content={dailyProblem.tags.slice(4).join(', ')}>
@@ -90,20 +95,22 @@ export default function DailyProblemCard({ initialData }: DailyProblemCardProps)
       </div>
 
       {/* Right column – Today's Goal */}
-      <div className={styles.rightColumn}>
-        <div className={styles.goalCard}>
-          <div className={styles.goalHeader}>
-            <FiTarget className={styles.icon} />
-            <span className={styles.goalLabel}>Today&apos;s goal</span>
-          </div>
-          <div className={styles.goalProgress}>
-            <ProgressBar value={goalPercentage} max={100} size="md" showValue rounded />
-            <span className={styles.goalCount}>
-              {todayGoal?.completedCount} / {todayGoal?.targetCount} completed
-            </span>
+      {todayGoal?.completedCount >= 0 && (
+        <div className={styles.rightColumn}>
+          <div className={styles.goalCard}>
+            <div className={styles.goalHeader}>
+              <FiTarget className={styles.icon} />
+              <span className={styles.goalLabel}>Today&apos;s goal</span>
+            </div>
+            <div className={styles.goalProgress}>
+              <ProgressBar value={goalPercentage} max={100} size="md" showValue rounded />
+              <span className={styles.goalCount}>
+                {todayGoal?.completedCount} / {todayGoal?.targetCount} completed
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </Card>
   );
 }
