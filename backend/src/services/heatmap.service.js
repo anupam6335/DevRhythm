@@ -17,6 +17,7 @@ const {
   getEndOfMonth,
 } = require('../utils/helpers/date');
 const { DateTime } = require('luxon');
+const { invalidateDashboardCache } = require('../middleware/cache');
 
 const calculateIntensityLevel = (activityCount) => {
   if (activityCount === 0) return 0;
@@ -348,6 +349,7 @@ const regenerateHeatmapData = async (userId, year, forceFullRefresh = false, tim
   try {
     await HeatmapData.deleteOne({ userId, year });
     const heatmap = await generateHeatmapData(userId, year, timeZone);
+    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache after heatmap regeneration
     return heatmap;
   } catch (error) {
     console.error('Error regenerating heatmap data:', error);

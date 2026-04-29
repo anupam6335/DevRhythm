@@ -4,6 +4,7 @@ const Goal = require('../../models/Goal');
 const ProgressSnapshot = require('../../models/ProgressSnapshot');
 const HeatmapData = require('../../models/HeatmapData');
 const heatmapService = require('../heatmap.service');
+const { invalidateDashboardCache } = require('../../middleware/cache');
 
 const handleUserTimezoneChange = async (job) => {
   const { userId, oldTimezone, newTimezone } = job.data;
@@ -62,6 +63,9 @@ const handleUserTimezoneChange = async (job) => {
   for (const year of years) {
     await heatmapService.generateHeatmapData(userId, year, newTimezone);
   }
+
+  // 5. Invalidate dashboard cache to reflect new dates for goals, revisions, etc.
+  await invalidateDashboardCache(userId);
 
   console.log(`Timezone change completed for user ${userId} (${oldTimezone} → ${newTimezone})`);
 };

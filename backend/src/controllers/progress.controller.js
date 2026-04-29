@@ -6,7 +6,7 @@ const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
 const AppError = require('../utils/errors/AppError');
-const { invalidateProgressCache, invalidateCache } = require('../middleware/cache');
+const { invalidateProgressCache, invalidateCache, invalidateDashboardCache } = require('../middleware/cache');
 const { jobQueue } = require('../services/queue.service'); 
 
 const updateProgressPatternMastery = async (userId, questionId) => {
@@ -153,6 +153,7 @@ const createOrUpdateProgress = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    await invalidateDashboardCache(userId);  // NEW: dashboard cache invalidation
     await updateProgressPatternMastery(userId, questionId);
 
     const statusCode = newProgress.createdAt === newProgress.updatedAt ? 201 : 200;
@@ -207,6 +208,7 @@ const updateStatus = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    await invalidateDashboardCache(userId);  // NEW
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Status updated successfully', { progress }));
@@ -234,6 +236,7 @@ const updateCode = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    await invalidateDashboardCache(userId);  // NEW (code update doesn't affect dashboard directly, but safe)
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Code updated successfully', { progress }));
@@ -258,6 +261,8 @@ const updateNotes = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    // Notes don't affect dashboard, but invalidate anyway for consistency
+    await invalidateDashboardCache(userId);
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Notes updated successfully', { progress }));
@@ -265,6 +270,7 @@ const updateNotes = async (req, res, next) => {
 };
 
 const updateConfidence = async (req, res, next) => {
+  // This endpoint is disabled – confidence is auto-calculated
   next(new AppError('Confidence level is automatically calculated and cannot be set manually', 400));
 };
 
@@ -324,6 +330,7 @@ const recordAttempt = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    await invalidateDashboardCache(userId);  // NEW
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Attempt recorded successfully', { progress }));
@@ -354,6 +361,7 @@ const recordRevision = async (req, res, next) => {
 
     await invalidateProgressCache(userId);
     await invalidateQuestionDetailsCache(userId, questionId);
+    await invalidateDashboardCache(userId);  // NEW
     await updateProgressPatternMastery(userId, questionId);
 
     res.json(formatResponse('Revision recorded successfully', { progress }));
@@ -371,6 +379,7 @@ const deleteProgress = async (req, res, next) => {
 
     await invalidateProgressCache(req.user._id);
     await invalidateQuestionDetailsCache(req.user._id, req.params.questionId);
+    await invalidateDashboardCache(req.user._id);  // NEW
     await patternMasteryService.updatePatternMasteryFromProgress(req.user._id, progress._id);
 
     res.json(formatResponse('Progress deleted successfully'));

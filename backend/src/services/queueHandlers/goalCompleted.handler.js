@@ -1,6 +1,6 @@
 const Goal = require('../../models/Goal');
 const Notification = require('../../models/Notification');
-const { invalidateCache } = require('../../middleware/cache');
+const { invalidateCache, invalidateDashboardCache } = require('../../middleware/cache');
 
 const handleGoalCompleted = async (job) => {
   const { userId, goalId, completedAt, goalType, targetCount, completedCount, completedQuestionDetails } = job.data;
@@ -36,6 +36,7 @@ const handleGoalCompleted = async (job) => {
 
     await invalidateCache(`goals:*:user:${userId}:*`);
     await invalidateCache(`notifications:${userId}:*`);
+    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache
 
     console.log(`Goal completed event processed for user ${userId} (${goalType})`);
   } catch (error) {

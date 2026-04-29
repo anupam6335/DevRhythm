@@ -2,7 +2,7 @@
 const Goal = require("../models/Goal");
 const User = require("../models/User");
 const { formatResponse, paginate, getPaginationParams, getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, formatDate } = require("../utils/helpers");
-const { invalidateCache } = require("../middleware/cache");
+const { invalidateCache, invalidateDashboardCache } = require("../middleware/cache");
 const cacheService = require("../services/cache.service");
 const AppError = require("../utils/errors/AppError");
 const constants = require("../config/constants");
@@ -138,6 +138,7 @@ const createGoal = async (req, res, next) => {
     });
     
     await invalidateCache(`goals:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);
     res.status(201).json(formatResponse("Goal created successfully", { goal }));
   } catch (error) {
     next(error);
@@ -168,6 +169,7 @@ const updateGoal = async (req, res, next) => {
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
+    await invalidateDashboardCache(userId);
     
     res.json(formatResponse("Goal updated successfully", { goal: updatedGoal }));
   } catch (error) {
@@ -202,6 +204,7 @@ const incrementGoal = async (req, res, next) => {
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
+    await invalidateDashboardCache(userId);
     
     res.json(formatResponse("Goal progress updated", { goal }));
   } catch (error) {
@@ -229,6 +232,7 @@ const decrementGoal = async (req, res, next) => {
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
+    await invalidateDashboardCache(userId);
     
     res.json(formatResponse("Goal progress updated", { goal }));
   } catch (error) {
@@ -252,6 +256,7 @@ const setGoalProgress = async (req, res, next) => {
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
+    await invalidateDashboardCache(userId);
     
     res.json(formatResponse("Goal progress updated", { goal }));
   } catch (error) {
@@ -318,6 +323,7 @@ const autoCreateGoals = async (req, res, next) => {
     }
     
     await invalidateCache(`goals:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);
     
     res.status(201).json(formatResponse("Goals created successfully", { created }));
   } catch (error) {
@@ -335,6 +341,7 @@ const deleteGoal = async (req, res, next) => {
     
     await invalidateCache(`goals:*:user:${userId}:*`);
     await cacheService.del(`goal:${goalId}`);
+    await invalidateDashboardCache(userId);
     
     res.json(formatResponse("Goal deleted successfully"));
   } catch (error) {
@@ -599,10 +606,10 @@ const createPlannedGoal = async (req, res, next) => {
       status: "active",
     });
 
-    // Populate targetQuestions before sending response
     await goal.populate('targetQuestions', '_id title platformQuestionId platform difficulty');
 
     await invalidateCache(`goals:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);
     res.status(201).json(formatResponse("Planned goal created successfully", { goal }));
   } catch (error) {
     next(error);
@@ -649,6 +656,7 @@ const deletePlannedGoal = async (req, res, next) => {
     const goal = await Goal.findOneAndDelete({ _id: goalId, userId, goalType: "planned" });
     if (!goal) throw new AppError("Planned goal not found", 404);
     await invalidateCache(`goals:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);
     res.json(formatResponse("Planned goal deleted successfully"));
   } catch (error) {
     next(error);
@@ -740,12 +748,12 @@ const copyGoal = async (req, res, next) => {
 
     const newGoal = await Goal.create(newGoalData);
     
-    // Populate targetQuestions if it's a planned goal before sending response
     if (newGoal.goalType === 'planned') {
       await newGoal.populate('targetQuestions', '_id title platformQuestionId platform difficulty');
     }
     
     await invalidateCache(`goals:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);
     res.status(201).json(formatResponse('Goal copied successfully', { goal: newGoal }));
   } catch (error) {
     next(error);

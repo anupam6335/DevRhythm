@@ -2,7 +2,7 @@ const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const AppError = require('../utils/errors/AppError');
 const { generateToken } = require('../middleware/auth');
-const { invalidateUserCache } = require('../middleware/cache');
+const { invalidateUserCache, invalidateDashboardCache } = require('../middleware/cache');
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
 
@@ -27,8 +27,16 @@ const getCurrentUser = async (req, res, next) => {
 const updateCurrentUser = async (req, res, next) => {
   try {
     const updates = {};
+    let dashboardInvalidate = false;
+    
     if (req.body.displayName) updates.displayName = req.body.displayName;
-    if (req.body.preferences) updates.preferences = req.body.preferences;
+    if (req.body.preferences) {
+      updates.preferences = req.body.preferences;
+      // If dailyGoal or weeklyGoal changed, dashboard needs refresh
+      if (req.body.preferences.dailyGoal !== undefined || req.body.preferences.weeklyGoal !== undefined) {
+        dashboardInvalidate = true;
+      }
+    }
     if (req.body.privacy) updates.privacy = req.body.privacy;
     
     const user = await User.findByIdAndUpdate(
@@ -38,6 +46,9 @@ const updateCurrentUser = async (req, res, next) => {
     ).select('-__v');
     
     await invalidateUserCache(req.user._id);
+    if (dashboardInvalidate) {
+      await invalidateDashboardCache(req.user._id);
+    }
     
     // Round masteryRate for response
     if (user.stats && user.stats.masteryRate) {
@@ -206,6 +217,7 @@ const deleteCurrentUser = async (req, res, next) => {
   try {
     await User.findByIdAndUpdate(req.user._id, { isActive: false });
     await invalidateUserCache(req.user._id);
+    await invalidateDashboardCache(req.user._id);
     res.json(formatResponse('Account deleted successfully'));
   } catch (error) {
     next(error);
@@ -230,7 +242,6 @@ const getUserPublicProgress = async (req, res, next) => {
     const limit = Math.min(parseInt(req.query.limit) || 6, 6);
     const { sortBy = 'solvedAt', sortOrder = 'desc' } = req.query;
 
-    // Map frontend sort field to actual MongoDB field path
     let sortField;
     if (sortBy === 'solvedAt') {
       sortField = 'attempts.solvedAt';
@@ -241,17 +252,15 @@ const getUserPublicProgress = async (req, res, next) => {
     } else if (sortBy === 'totalTimeSpent') {
       sortField = 'totalTimeSpent';
     } else {
-      sortField = 'attempts.solvedAt'; // fallback
+      sortField = 'attempts.solvedAt';
     }
 
     const sort = { [sortField]: sortOrder === 'asc' ? 1 : -1 };
 
-    // Find user and check privacy
     const user = await User.findById(userId).select('privacy username displayName avatarUrl');
     if (!user) throw new AppError('User not found', 404);
     if (user.privacy !== 'public') throw new AppError('User progress is private', 403);
 
-    // Fetch solved questions – no longer filter by solvedAt existence
     const progress = await UserQuestionProgress.find({
       userId,
       status: 'Solved'
@@ -262,7 +271,6 @@ const getUserPublicProgress = async (req, res, next) => {
       .select('_id questionId status attempts.solvedAt attempts.count attempts.lastAttemptAt attempts.firstAttemptAt revisionCount totalTimeSpent confidenceLevel')
       .lean();
 
-    // Format response
     const formattedProgress = progress.map(p => ({
       _id: p._id,
       questionId: p.questionId,
@@ -301,7 +309,6 @@ const changeTimezone = async (req, res, next) => {
       ));
     }
 
-    // Queue background job to recalc all date‑sensitive data
     const { jobQueue } = require('../services/queue.service');
     await jobQueue.add({
       type: 'user.timezone_change',
@@ -311,11 +318,11 @@ const changeTimezone = async (req, res, next) => {
       triggeredAt: new Date(),
     });
 
-    // Immediately update user's timezone (future requests use new zone)
     if (!req.user.preferences) req.user.preferences = {};
     req.user.preferences.timezone = newTimezone;
     await req.user.save();
     await invalidateUserCache(userId);
+    await invalidateDashboardCache(userId);
 
     res.json(formatResponse('Timezone change queued. Data adjustment will complete shortly.', {
       oldTimezone,

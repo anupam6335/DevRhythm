@@ -17,6 +17,7 @@ const notificationRoutes = require('./notification.routes');
 const progressSnapshotRoutes = require('./progressSnapshot.routes');
 const userStatsRoutes = require('./userStats.routes');
 const codeExecutionRoutes = require('./codeExecution.routes');
+const dashboardRoutes = require('./dashboard.routes');
 
 router.get('/health', (req, res) => {
   res.json({
@@ -56,5 +57,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/progress-snapshots', progressSnapshotRoutes);
 router.use('/user-stats', userStatsRoutes);
 router.use('/code', codeExecutionRoutes);
+router.use('/dashboard', dashboardRoutes);   // NEW LINE
 
 module.exports = router;

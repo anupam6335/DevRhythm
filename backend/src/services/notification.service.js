@@ -1,12 +1,11 @@
 const Notification = require('../models/Notification');
 const { invalidateCache } = require('../middleware/cache');
+const { invalidateDashboardCache } = require('../middleware/cache');   // NEW LINE
 
 /**
  * Create an in-app notification.
  */
 const createNotification = async ({ userId, type, title, message, data = {}, channel = 'in-app', scheduledAt = new Date() }) => {
-  // For in-app notifications, status is 'sent' immediately.
-  // For email or both, we would set to 'pending', but we are not using those now.
   const status = channel === 'in-app' ? 'sent' : 'pending';
   const notification = await Notification.create({
     userId,
@@ -20,6 +19,7 @@ const createNotification = async ({ userId, type, title, message, data = {}, cha
   });
 
   await invalidateCache(`notifications:${userId}:*`);
+  await invalidateDashboardCache(userId); 
   return notification;
 };
 
@@ -39,6 +39,7 @@ const sendBulkNotifications = async (userIds, notificationData) => {
 
   for (const userId of userIds) {
     await invalidateCache(`notifications:${userId}:*`);
+    await invalidateDashboardCache(userId);
   }
 
   return inserted;

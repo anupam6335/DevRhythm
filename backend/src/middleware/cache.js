@@ -82,9 +82,12 @@ const invalidateProgressCache = async (userId) => {
   await invalidateCache(`progress:question:*:user:${userId}:*`);
 };
 
-// NEW: Specifically invalidate goal chart cache for a user
 const invalidateGoalChartCache = async (userId) => {
   await invalidateCache(`goal-chart:user:${userId}:*`);
+};
+
+const invalidateDashboardCache = async (userId) => {
+  await invalidateCache(`dashboard:user:${userId}`);
 };
 
 module.exports = {
@@ -93,5 +96,6 @@ module.exports = {
   invalidateUserCache,
   invalidateQuestionCache,
   invalidateProgressCache,
-  invalidateGoalChartCache, // NEW
+  invalidateGoalChartCache,
+  invalidateDashboardCache,
 };
