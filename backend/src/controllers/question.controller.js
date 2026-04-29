@@ -547,7 +547,7 @@ const getStatistics = async (req, res, next) => {
 const getDailyProblemAndGoal = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const timeZone = req.userTimeZone; // used for daily goal boundaries
+    const timeZone = req.userTimeZone;
 
     const currentStreak = req.user.streak.current;
     const longestStreak = req.user.streak.longest;
@@ -572,11 +572,83 @@ const getDailyProblemAndGoal = async (req, res, next) => {
 
     const forceRefresh = req.query.refresh === 'true';
     let dailyProblem = null;
+
     try {
       const leetcodeService = require('../services/leetcode.service');
-      dailyProblem = await leetcodeService.getDailyProblem(forceRefresh);
+      const rawDaily = await leetcodeService.getDailyProblem(forceRefresh);
+      
+      if (rawDaily && rawDaily.titleSlug) {
+        // Compute POD active flag based on the date from LeetCode
+        const todayUTC = new Date().toISOString().split('T')[0];
+        const isPodActive = rawDaily.date === todayUTC;
+
+        // Build the enriched dailyProblem object
+        dailyProblem = {
+          date: rawDaily.date,
+          title: rawDaily.title,
+          titleSlug: rawDaily.titleSlug,
+          difficulty: rawDaily.difficulty,
+          link: rawDaily.link,
+          tags: rawDaily.tags || [],
+          codeSnippets: rawDaily.codeSnippets || {},
+          isPodActive 
+        };
+
+        // Auto-create the question in DB if not exists (existing logic)
+        const existingQuestion = await Question.findOne({
+          platform: 'LeetCode',
+          platformQuestionId: rawDaily.titleSlug,
+          isActive: true
+        });
+
+        if (!existingQuestion) {
+          const fullDetails = await leetcodeService.fetchProblemDetails(rawDaily.link);
+          
+          let extractedTestCases = [];
+          if (fullDetails.description) {
+            const { extractTestCasesFromHtml } = require('../services/queueHandlers/questionExtractTestCases.hanlder');
+            extractedTestCases = extractTestCasesFromHtml(fullDetails.description);
+          }
+
+          const starterCode = {};
+          if (fullDetails.codeSnippets) {
+            Object.entries(fullDetails.codeSnippets).forEach(([lang, code]) => {
+              starterCode[lang.toLowerCase()] = code;
+            });
+          }
+
+          const newQuestion = new Question({
+            title: rawDaily.title,
+            problemLink: rawDaily.link,
+            platform: 'LeetCode',
+            platformQuestionId: rawDaily.titleSlug,
+            difficulty: rawDaily.difficulty,
+            tags: rawDaily.tags || [],
+            pattern: [],
+            solutionLinks: [],
+            similarQuestions: [],
+            contentRef: fullDetails.description || '',
+            testCases: extractedTestCases,
+            starterCode: starterCode,
+            source: 'leetcode',
+            createdBy: null,
+            isActive: true
+          });
+
+          await newQuestion.save();
+          console.log(`[DailyProblem] Auto-created question: ${rawDaily.title} (${rawDaily.titleSlug})`);
+          
+          if (extractedTestCases.length === 0 && fullDetails.description) {
+            const { jobQueue } = require('../services/queue.service');
+            await jobQueue.add({
+              type: 'question.extract_testcases',
+              questionId: newQuestion._id
+            });
+          }
+        }
+      }
     } catch (error) {
-        console.error('Failed to fetch LeetCode daily problem:', error.message);
+      console.error('Failed to fetch or save daily LeetCode problem:', error.message);
     }
 
     const responseData = {
