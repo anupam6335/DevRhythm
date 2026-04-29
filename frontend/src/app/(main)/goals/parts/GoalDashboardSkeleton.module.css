@@ -1,0 +1,85 @@
+.container {
+  padding: 1rem 0;
+}
+
+.dailyProblemSkeleton {
+  height: 140px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  margin-bottom: 2rem;
+  animation: pulse 1.5s infinite;
+}
+
+.heroStats {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.heroCard {
+  flex: 1;
+  height: 80px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.momentum {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.momentumCard {
+  flex: 1;
+  height: 140px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+
+.charts {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.chartCard {
+  flex: 1;
+  height: 260px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+
+.plannedSection {
+  display: block;
+  height: 300px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+.historySection {
+  display: block;
+  height: 400px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (max-width: 767px) {
+  .momentum {
+    flex-direction: column;
+  }
+  .charts {
+    flex-direction: column;
+  }
+}

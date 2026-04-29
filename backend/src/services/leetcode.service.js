@@ -169,10 +169,11 @@ const searchProblems = async (query, filterType = 'name') => {
  * Fetch today's LeetCode Problem of the Day.
  * Cached for 24 hours.
  */
-const getDailyProblem = async () => {
+const getDailyProblem = async (forceRefresh = false) => {
   const cacheKey = 'leetcode:daily';
-  // Try to get from cache
-  if (redisClient) {
+
+  // Try to get from cache only if not forcing a refresh
+  if (!forceRefresh && redisClient) {
     try {
       const cached = await redisClient.get(cacheKey);
       if (cached) {
@@ -225,7 +226,8 @@ const getDailyProblem = async () => {
     }, {})
   };
 
-  // Cache for 24 hours (86400 seconds)
+  // Always cache the result (overwrite) after a successful fetch,
+  // regardless of forceRefresh. This ensures the cache stays up‑to‑date.
   if (redisClient) {
     try {
       await redisClient.setEx(cacheKey, 86400, JSON.stringify(result));

@@ -405,6 +405,13 @@ export interface Goal extends Timestamp {
   status: GoalStatus;
   completionPercentage: number; // 0-100
   achievedAt?: ISODateString;
+  // Planned goal specific fields
+  targetQuestions?: Array<ID | Question>;
+  completedQuestions?: Array<{
+    questionId: ID | Question;
+    platformQuestionId?: string;
+    completedAt?: ISODateString;
+  }>;
 }
 
 export interface RevisionSchedule extends Timestamp {

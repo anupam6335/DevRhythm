@@ -21,9 +21,15 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { user } = useAuth();
   const { pendingCount } = usePendingRevisions();
-  const { progress } = useCurrentGoalProgress();
+  const { daily, isLoading: goalLoading } = useCurrentGoalProgress();
   const isDesktop = useMediaQuery('(min-width: 940px)');
   const isMobile = useMediaQuery('(max-width: 768px)');
+
+  // Prepare daily goal progress for Navbar (default to 0 if still loading)
+  const dailyGoalProgress = {
+    completed: daily?.completed ?? 0,
+    target: daily?.target ?? 3,
+  };
 
   const handleQuickAdd = () => {
     setIsAddModalOpen(true);
@@ -33,9 +39,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     <>
       <Navbar
         pendingRevisionsCount={pendingCount}
-        dailyGoalProgress={progress}
+        dailyGoalProgress={dailyGoalProgress}
         streakCount={user?.streak?.current || 0}
-        // onQuickAdd={handleQuickAdd}
+        // onQuickAdd={handleQuickAdd} // optional
       />
       <main
         className="devRhythmContainer"

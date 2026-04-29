@@ -1,0 +1,12 @@
+.container {
+  padding: 1rem 0;
+}
+
+.errorContainer {
+  text-align: center;
+  padding: 3rem;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
