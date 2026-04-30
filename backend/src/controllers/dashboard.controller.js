@@ -63,9 +63,9 @@ const getDashboard = async (req, res, next) => {
 
     const responseData = {
       summary: userStats,
-      productivity: {
+       productivity: {
         heatmap: heatmapSummary,
-        weeklyStudyTimeMinutes: weeklyStudyTime,
+        weeklyStudyTime: weeklyStudyTime,
         currentMonthHeatmap
       },
       goals: {

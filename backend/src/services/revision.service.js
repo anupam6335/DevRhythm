@@ -1,114 +1,82 @@
 const RevisionSchedule = require('../models/RevisionSchedule');
 const { getStartOfDay, getEndOfDay, isToday } = require('../utils/helpers/date');
 
+/**
+ * Calculate revision stats using aggregation with pendingDue (actual due date)
+ */
 const calculateRevisionStats = async (userId) => {
   const todayStart = getStartOfDay();
   const todayEnd = getEndOfDay();
+  const nextWeekEnd = new Date(todayStart);
+  nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+  nextWeekEnd.setHours(23, 59, 59, 999);
 
+  // Total active
+  const totalActive = await RevisionSchedule.countDocuments({ userId, status: 'active' });
+  const totalCompleted = await RevisionSchedule.countDocuments({ userId, status: 'completed' });
+
+  // Overdue and pending counts based on pendingDue
   const stats = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
     {
-      $match: { userId },
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+      }
     },
     {
       $facet: {
-        totalActive: [
-          { $match: { status: 'active' } },
-          { $count: 'count' },
-        ],
-        totalCompleted: [
-          { $match: { status: 'completed' } },
-          { $count: 'count' },
-        ],
         totalOverdue: [
-          {
-            $match: {
-              status: 'active',
-              $expr: {
-                $and: [
-                  { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, todayStart] },
-                  { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] },
-                ],
-              },
-            },
-          },
-          { $count: 'count' },
+          { $match: { pendingDue: { $lt: todayStart } } },
+          { $count: 'count' }
         ],
         pendingToday: [
-          {
-            $match: {
-              userId,
-              status: 'active',
-              schedule: { $elemMatch: { $gte: todayStart, $lte: todayEnd } },
-              $expr: {
-                $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
-              },
-            },
-          },
-          { $count: 'count' },
+          { $match: { pendingDue: { $gte: todayStart, $lte: todayEnd } } },
+          { $count: 'count' }
         ],
         pendingWeek: [
-          {
-            $match: {
-              userId,
-              status: 'active',
-              schedule: {
-                $elemMatch: {
-                  $gte: todayStart,
-                  $lte: new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000),
-                },
-              },
-              $expr: {
-                $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
-              },
-            },
-          },
-          { $count: 'count' },
+          { $match: { pendingDue: { $gt: todayEnd, $lte: nextWeekEnd } } },
+          { $count: 'count' }
         ],
         byRevisionIndex: [
           {
-            $match: { status: 'active' },
-          },
-          {
             $group: {
               _id: '$currentRevisionIndex',
-              count: { $sum: 1 },
-            },
-          },
+              count: { $sum: 1 }
+            }
+          }
         ],
         completionStats: [
           {
             $project: {
               totalRevisions: { $size: '$schedule' },
-              completedCount: { $size: '$completedRevisions' },
-            },
+              completedCount: { $size: '$completedRevisions' }
+            }
           },
           {
             $group: {
               _id: null,
               totalRevisions: { $sum: '$totalRevisions' },
-              totalCompleted: { $sum: '$completedCount' },
-            },
-          },
+              totalCompleted: { $sum: '$completedCount' }
+            }
+          }
         ],
         overdueStats: [
           {
-            $match: { status: 'active' },
+            $match: { pendingDue: { $lt: todayStart } }
           },
           {
             $group: {
               _id: null,
               totalOverdueCount: { $sum: '$overdueCount' },
-              avgOverdue: { $avg: '$overdueCount' },
-            },
-          },
-        ],
-      },
-    },
+              avgOverdue: { $avg: '$overdueCount' }
+            }
+          }
+        ]
+      }
+    }
   ]);
 
   const result = stats[0];
-  const totalActive = result.totalActive[0]?.count || 0;
-  const totalCompleted = result.totalCompleted[0]?.count || 0;
   const totalOverdue = result.totalOverdue[0]?.count || 0;
   const pendingToday = result.pendingToday[0]?.count || 0;
   const pendingWeek = result.pendingWeek[0]?.count || 0;
@@ -138,52 +106,30 @@ const calculateRevisionStats = async (userId) => {
 
 const calculateUpcomingStats = async (userId, startDate, endDate) => {
   const stats = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
     {
-      $match: {
-        userId,
-        status: 'active',
-      },
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+      }
     },
-    {
-      $unwind: {
-        path: '$schedule',
-        includeArrayIndex: 'revisionIndex',
-      },
-    },
-    {
-      $match: {
-        $expr: {
-          $and: [
-            { $gte: ['$schedule', startDate] },
-            { $lte: ['$schedule', endDate] },
-            { $eq: ['$revisionIndex', '$currentRevisionIndex'] },
-          ],
-        },
-      },
-    },
+    { $match: { pendingDue: { $gte: startDate, $lte: endDate } } },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$schedule' } },
-        count: { $sum: 1 },
-      },
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$pendingDue' } },
+        count: { $sum: 1 }
+      }
     },
-    {
-      $sort: { _id: 1 },
-    },
+    { $sort: { _id: 1 } }
   ]);
 
   const byDay = {};
   let totalUpcoming = 0;
-
   stats.forEach(stat => {
     byDay[stat._id] = stat.count;
     totalUpcoming += stat.count;
   });
 
-  return {
-    totalUpcoming,
-    byDay,
-  };
+  return { totalUpcoming, byDay };
 };
 
 const createRevisionSchedule = async (userId, questionId, baseDate, customSchedule = null) => {
@@ -226,14 +172,17 @@ const markRevisionComplete = async (revisionId, completedAt = new Date(), status
 const getPendingRevisionsForDate = async (userId, date, timeZone = 'UTC') => {
   const dateStart = getStartOfDay(date, timeZone);
   const dateEnd = getEndOfDay(date, timeZone);
-  const pending = await RevisionSchedule.find({
-    userId,
-    schedule: { $elemMatch: { $gte: dateStart, $lte: dateEnd } },
-    status: 'active',
-    $expr: {
-      $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
+  const pending = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
+    {
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+      }
     },
-  }).populate('questionId');
+    { $match: { pendingDue: { $gte: dateStart, $lte: dateEnd } } },
+    { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } }
+  ]);
   return pending;
 };
 
@@ -245,13 +194,13 @@ const updateOverdueRevisions = async (timeZone = 'UTC') => {
       $expr: {
         $and: [
           { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, today] },
-          { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] },
-        ],
-      },
+          { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] }
+        ]
+      }
     },
     {
       $inc: { overdueCount: 1 },
-      $set: { status: 'overdue', updatedAt: new Date() },
+      $set: { status: 'overdue', updatedAt: new Date() }
     }
   );
   return result.modifiedCount;
@@ -285,10 +234,6 @@ const getRevisionStatusLabel = (revision, index = null, mode = 'actionable', tim
   return 'Upcoming';
 };
 
-/**
- * Get detailed revision statistics (trends, breakdowns, etc.)
- * Now accepts timeZone parameter for date comparisons
- */
 const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   const baseStats = await calculateRevisionStats(userId);
 
@@ -317,26 +262,20 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
       : null
   }));
 
-  const weeklyTrends = [];
-  const monthlyTrends = [];
-
-  // Overdue distribution using timezone
   const today = getStartOfDay(new Date(), timeZone);
-  const overdueSchedules = await RevisionSchedule.find({
-    userId,
-    status: 'active',
-    $expr: {
-      $and: [
-        { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, today] },
-        { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] }
-      ]
-    }
-  }).lean();
+  const overdueSchedules = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
+    {
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+      }
+    },
+    { $match: { pendingDue: { $lt: today } } }
+  ]);
 
   const distribution = { '1-3days': 0, '4-7days': 0, '8-14days': 0, '15-30days': 0, '30+days': 0 };
   for (const rev of overdueSchedules) {
-    const dueDate = rev.schedule[rev.currentRevisionIndex];
-    const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+    const daysOverdue = Math.floor((today - rev.pendingDue) / (1000 * 60 * 60 * 24));
     if (daysOverdue <= 3) distribution['1-3days']++;
     else if (daysOverdue <= 7) distribution['4-7days']++;
     else if (daysOverdue <= 14) distribution['8-14days']++;
@@ -344,7 +283,6 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
     else distribution['30+days']++;
   }
 
-  // By difficulty, platform, pattern
   const allSchedules = await RevisionSchedule.find({ userId })
     .populate('questionId', 'difficulty platform pattern')
     .lean();
@@ -404,8 +342,8 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
       }
     }
 
-    const currentDue = schedule.schedule[schedule.currentRevisionIndex];
-    if (currentDue && currentDue < today) {
+    const pendingDue = schedule.schedule[schedule.currentRevisionIndex];
+    if (pendingDue && pendingDue < today) {
       byDifficulty[diff].overdueCount += 1;
       byPlatform[platform].overdueCount += 1;
       for (const pattern of patterns) {
@@ -424,7 +362,6 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
   for (const plat in byPlatform) computeStats(byPlatform[plat]);
   for (const pat in byPattern) computeStats(byPattern[pat]);
 
-  // Time stats
   const allCompleted = allSchedules.flatMap(s => s.completedRevisions.filter(cr => cr.status === 'completed'));
   const totalMinutesSpent = allCompleted.reduce((sum, cr) => sum + (cr.timeSpent || 0), 0);
   const avgMinutesPerRevision = allCompleted.length ? totalMinutesSpent / allCompleted.length : 0;
@@ -439,7 +376,6 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
     if (minutes > mostMinutes) { mostMinutes = minutes; mostProductiveDay = day; }
   }
 
-  // Confidence stats
   const confidenceAfterValues = allCompleted.map(cr => cr.confidenceAfter).filter(v => v != null);
   const overallAvgConfidence = confidenceAfterValues.length ? (confidenceAfterValues.reduce((a,b)=>a+b,0) / confidenceAfterValues.length).toFixed(1) : null;
   const confidenceDist = { 1:0, 2:0, 3:0, 4:0, 5:0 };
@@ -469,7 +405,7 @@ const getDetailedRevisionStats = async (userId, timeZone = 'UTC') => {
       averageConfidenceAfter: null,
       dropoutRate: 0
     })),
-    trends: { daily: dailyTrends, weekly: weeklyTrends, monthly: monthlyTrends },
+    trends: { daily: dailyTrends, weekly: [], monthly: [] },
     overdueDistribution: distribution,
     byDifficulty,
     byPlatform,

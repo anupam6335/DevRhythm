@@ -1,0 +1,230 @@
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem;
+  gap: 1rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.container:hover {
+  border-color: var(--accent-moss);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+/* Top row: POD on left, date on right */
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.podBadge {
+  background: linear-gradient(135deg, #f5b042, #e67e22);
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+}
+
+.podBadge span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: white;
+  text-transform: uppercase;
+}
+
+.dateBadge {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  padding: 0.25rem 0.5rem;
+  border-radius: 20px;
+}
+
+/* Middle section: two columns, both vertically centered */
+.middleSection {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.titleSection {
+  flex: 1;
+}
+
+.titleLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.problemTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.titleLink:hover .problemTitle {
+  color: var(--accent-moss);
+}
+
+.infoBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background-color: var(--divider);
+}
+
+/* Bottom row: centered button */
+.bottomRow {
+  display: flex;
+  justify-content: center;
+}
+
+.leetcodeButton {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.leetcodeButton:hover {
+  transform: translateY(-1px);
+}
+/* Time badge styles – accessible, soft background + bold text */
+.timeBadgeInfo {
+  background-color: rgba(108, 122, 110, 0.15);
+  color: var(--accent-moss);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: 1px solid var(--accent-moss);
+}
+
+.timeBadgeWarning {
+  background-color: rgba(230, 126, 34, 0.12);
+  color: #d35400;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: 1px solid #d35400;
+}
+
+.timeBadgeUrgent {
+  background-color: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: 1px solid #c0392b;
+  animation: subtlePulse 1.5s infinite;
+}
+
+.timeBadgeExpired {
+  background-color: rgba(127, 140, 141, 0.15);
+  color: #7f8c8d;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: 1px solid #7f8c8d;
+}
+
+@keyframes subtlePulse {
+  0% { opacity: 1; background-color: rgba(192, 57, 43, 0.08); border-color: #c0392b; }
+  50% { opacity: 0.7; background-color: rgba(192, 57, 43, 0.2); border-color: #e74c3c; }
+  100% { opacity: 1; background-color: rgba(192, 57, 43, 0.08); border-color: #c0392b; }
+}
+/* Skeleton */
+.skeletonContent {
+  width: 100%;
+  height: 200px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.errorState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--error);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .middleSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .infoBlock {
+    align-items: flex-start;
+  }
+  .infoRow {
+    justify-content: flex-start;
+  }
+  .titleSection {
+    text-align: center;
+  }
+  .bottomRow {
+    margin-top: 0.5rem;
+  }
+  .problemTitle {
+    font-size: 1.2rem;
+  }
+}

@@ -25,6 +25,18 @@ router.get('/by-platform/:platform/:platformQuestionId',
 router.post('/question/:questionId', auth, rateLimiters.progressUpdateLimiter, validate(progressValidator.createRevision, 'body'), revisionController.createRevision);
 router.post('/:revisionId/complete', auth, rateLimiters.revisionCompleteLimiter, validate(progressValidator.completeRevision, 'body'), revisionController.completeRevision);
 router.post('/question/:questionId/complete', auth, rateLimiters.revisionCompleteLimiter, validate(progressValidator.completeRevision, 'body'), revisionController.completeQuestionRevision);
+
+// Complete a specific past revision by date
+router.post('/question/:questionId/complete-past',
+  auth,
+  rateLimiters.revisionCompleteLimiter,
+  validate(Joi.object({
+    date: Joi.date().required(),
+    confidence: Joi.number().integer().min(1).max(5).optional()
+  })),
+  revisionController.completePastRevision
+);
+
 router.post('/:questionId/time-spent', auth, rateLimiters.revisionCompleteLimiter, validate(Joi.object({ minutes: Joi.number().integer().min(1).max(480).required() }), 'body'), revisionController.recordTimeSpent);
 router.put('/:revisionId/reschedule', auth, rateLimiters.progressUpdateLimiter, validate(progressValidator.rescheduleRevision, 'body'), revisionController.rescheduleRevision);
 router.delete('/:revisionId', auth, rateLimiters.progressUpdateLimiter, revisionController.deleteRevision);

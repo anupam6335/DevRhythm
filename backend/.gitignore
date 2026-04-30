@@ -64,3 +64,4 @@ out/
 .vscode-test/
 *.vsix
 .chrome/
+/scripts

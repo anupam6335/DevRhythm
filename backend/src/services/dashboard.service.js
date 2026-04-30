@@ -148,7 +148,7 @@ const getRecentActivity = async (userId, timeZone) => {
     'attempts.solvedAt': { $exists: true }
   })
     .sort({ 'attempts.solvedAt': -1 })
-    .limit(5)
+    .limit(10)
     .populate('questionId', '_id platformQuestionId title platform difficulty')
     .lean();
 
@@ -172,7 +172,7 @@ const getRecentActivity = async (userId, timeZone) => {
     { $unwind: '$completedRevisions' },
     { $match: { 'completedRevisions.status': 'completed' } },
     { $sort: { 'completedRevisions.completedAt': -1 } },
-    { $limit: 5 },
+    { $limit: 10 },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
     { $unwind: '$question' },
     {
@@ -225,7 +225,7 @@ const getRecentActivity = async (userId, timeZone) => {
 
   const all = [...solvedItems, ...revisionItems];
   all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  return all.slice(0, 5);
+  return all.slice(0, 10);
 };
 
 const getHeatmapSummary = async (userId) => {
@@ -430,19 +430,68 @@ const getRecentlySolved = async (userId) => {
 
 const getWeeklyStudyTime = async (userId, timeZone) => {
   const now = new Date();
-  const weekStart = getStartOfWeek(now, timeZone);
-  const weekEnd = getEndOfWeek(now, timeZone);
   const year = now.getUTCFullYear();
 
   const heatmap = await HeatmapData.findOne({ userId, year }).select('dailyData').lean();
-  if (!heatmap?.dailyData) return 0;
+  if (!heatmap?.dailyData) return {
+    currentWeekMinutes: 0,
+    previousWeekMinutes: 0,
+    weekOverWeekChangePercent: null,
+    monthlyAverageWeeklyMinutes: 0,
+    changeFromMonthlyAveragePercent: null
+  };
 
-  let total = 0;
+  const weekStartCurrent = getStartOfWeek(now, timeZone);
+  const todayEnd = getEndOfDay(now, timeZone);
+  const weekStartPrevious = new Date(weekStartCurrent);
+  weekStartPrevious.setDate(weekStartPrevious.getDate() - 7);
+  const weekEndPrevious = new Date(weekStartCurrent);
+  weekEndPrevious.setDate(weekEndPrevious.getDate() - 1);
+  weekEndPrevious.setHours(23, 59, 59, 999);
+
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  let currentWeek = 0;
+  let previousWeek = 0;
+  let last30Days = 0;
+
   for (const day of heatmap.dailyData) {
     const dayDate = new Date(day.date);
-    if (dayDate >= weekStart && dayDate <= weekEnd) total += day.totalTimeSpent || 0;
+    if (dayDate >= weekStartCurrent && dayDate <= todayEnd) {
+      currentWeek += day.totalTimeSpent || 0;
+    }
+    if (dayDate >= weekStartPrevious && dayDate <= weekEndPrevious) {
+      previousWeek += day.totalTimeSpent || 0;
+    }
+    if (dayDate >= thirtyDaysAgo && dayDate <= todayEnd) {
+      last30Days += day.totalTimeSpent || 0;
+    }
   }
-  return total;
+
+  const monthlyAverageWeekly = last30Days / 4;
+  let weekOverWeekChange = null;
+  if (previousWeek > 0) {
+    weekOverWeekChange = ((currentWeek - previousWeek) / previousWeek) * 100;
+  } else if (currentWeek > 0 && previousWeek === 0) {
+    weekOverWeekChange = 100;
+  }
+
+  let changeFromMonthlyAvg = null;
+  if (monthlyAverageWeekly > 0) {
+    changeFromMonthlyAvg = ((currentWeek - monthlyAverageWeekly) / monthlyAverageWeekly) * 100;
+  } else if (currentWeek > 0 && monthlyAverageWeekly === 0) {
+    changeFromMonthlyAvg = 100;
+  }
+
+  return {
+    currentWeekMinutes: Math.round(currentWeek),
+    previousWeekMinutes: Math.round(previousWeek),
+    weekOverWeekChangePercent: weekOverWeekChange !== null ? Math.round(weekOverWeekChange) : null,
+    monthlyAverageWeeklyMinutes: Math.round(monthlyAverageWeekly),
+    changeFromMonthlyAveragePercent: changeFromMonthlyAvg !== null ? Math.round(changeFromMonthlyAvg) : null
+  };
 };
 
 const getRevisionCompletionRate = async (userId, timeZone) => {

@@ -1,152 +1,140 @@
 .container {
-  padding: 2rem 0;
-  max-width: 800px;
+  max-width: 940px;
   margin: 0 auto;
+  padding: 1rem 0;
+  animation: fadeInUp 0.4s ease-out both;
 }
 
-.title {
-  font-size: 2rem;
-  margin-bottom: 2rem;
-  color: var(--text-primary);
-}
-
-.constructionCard {
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  box-shadow: 0 10px 30px var(--shadow);
-  margin-bottom: 2rem;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Breathing background container */
-.breathingBackground {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 40%, rgba(var(--accent-moss-rgb), 0.15), transparent 70%);
-  border-radius: inherit;
-  z-index: 0;
-  pointer-events: none;
-  animation: breathe 6s infinite ease-in-out;
-}
-
-@keyframes breathe {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.05);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.constructionContent {
-  position: relative;
-  z-index: 1;
-  padding: 2rem;
+/* Stagger child cards */
+.container > * {
+  animation: fadeInUp 0.4s ease-out both;
 }
 
-.constructionHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.container > *:nth-child(1) { animation-delay: 0s; }
+.container > *:nth-child(2) { animation-delay: 0.05s; }
+.container > *:nth-child(3) { animation-delay: 0.1s; }
+.container > *:nth-child(4) { animation-delay: 0.15s; }
+.container > *:nth-child(5) { animation-delay: 0.2s; }
+.container > *:nth-child(6) { animation-delay: 0.25s; }
+.container > *:nth-child(7) { animation-delay: 0.3s; }
+.container > *:nth-child(8) { animation-delay: 0.35s; }
+
+.heroSection {
+  width: 100%;
   margin-bottom: 1rem;
 }
 
-.emoji {
-  font-size: 2rem;
-}
-
-.constructionHeader h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.constructionMessage {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
-}
-
-.progressContainer {
-  background-color: var(--bg-surface);
-  border-radius: 40px;
-  height: 24px;
-  position: relative;
-  margin-bottom: 1rem;
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-moss), var(--accent-sand));
-  border-radius: 40px;
-  transition: width 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.progressBar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.progressLabel {
-  display: block;
-  text-align: center;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  margin-top: 0.5rem;
-}
-
-.constructionFooter {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  font-style: italic;
-  margin-top: 1rem;
-  border-top: 1px dashed var(--border);
-  padding-top: 1rem;
-}
-
-.logoutSection {
+/* Two‑column layout – equal height stretch */
+.twoColumn {
   display: flex;
-  justify-content: center;
-  margin-top: 2rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .title {
-    font-size: 1.5rem;
+/* Base styles for all column wrappers */
+.heatmapColumn,
+.weeklyColumn,
+.goalsGraphColumn,
+.upcomingColumn,
+.activeGoalsColumn,
+.dailyChallengeColumn,
+.pendingColumn,
+.recentActivityColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* JUMBLED WIDTHS – each row has different ratios */
+/* Row 1 (heatmap + weekly) */
+.heatmapColumn { flex: 7; }   /* 70% */
+.weeklyColumn  { flex: 3; }   /* 30% */
+
+/* Row 2 (pending revisions + goals graph) – non‑uniform */
+.pendingColumn   { flex: 4; } /* 40% */
+.goalsGraphColumn { flex: 6; } /* 60% */
+
+/* Row 3 (active goals + daily challenge) – balanced */
+.activeGoalsColumn    { flex: 5; } /* 50% */
+.dailyChallengeColumn { flex: 5; } /* 50% */
+
+/* Row 4 (upcoming revisions + recent activity) – swapped */
+.upcomingColumn     { flex: 4; } /* 40% */
+.recentActivityColumn { flex: 6; } /* 60% */
+
+/* Force direct children (cards) to fill column height */
+.heatmapColumn > *,
+.weeklyColumn > *,
+.goalsGraphColumn > *,
+.upcomingColumn > *,
+.activeGoalsColumn > *,
+.dailyChallengeColumn > *,
+.pendingColumn > *,
+.recentActivityColumn > * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullWidth {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+/* Tablet breakpoint (768px – 939px) */
+@media (min-width: 768px) and (max-width: 939px) {
+  .container {
+    padding: 0.75rem;
   }
-  .constructionHeader h2 {
-    font-size: 1.3rem;
+  .twoColumn {
+    gap: 0.75rem;
   }
-  .constructionMessage {
-    font-size: 1rem;
+  /* Keep same flex ratios on tablet */
+}
+
+/* Mobile breakpoint (≤767px) – single column, reset flex to auto */
+@media (max-width: 767px) {
+  .container {
+    padding: 0.5rem;
   }
-  .constructionContent {
-    padding: 1.5rem;
+  .twoColumn {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .heroSection {
+    margin-bottom: 0.5rem;
+  }
+  .fullWidth {
+    margin-bottom: 0.75rem;
+  }
+  .heatmapColumn,
+  .weeklyColumn,
+  .goalsGraphColumn,
+  .upcomingColumn,
+  .activeGoalsColumn,
+  .dailyChallengeColumn,
+  .pendingColumn,
+  .recentActivityColumn {
+    flex: auto;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .container > * {
+    animation: none;
   }
 }
