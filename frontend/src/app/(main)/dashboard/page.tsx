@@ -1,58 +1,99 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSession } from '@/features/auth/hooks/useSession';
-import Button from '@/shared/components/Button';
-import Loader from '@/shared/components/Loader';
+import { useDashboard } from '@/features/dashboard';
+import { useUser } from '@/features/user';
+import QuestionsList from '@/features/user/components/QuestionsList';
+import HeroSummary from './parts/HeroSummary';
+import ProductivityHeatmap from './parts/ProductivityHeatmap';
+import WeeklyStudyTime from './parts/WeeklyStudyTime';
+import GoalsProgressGraph from './parts/GoalsProgressGraph';
+import ActiveGoals from './parts/ActiveGoals';
+import DailyChallengeCard from './parts/DailyChallengeCard';
+import PendingRevisions from './parts/PendingRevisions';
+import RecentActivity from './parts/RecentActivity';
+import WeakestPatternInsight from './parts/WeakestPatternInsight';
+import DashboardSkeleton from './parts/DashboardSkeleton';
 import styles from './page.module.css';
 
 export default function DashboardPage() {
-  const { user, isLoading, logout } = useSession();
-  const [mounted, setMounted] = useState(false);
+  const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } = useDashboard();
+  const { user } = useUser();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return <div className="devRhythmContainer">Loading...</div>;
+  if (dashboardLoading || !dashboard) {
+    return <DashboardSkeleton />;
   }
 
-  if (isLoading) return <div className="devRhythmContainer"><Loader/></div>;
-  if (!user) return <div className="devRhythmContainer">Not authenticated</div>;
+  const {
+    summary,
+    productivity,
+    goals,
+    revisions,
+    activity,
+    dailyChallenge,
+    insights,
+  } = dashboard;
 
   return (
-<div className={styles.container}>
-        <h1 className={styles.title}>Welcome back, {user.displayName}! 👋</h1>
+    <div className={styles.container}>
+      <div className={styles.heroSection}>
+        <HeroSummary summary={summary} goals={goals.current} />
+      </div>
 
-        {/* Construction card with breathing animation */}
-        <div className={styles.constructionCard}>
-          {/* Breathing background container */}
-          <div className={styles.breathingBackground} aria-hidden="true"></div>
-
-          <div className={styles.constructionContent}>
-            <div className={styles.constructionHeader}>
-              <span className={styles.emoji}>🚧👷‍♂️🚧</span>
-              <h2>Dashboard? More like Dash‑Bored!</h2>
-            </div>
-            <p className={styles.constructionMessage}>
-              Our developers are currently wrestling with bugs, drinking chai, and building something epic.
-              Come back soon – or better yet, keep solving problems while you wait. They’re way more fun anyway!
-            </p>
-            <div className={styles.progressContainer}>
-              <div className={styles.progressBar} style={{ width: '42%' }}></div>
-              <span className={styles.progressLabel}>42% ready (estimated by random number generator)</span>
-            </div>
-            <p className={styles.constructionFooter}>
-              P.S. If you see any glitches, just pretend they’re features. 😉
-            </p>
-          </div>
+      <div className={styles.twoColumn}>
+        <div className={styles.heatmapColumn}>
+          <ProductivityHeatmap data={productivity.currentMonthHeatmap} isLoading={dashboardLoading} />
         </div>
-
-        {/* Optional logout button */}
-        <div className={styles.logoutSection}>
-          <Button onClick={logout} variant="outline">Logout</Button>
+        <div className={styles.weeklyColumn}>
+          <WeeklyStudyTime data={productivity.weeklyStudyTime} isLoading={dashboardLoading} />
         </div>
       </div>
+
+      <div className={styles.twoColumn}>
+         <div className={styles.pendingColumn}>
+          <PendingRevisions
+            type="pending"
+            revisions={revisions.pendingToday}
+            isLoading={dashboardLoading}
+            onRevisionComplete={() => refetchDashboard()}
+            limit={2}
+          />
+        </div>
+       
+         <div className={styles.goalsGraphColumn}>
+          <GoalsProgressGraph />
+        </div>
+      </div>
+
+      <div className={styles.twoColumn}>
+        <div className={styles.activeGoalsColumn}>
+          <ActiveGoals goals={goals.planned} isLoading={dashboardLoading} />
+        </div>
+        <div className={styles.dailyChallengeColumn}>
+          <DailyChallengeCard dailyChallenge={dailyChallenge} isLoading={dashboardLoading} />
+        </div>
+      </div>
+
+      <div className={styles.twoColumn}>
+         <div className={styles.upcomingColumn}>
+          <PendingRevisions
+            type="upcoming"
+            revisions={revisions.upcoming}
+            isLoading={dashboardLoading}
+            limit={5}
+          />
+        </div>
+        <div className={styles.recentActivityColumn}>
+          <RecentActivity activities={activity.timeline} isLoading={dashboardLoading} />
+        </div>
+      </div>
+
+      <div className={styles.fullWidth}>
+        <QuestionsList isOwnProfile limit={3} />
+      </div>
+
+      <div className={styles.fullWidth}>
+        <WeakestPatternInsight pattern={insights.weakestPattern} isLoading={dashboardLoading} />
+      </div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@ const Notification = require('../models/Notification');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const AppError = require('../utils/errors/AppError');
-const { invalidateCache } = require('../middleware/cache');
+const { invalidateCache, invalidateDashboardCache } = require('../middleware/cache');
 
 /**
  * Get notifications for the authenticated user
@@ -46,6 +46,7 @@ const markAsRead = async (req, res, next) => {
     if (!notification) throw new AppError('Notification not found', 404);
 
     await invalidateCache(`notifications:${req.user._id}:*`);
+    await invalidateDashboardCache(req.user._id);
     res.json(formatResponse('Notification marked as read', { notification }));
   } catch (error) {
     next(error);
@@ -68,6 +69,7 @@ const markMultipleAsRead = async (req, res, next) => {
     );
 
     await invalidateCache(`notifications:${req.user._id}:*`);
+    await invalidateDashboardCache(req.user._id);
     res.json(formatResponse(`${result.modifiedCount} notifications marked as read`));
   } catch (error) {
     next(error);
@@ -85,6 +87,7 @@ const markAllAsRead = async (req, res, next) => {
     );
 
     await invalidateCache(`notifications:${req.user._id}:*`);
+    await invalidateDashboardCache(req.user._id);
     res.json(formatResponse(`All ${result.modifiedCount} notifications marked as read`));
   } catch (error) {
     next(error);
@@ -101,6 +104,7 @@ const deleteNotification = async (req, res, next) => {
     if (!notification) throw new AppError('Notification not found', 404);
 
     await invalidateCache(`notifications:${req.user._id}:*`);
+    await invalidateDashboardCache(req.user._id);
     res.json(formatResponse('Notification deleted'));
   } catch (error) {
     next(error);

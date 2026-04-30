@@ -1,0 +1,155 @@
+.container {
+  width: 100%;
+  height: 100%;
+  transition: box-shadow 0.2s ease;
+}
+
+.container:hover {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.viewAllLink {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.viewAllLink:hover {
+  color: var(--accent-moss);
+}
+
+.revisionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.revisionItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  transition: transform 0.2s ease;
+}
+
+.revisionItem:hover {
+  transform: translateX(4px);
+}
+
+.revisionContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.revisionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.lightningIcon {
+  color: var(--accent-moss);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.questionTitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.questionLink {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.questionLink:hover .questionTitle {
+  color: var(--accent-moss);
+}
+
+.revisionMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.platform {
+  color: var(--text-secondary);
+}
+
+.scheduledDate {
+  color: var(--text-muted);
+}
+
+.reviseButton {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Skeleton styles */
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeletonItem {
+  height: 56px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .revisionItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .reviseButton {
+    width: 100%;
+    justify-content: center;
+  }
+  .revisionHeader {
+    gap: 0.25rem;
+  }
+  .questionTitle {
+    font-size: 0.85rem;
+  }
+}

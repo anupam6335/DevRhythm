@@ -1,0 +1,104 @@
+.container {
+  width: 100%;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.heroCard {
+  padding: 0.5rem;
+}
+
+.statSkeleton {
+  height: 60px;
+  width: 100%;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  animation: pulse 1.5s infinite;
+}
+
+.goalRow {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.goalSkeleton {
+  flex: 1;
+  height: 40px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+.twoColumn {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.twoColumn > div {
+  flex: 1;
+}
+
+.skeletonCard {
+  width: 100%;
+  height: 160px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonCardLarge {
+  width: 100%;
+  height: 260px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+
+.fullWidth {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 767px) {
+  .heroGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .goalRow {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .twoColumn {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .skeletonCard, .skeletonCardLarge {
+    height: auto;
+    min-height: 120px;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

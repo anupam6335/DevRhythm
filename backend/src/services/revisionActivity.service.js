@@ -14,7 +14,7 @@ const getRevisionActivityKey = (userId, questionId, date) => {
 const recordTimeSpent = async (userId, questionId, date, minutes) => {
   const key = getRevisionActivityKey(userId, questionId, date);
   await redisClient.hIncrBy(key, 'timeSpent', minutes);
-  await redisClient.expire(key, 86400); // 24 hours
+  await redisClient.expire(key, 86400);
 };
 
 const recordCodeSubmission = async (userId, questionId, date) => {
@@ -32,36 +32,52 @@ const getRevisionActivity = async (userId, questionId, date) => {
   };
 };
 
-/**
- * Get user's timezone from database
- */
 const getUserTimeZone = async (userId) => {
   const user = await User.findById(userId).select('preferences.timezone');
   return user?.preferences?.timezone || 'UTC';
 };
 
 /**
- * Complete a revision (or a specific revision by date) for a given question.
- * Now uses user's timezone for date calculations.
+ * Update revision state (status, overdueCount, overdueActive) based on currentRevisionIndex.
+ */
+const updateRevisionState = (revision, timeZone) => {
+  const todayStart = getStartOfDay(new Date(), timeZone);
+  const idx = revision.currentRevisionIndex;
+
+  if (idx >= revision.schedule.length) {
+    revision.status = 'completed';
+    revision.overdueActive = false;
+    revision.overdueCount = 0;
+    return;
+  }
+
+  const pendingDue = revision.schedule[idx];
+  const daysOverdue = Math.floor((todayStart - pendingDue) / (1000 * 60 * 60 * 24));
+  revision.overdueCount = daysOverdue > 0 ? daysOverdue : 0;
+  revision.overdueActive = daysOverdue > 0;
+  revision.status = daysOverdue > 0 ? 'overdue' : 'active';
+};
+
+/**
+ * Standard completion – completes the current pending revision and advances the index.
+ * Used by the regular completion endpoint.
  */
 const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto', options = {}) => {
   const { targetDate = null, allowOverdue = false } = options;
-  
-  // Fetch user's timezone
   const timeZone = await getUserTimeZone(userId);
   const todayStart = getStartOfDay(date, timeZone);
 
   const revision = await RevisionSchedule.findOne({
     userId,
     questionId,
-    status: 'active',
+    status: { $in: ['active', 'overdue'] }
   });
 
   if (!revision) {
     return { completed: false, message: 'No active revision schedule found', skippedCount: 0 };
   }
 
-  // Determine which revision to complete
+  // Determine target index (default current, or specified date)
   let targetIndex = null;
   if (targetDate) {
     const targetDayStart = getStartOfDay(targetDate, timeZone);
@@ -79,8 +95,8 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   }
 
   // Check if already completed
-  const alreadyCompleted = revision.completedRevisions.some(rev =>
-    getStartOfDay(rev.date, timeZone).getTime() === getStartOfDay(revision.schedule[targetIndex], timeZone).getTime()
+  const alreadyCompleted = revision.completedRevisions.some(cr =>
+    getStartOfDay(cr.date, timeZone).getTime() === getStartOfDay(revision.schedule[targetIndex], timeZone).getTime()
   );
   if (alreadyCompleted) {
     return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
@@ -88,20 +104,19 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
 
   const isOverdue = revision.schedule[targetIndex] < todayStart;
 
-  // For manual completion, check activity conditions
+  // For manual completion, enforce activity conditions
   if (source === 'manual' && targetIndex === revision.currentRevisionIndex) {
     const activity = await getRevisionActivity(userId, questionId, date);
-    const conditionsMet = activity.timeSpent > 20 || activity.codeSubmitted;
+    const conditionsMet = activity.timeSpent >= 20 || activity.codeSubmitted;
     if (!conditionsMet) {
       return {
         completed: false,
-        message: 'Please spend more than 20 minutes or submit code (all test cases must pass) before marking the revision as complete.',
+        message: 'Please spend at least 20 minutes or submit passing code before marking this revision as complete.',
         skippedCount: 0
       };
     }
   }
 
-  // If overdue and not allowed, reject
   if (isOverdue && !allowOverdue) {
     return {
       completed: false,
@@ -110,12 +125,13 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     };
   }
 
-  // Get confidence after completion
   const progress = await UserQuestionProgress.findOne({ userId, questionId });
   const confidenceAfter = progress?.confidenceLevel || null;
   const activity = await getRevisionActivity(userId, questionId, date);
 
   const outOfOrder = (targetIndex !== revision.currentRevisionIndex);
+
+  // Add completion entry
   revision.completedRevisions.push({
     date: revision.schedule[targetIndex],
     completedAt: new Date(),
@@ -124,23 +140,20 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     confidenceAfter,
     overdueCompleted: isOverdue,
     skipped: false,
-    outOfOrder: outOfOrder
+    outOfOrder,
   });
 
+  // Advance index if this was the current pending revision
   if (targetIndex === revision.currentRevisionIndex) {
-    // Find next pending revision
     let nextIndex = revision.currentRevisionIndex + 1;
     while (nextIndex < revision.schedule.length &&
-           revision.completedRevisions.some(rev => getStartOfDay(rev.date, timeZone).getTime() === getStartOfDay(revision.schedule[nextIndex], timeZone).getTime())) {
+           revision.completedRevisions.some(cr => getStartOfDay(cr.date, timeZone).getTime() === getStartOfDay(revision.schedule[nextIndex], timeZone).getTime())) {
       nextIndex++;
     }
-    if (nextIndex < revision.schedule.length) {
-      revision.currentRevisionIndex = nextIndex;
-    } else {
-      revision.status = 'completed';
-    }
+    revision.currentRevisionIndex = nextIndex;
   }
 
+  updateRevisionState(revision, timeZone);
   revision.updatedAt = new Date();
   await revision.save();
 
@@ -154,7 +167,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
       revisionIndex: targetIndex,
       status: 'completed',
       overdueCompleted: isOverdue,
-      outOfOrder
+      outOfOrder,
     });
   }
 
@@ -167,7 +180,89 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
       : 'Great, your revision is done.',
     skippedCount: 0,
     overdueCompleted: isOverdue,
-    outOfOrder
+    outOfOrder,
+  };
+};
+
+/**
+ * NEW: Complete a specific past revision (date < today) without affecting currentRevisionIndex.
+ * Enforces activity conditions (20 min or code passed today).
+ */
+const completePastRevision = async (userId, questionId, targetDate, confidence = null) => {
+  const timeZone = await getUserTimeZone(userId);
+  const todayStart = getStartOfDay(new Date(), timeZone);
+  const targetDayStart = getStartOfDay(targetDate, timeZone);
+
+  // Ensure target date is in the past
+  if (targetDayStart >= todayStart) {
+    return { completed: false, message: 'Cannot complete a future or today’s revision with this endpoint. Use the standard completion endpoint.' };
+  }
+
+  const revision = await RevisionSchedule.findOne({
+    userId,
+    questionId,
+    status: { $in: ['active', 'overdue'] }
+  });
+
+  if (!revision) {
+    return { completed: false, message: 'No active revision schedule found' };
+  }
+
+  // Find index matching the target date
+  let targetIndex = -1;
+  for (let i = 0; i < revision.schedule.length; i++) {
+    if (getStartOfDay(revision.schedule[i], timeZone).getTime() === targetDayStart.getTime()) {
+      targetIndex = i;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) {
+    return { completed: false, message: 'No revision scheduled on the given date' };
+  }
+
+  // Check if already completed
+  const alreadyCompleted = revision.completedRevisions.some(cr =>
+    getStartOfDay(cr.date, timeZone).getTime() === targetDayStart.getTime()
+  );
+  if (alreadyCompleted) {
+    return { completed: true, message: 'Revision already completed' };
+  }
+
+  // Enforce activity condition: must have spent ≥20 minutes today OR submitted passing code today
+  const activity = await getRevisionActivity(userId, questionId, new Date());
+  const conditionsMet = activity.timeSpent >= 20 || activity.codeSubmitted;
+  if (!conditionsMet) {
+    return {
+      completed: false,
+      message: 'You must spend at least 20 minutes on this question today or submit passing code before completing a past revision.'
+    };
+  }
+
+  // Add completion entry
+  revision.completedRevisions.push({
+    date: revision.schedule[targetIndex],
+    completedAt: new Date(),
+    status: 'completed',
+    timeSpent: activity.timeSpent,
+    confidenceAfter: confidence && confidence >= 1 && confidence <= 5 ? confidence : null,
+    overdueCompleted: true,
+    skipped: false,
+    outOfOrder: true, // always out of order because index points to future/today
+  });
+
+  // Do NOT change currentRevisionIndex
+  // Recalculate state based on the existing index (which already points to today/future)
+  updateRevisionState(revision, timeZone);
+  revision.updatedAt = new Date();
+  await revision.save();
+
+  await invalidateCache(`revisions:*:user:${userId}:*`);
+
+  return {
+    completed: true,
+    message: `Past revision for ${formatDate(targetDate)} marked as completed.`,
+    revision,
   };
 };
 
@@ -175,5 +270,6 @@ module.exports = {
   recordTimeSpent,
   recordCodeSubmission,
   checkAndCompleteRevision,
+  completePastRevision,
   getRevisionActivity,
 };

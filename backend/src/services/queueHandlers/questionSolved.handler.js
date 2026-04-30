@@ -10,6 +10,7 @@ const UserQuestionProgress = require("../../models/UserQuestionProgress");
 const {
   invalidateUserCache,
   invalidateCache,
+  invalidateDashboardCache,
 } = require("../../middleware/cache");
 const { getStartOfDay, parseDate } = require("../../utils/helpers/date");
 const heatmapService = require("../heatmap.service");
@@ -345,6 +346,7 @@ const handleQuestionSolved = async (job) => {
     }
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache
   } catch (error) {
     console.error(`[question.solved] Error processing for user ${userId}:`, error);
     throw error;

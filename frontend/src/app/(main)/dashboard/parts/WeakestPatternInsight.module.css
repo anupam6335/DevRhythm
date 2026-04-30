@@ -1,0 +1,271 @@
+.container {
+  width: 100%;
+  height: 100%;
+  transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  gap: 1rem;
+}
+
+.container:hover {
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.viewAllLink {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.viewAllLink:hover {
+  color: var(--accent-moss);
+}
+
+.skeletonViewLink {
+  width: 100px;
+  height: 20px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+/* Two‑column layout */
+.cardInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+/* Left side – pattern name vertically centered */
+.leftSection {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1;
+}
+
+.patternNameLink {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.2s ease;
+}
+
+.patternName {
+  font-size: 3rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.patternName:hover {
+  color: var(--accent-moss);
+}
+
+/* Right side – metrics block, centered */
+.rightSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 160px;
+}
+
+.confidenceWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.confidenceDots {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.dotFilled {
+  background-color: var(--accent-moss);
+}
+
+.dotEmpty {
+  background-color: var(--border);
+}
+
+.confidenceLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.divider {
+  width: 80%;
+  height: 1px;
+  background-color: var(--divider);
+  margin: 0.25rem auto;
+}
+
+.metricsRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.metricItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.metricValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-code);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.metricLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.metricPipe {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Full‑width explore button */
+.actionRow {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.actionLink {
+  text-decoration: none;
+  width: 100%;
+}
+
+.exploreButton {
+  width: 100%;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.9rem;
+  background-color: var(--primary-action);
+  color: var(--primary-text-on-action);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.2s;
+}
+
+.exploreButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow);
+}
+
+/* Skeleton & empty state */
+.skeletonContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.skeletonPattern {
+  height: 80px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeletonActions {
+  height: 60px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .cardInner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .leftSection {
+    justify-content: center;
+    text-align: center;
+  }
+  .patternName {
+    font-size: 1.8rem;
+  }
+  .rightSection {
+    align-items: center;
+  }
+  .metricsRow {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .metricPipe {
+    display: none;
+  }
+  .metricItem {
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+  .metricLabel {
+    white-space: normal;
+  }
+}

@@ -4,7 +4,7 @@ const UserQuestionProgress = require('../../models/UserQuestionProgress');
 const HeatmapData = require('../../models/HeatmapData');
 const Notification = require('../../models/Notification');
 const Goal = require('../../models/Goal');
-const { invalidateCache } = require('../../middleware/cache');
+const { invalidateCache, invalidateDashboardCache } = require('../../middleware/cache');
 const heatmapService = require('../heatmap.service');
 const { parseDate } = require('../../utils/helpers/date');
 const { updateUserActivity } = require('../user.service');
@@ -71,7 +71,7 @@ const handleRevisionCompleted = async (job) => {
       scheduledAt: new Date(),
     });
 
-    // Update planned goals if revision completed
+    // Update planned goals if revision completed (and it counts as progress toward goal)
     const revisionLocal = DateTime.fromJSDate(revisionDate, { zone: userTimeZone });
     const revisionLocalMidnight = revisionLocal.startOf('day');
     const revisionLocalEnd = revisionLocal.endOf('day');
@@ -94,7 +94,7 @@ const handleRevisionCompleted = async (job) => {
       if (!alreadyCompleted) {
         goal.completedQuestions.push({
           questionId,
-          platformQuestionId,   // NEW
+          platformQuestionId,
           completedAt: revisionDate
         });
         await goal.save();
@@ -121,6 +121,7 @@ const handleRevisionCompleted = async (job) => {
     }
 
     await invalidateCache(`notifications:*:user:${userId}:*`);
+    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache
   } catch (error) {
     console.error('Error processing revision.completed:', error);
     throw error;

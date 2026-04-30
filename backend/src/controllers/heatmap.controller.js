@@ -12,6 +12,7 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
+const { calculateIntensityLevel } = heatmapService;
 
 /**
  * Helper to generate fresh tooltip data from dailyData
@@ -28,7 +29,7 @@ const getHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const includeCache = req.query.includeCache !== 'false';
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
 
     let heatmap = await HeatmapData.findOne({
       userId: req.user._id,
@@ -44,6 +45,14 @@ const getHeatmap = async (req, res, next) => {
         code: 'HEATMAP_NOT_FOUND',
         details: 'No heatmap data exists for the specified year'
       });
+    }
+
+    // Recalculate intensity levels to ensure they match totalActivities
+    if (heatmap.dailyData) {
+      heatmap.dailyData = heatmap.dailyData.map(day => ({
+        ...day,
+        intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
+      }));
     }
 
     const response = {
@@ -87,7 +96,7 @@ const getHeatmapByYear = async (req, res, next) => {
   try {
     const year = parseInt(req.params.year);
     const includeCache = req.query.includeCache !== 'false';
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
 
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
@@ -108,6 +117,14 @@ const getHeatmapByYear = async (req, res, next) => {
         details: 'No heatmap data exists for the specified year',
         suggestedAction: 'Refresh heatmap data'
       });
+    }
+
+    // Recalculate intensity levels
+    if (heatmap.dailyData) {
+      heatmap.dailyData = heatmap.dailyData.map(day => ({
+        ...day,
+        intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
+      }));
     }
 
     const response = {
@@ -151,7 +168,7 @@ const refreshHeatmap = async (req, res, next) => {
   try {
     const year = parseInt(req.body.year) || new Date().getFullYear();
     const forceFullRefresh = req.body.forceFullRefresh === true;
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
 
     if (year < 2000 || year > 2100) {
       throw new AppError('Invalid year specified', 400);
@@ -182,7 +199,7 @@ const refreshHeatmap = async (req, res, next) => {
 const getHeatmapStats = async (req, res, next) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
 
     const heatmap = await HeatmapData.findOne({
       userId: req.user._id,
@@ -217,7 +234,7 @@ const getFilteredHeatmap = async (req, res, next) => {
     const viewType = req.query.viewType || 'all';
     const weekStart = parseInt(req.query.weekStart) || 1;
     const weekEnd = parseInt(req.query.weekEnd) || 53;
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
 
     const validViewTypes = [
       'all', 'new_problems', 'revisions', 'study_group',
@@ -247,7 +264,7 @@ const getFilteredHeatmap = async (req, res, next) => {
       filteredData = heatmap.dailyData.map((day, index) => ({
         ...day,
         totalActivities: heatmap.filterViews[viewType][index] || 0,
-        intensityLevel: heatmapService.calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
+        intensityLevel: calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
       }));
     } else {
       filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType, timeZone);
@@ -397,11 +414,18 @@ const getPublicUserHeatmap = async (req, res, next) => {
     const user = await User.findById(userId).select('_id preferences.timezone');
     if (!user) throw new AppError('User not found', 404);
 
-    // Use the user's own timezone for public heatmap (or fallback to UTC)
     const userTimeZone = user.preferences?.timezone || 'UTC';
 
     const heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear, userTimeZone);
     if (!heatmap) throw new AppError('Heatmap data not found', 404);
+
+    // Recalculate intensity levels
+    if (heatmap.dailyData) {
+      heatmap.dailyData = heatmap.dailyData.map(day => ({
+        ...day,
+        intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
+      }));
+    }
 
     let response;
     if (simple) {
