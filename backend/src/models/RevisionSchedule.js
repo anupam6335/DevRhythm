@@ -20,7 +20,7 @@ const RevisionScheduleSchema = new mongoose.Schema({
     completedAt: Date,
     status: {
       type: String,
-      enum: ['completed', 'skipped'],
+      enum: ['completed', 'skipped', 'auto_skipped'],
     },
     timeSpent: { type: Number, default: 0 },
     confidenceAfter: { type: Number, min: 1, max: 5 },
@@ -43,6 +43,11 @@ const RevisionScheduleSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  overdueActive: {          
+    type: Boolean,
+    default: false,
+    index: true,
+  },
   baseDate: {
     type: Date,
     required: true,
@@ -51,11 +56,13 @@ const RevisionScheduleSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Indexes (add for new field if needed)
 RevisionScheduleSchema.index({ userId: 1, status: 1 });
 RevisionScheduleSchema.index({ userId: 1, schedule: 1 });
 RevisionScheduleSchema.index({ userId: 1, questionId: 1 }, { unique: true });
 RevisionScheduleSchema.index({ schedule: 1, status: 1 });
 RevisionScheduleSchema.index({ userId: 1, currentRevisionIndex: 1 });
+RevisionScheduleSchema.index({ userId: 1, overdueActive: 1 });
 RevisionScheduleSchema.index({ schedule: 1, userId: 1, status: 1 });
 RevisionScheduleSchema.index({
   createdAt: 1,

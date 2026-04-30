@@ -7,6 +7,7 @@ const { invalidateCache } = require('../middleware/cache');
 const revisionService = require('../services/revision.service');
 const revisionActivityService = require('../services/revisionActivity.service');
 const { jobQueue } = require('../services/queue.service');
+const { client: redisClient } = require('../config/redis');
 
 const calculateSpacedRepetitionSchedule = (baseDate, schedule = [1, 3, 7, 14, 30]) => {
   return schedule.map(days => {
@@ -63,31 +64,52 @@ const getRevisions = async (req, res, next) => {
 
 const getTodayRevisions = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     const todayStart = getStartOfDay(new Date(), timeZone);
     const todayEnd = getEndOfDay(new Date(), timeZone);
     
-    const pendingRevisions = await RevisionSchedule.find({
-      userId: req.user._id,
-      schedule: { $elemMatch: { $gte: todayStart, $lte: todayEnd } },
-      status: 'active',
-      $expr: {
-        $lt: ['$currentRevisionIndex', { $size: '$schedule' }],
+    const pendingRevisions = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: 'active' } },
+      {
+        $addFields: {
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        }
       },
-    }).populate({
-      path: 'questionId',
-      select: 'title platform difficulty tags platformQuestionId', 
-    });
+      { $match: { pendingDue: { $gte: todayStart, $lte: todayEnd } } },
+      {
+        $lookup: {
+          from: 'questions',
+          localField: 'questionId',
+          foreignField: '_id',
+          as: 'question'
+        }
+      },
+      { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          questionId: { $ifNull: ['$question._id', null] },
+          title: { $ifNull: ['$question.title', null] },
+          platform: { $ifNull: ['$question.platform', null] },
+          platformQuestionId: { $ifNull: ['$question.platformQuestionId', null] },
+          difficulty: { $ifNull: ['$question.difficulty', null] },
+          tags: { $ifNull: ['$question.tags', []] },
+          scheduledDate: '$pendingDue',
+          revisionIndex: '$currentRevisionIndex',
+          overdue: { $lt: ['$pendingDue', todayStart] }
+        }
+      }
+    ]);
     
     const stats = await revisionService.calculateRevisionStats(req.user._id);
     
     const enhancedRevisions = pendingRevisions.map(rev => ({
       _id: rev._id,
       questionId: rev.questionId,
-      scheduledDate: rev.schedule[rev.currentRevisionIndex],
-      revisionIndex: rev.currentRevisionIndex,
-      overdue: rev.schedule[rev.currentRevisionIndex] < todayStart,
-      status: revisionService.getRevisionStatusLabel(rev, null, 'actionable', timeZone),
+      scheduledDate: rev.scheduledDate,
+      revisionIndex: rev.revisionIndex,
+      overdue: rev.overdue,
+      status: rev.overdue ? 'Overdue' : 'Pending'
     }));
     
     res.json(formatResponse('Today\'s pending revisions retrieved', {
@@ -101,69 +123,64 @@ const getTodayRevisions = async (req, res, next) => {
 
 const getUpcomingRevisions = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     let startDate = req.query.startDate ? new Date(req.query.startDate) : getStartOfDay(new Date(), timeZone);
     let endDate = req.query.endDate ? new Date(req.query.endDate) : getEndOfDay(new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000), timeZone);
     
     const upcoming = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: 'active' } },
       {
-        $match: {
-          userId: req.user._id,
-          status: 'active',
-        },
+        $addFields: {
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        }
       },
-      {
-        $unwind: {
-          path: '$schedule',
-          includeArrayIndex: 'revisionIndex',
-        },
-      },
-      {
-        $match: {
-          $expr: {
-            $and: [
-              { $gte: ['$schedule', startDate] },
-              { $lte: ['$schedule', endDate] },
-              { $eq: ['$revisionIndex', '$currentRevisionIndex'] },
-            ],
-          },
-        },
-      },
+      { $match: { pendingDue: { $gte: startDate, $lte: endDate } } },
       {
         $lookup: {
           from: 'questions',
           localField: 'questionId',
           foreignField: '_id',
-          as: 'question',
-        },
+          as: 'question'
+        }
       },
-      {
-        $unwind: '$question',
-      },
+      { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$schedule' } },
-          date: { $first: '$schedule' },
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$pendingDue' } },
+          date: { $first: '$pendingDue' },
           count: { $sum: 1 },
           questions: {
             $push: {
               _id: '$_id',
               questionId: {
-                _id: '$question._id',
-                platformQuestionId: '$question.platformQuestionId',
-                title: '$question.title',
-                platform: '$question.platform',
-                difficulty: '$question.difficulty',
+                $cond: {
+                  if: { $eq: ['$question', null] },
+                  then: null,
+                  else: {
+                    _id: '$question._id',
+                    platformQuestionId: '$question.platformQuestionId',
+                    title: '$question.title',
+                    platform: '$question.platform',
+                    difficulty: '$question.difficulty'
+                  }
+                }
               },
-              revisionIndex: '$revisionIndex',
-            },
-          },
-        },
+              revisionIndex: '$currentRevisionIndex'
+            }
+          }
+        }
       },
-      {
-        $sort: { date: 1 },
-      },
+      { $sort: { date: 1 } },
     ]);
+    
+    // POST‑PROCESSING: replace empty objects with null
+    for (const group of upcoming) {
+      for (const q of group.questions) {
+        if (q.questionId && typeof q.questionId === 'object' && Object.keys(q.questionId).length === 0) {
+          q.questionId = null;
+        }
+      }
+    }
     
     const stats = await revisionService.calculateUpcomingStats(req.user._id, startDate, endDate);
     
@@ -185,7 +202,7 @@ const getUpcomingRevisions = async (req, res, next) => {
 
 const getQuestionRevision = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     const revision = await RevisionSchedule.findOne({
       userId: req.user._id,
       questionId: req.params.questionId,
@@ -215,7 +232,7 @@ const getQuestionRevision = async (req, res, next) => {
 
 const getQuestionRevisionByPlatform = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     const { platform, platformQuestionId } = req.params;
     const question = await Question.findOne({ platform, platformQuestionId, isActive: true });
     if (!question) throw new AppError('Question not found', 404);
@@ -255,7 +272,6 @@ const createRevision = async (req, res, next) => {
     }
     
     if (isNaN(baseDateObj.getTime())) {
-      console.error('DEBUG: Invalid baseDate:', baseDate);
       throw new AppError('Invalid baseDate format. Use ISO string like: 2026-02-01T08:00:00.000Z', 400);
     }
     
@@ -377,22 +393,59 @@ const completeQuestionRevision = async (req, res, next) => {
   }
 };
 
+/**
+ * NEW: Complete a specific past revision by its scheduled date.
+ * Requires activity condition (20 minutes or code passed today).
+ * Does NOT advance currentRevisionIndex.
+ */
+const completePastRevision = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+    const { date, confidence } = req.body;
+
+    if (!date) {
+      throw new AppError('Date is required', 400);
+    }
+
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      throw new AppError('Invalid date format. Use ISO string or YYYY-MM-DD', 400);
+    }
+
+    if (confidence !== undefined && (confidence < 1 || confidence > 5)) {
+      throw new AppError('Confidence must be between 1 and 5', 400);
+    }
+
+    const result = await revisionActivityService.completePastRevision(
+      req.user._id,
+      questionId,
+      targetDate,
+      confidence
+    );
+
+    if (!result.completed) {
+      throw new AppError(result.message, 400);
+    }
+
+    res.json(formatResponse(result.message, { revision: result.revision }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 const recordTimeSpent = async (req, res, next) => {
   try {
     const { questionId } = req.params;
     const { minutes } = req.body;
     const today = new Date();
 
-    // 1. Record time in Redis (daily accumulator)
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    // 2. Get the updated daily total time from Redis
     const todayStr = formatDate(today);
     const redisKey = `revision:activity:${req.user._id}:${questionId}:${todayStr}`;
     const activity = await redisClient.hGetAll(redisKey);
     const totalMinutesToday = parseInt(activity.timeSpent) || 0;
 
-    // 3. Check if threshold reached (≥20 minutes) and not already notified today
     const notifiedKey = `time_threshold_notified:${req.user._id}:${questionId}:${todayStr}`;
     const alreadyNotified = await redisClient.exists(notifiedKey);
     
@@ -404,11 +457,9 @@ const recordTimeSpent = async (req, res, next) => {
         minutesSpent: totalMinutesToday,
         date: today,
       });
-      // Set flag to prevent duplicate jobs for the same day/question
-      await redisClient.setEx(notifiedKey, 86400, '1'); // Expires after 24 hours
+      await redisClient.setEx(notifiedKey, 86400, '1');
     }
 
-    // --- Existing logic (unchanged below) ---
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
@@ -487,7 +538,7 @@ const recordTimeSpent = async (req, res, next) => {
 
 const rescheduleRevision = async (req, res, next) => {
   try {
-    const timeZone = req.userTimeZone; // for checking today
+    const timeZone = req.userTimeZone;
     const { newDate, revisionIndex } = req.body;
     
     if (revisionIndex < 0 || revisionIndex > 4) {
@@ -570,64 +621,17 @@ const deleteQuestionRevision = async (req, res, next) => {
   }
 };
 
-// Helper for stats – uses user timezone for overdue check
 const fetchOverdueRevisionsForStats = async (userId, timeZone, limit = 50) => {
   const todayStart = getStartOfDay(new Date(), timeZone);
-  const overdue = await RevisionSchedule.find({
-    userId,
-    status: 'active',
-    $expr: {
-      $and: [
-        { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, todayStart] },
-        { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] }
-      ]
-    }
-  })
-    .populate({
-      path: 'questionId',
-      select: '_id platformQuestionId title difficulty platform'
-    })
-    .sort({ 'schedule': 1 })
-    .limit(limit)
-    .lean();
-
-  return overdue.map(rev => ({
-    questionId: rev.questionId?._id || null,
-    platformQuestionId: rev.questionId?.platformQuestionId || null,
-    title: rev.questionId?.title || 'Unknown',
-    difficulty: rev.questionId?.difficulty || null,
-    platform: rev.questionId?.platform || null,
-    currentRevisionIndex: rev.currentRevisionIndex,
-    nextRevisionDue: rev.schedule[rev.currentRevisionIndex] || null,
-    totalTimeSpent: rev.completedRevisions.reduce((sum, cr) => sum + (cr.timeSpent || 0), 0),
-    confidenceLevel: rev.completedRevisions.length
-      ? rev.completedRevisions[rev.completedRevisions.length - 1].confidenceAfter
-      : null,
-    status: 'overdue'
-  }));
-};
-
-const fetchUpcomingRevisionsForStats = async (userId, timeZone, limit = 20) => {
-  const startDate = getStartOfDay(new Date(), timeZone);
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + 30);
-  endDate.setHours(23, 59, 59, 999);
-
-  const upcoming = await RevisionSchedule.aggregate([
+  const overdue = await RevisionSchedule.aggregate([
     { $match: { userId, status: 'active' } },
-    { $unwind: { path: '$schedule', includeArrayIndex: 'revisionIndex' } },
     {
-      $match: {
-        $expr: {
-          $and: [
-            { $gte: ['$schedule', startDate] },
-            { $lte: ['$schedule', endDate] },
-            { $eq: ['$revisionIndex', '$currentRevisionIndex'] }
-          ]
-        }
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
       }
     },
-    { $sort: { schedule: 1 } },
+    { $match: { pendingDue: { $lt: todayStart } } },
+    { $sort: { pendingDue: 1 } },
     { $limit: limit },
     {
       $lookup: {
@@ -640,15 +644,57 @@ const fetchUpcomingRevisionsForStats = async (userId, timeZone, limit = 20) => {
     { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
     {
       $project: {
-        _id: 0,
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
-        title: '$question.title',
+        title: { $ifNull: ['$question.title', 'Unknown'] },
+        difficulty: '$question.difficulty',
+        platform: '$question.platform',
+        currentRevisionIndex: 1,
+        nextRevisionDue: '$pendingDue',
+        totalTimeSpent: { $sum: '$completedRevisions.timeSpent' },
+        confidenceLevel: { $arrayElemAt: ['$completedRevisions.confidenceAfter', -1] },
+        status: { $literal: 'overdue' }
+      }
+    }
+  ]);
+  return overdue;
+};
+
+const fetchUpcomingRevisionsForStats = async (userId, timeZone, limit = 20) => {
+  const startDate = getStartOfDay(new Date(), timeZone);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 30);
+  endDate.setHours(23, 59, 59, 999);
+
+  const upcoming = await RevisionSchedule.aggregate([
+    { $match: { userId, status: 'active' } },
+    {
+      $addFields: {
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+      }
+    },
+    { $match: { pendingDue: { $gte: startDate, $lte: endDate } } },
+    { $sort: { pendingDue: 1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'questions',
+        localField: 'questionId',
+        foreignField: '_id',
+        as: 'question'
+      }
+    },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        questionId: '$question._id',
+        platformQuestionId: '$question.platformQuestionId',
+        title: { $ifNull: ['$question.title', 'Unknown'] },
         platform: '$question.platform',
         difficulty: '$question.difficulty',
-        scheduledDate: '$schedule',
-        revisionIndex: '$revisionIndex',
-        status: 'Upcoming'
+        scheduledDate: '$pendingDue',
+        revisionIndex: '$currentRevisionIndex',
+        status: { $literal: 'Upcoming' }
       }
     }
   ]);
@@ -658,7 +704,7 @@ const fetchUpcomingRevisionsForStats = async (userId, timeZone, limit = 20) => {
 const getRevisionStats = async (req, res, next) => {
   try {
     const detailed = req.query.detailed === 'true';
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     
     let stats;
     if (detailed) {
@@ -686,42 +732,63 @@ const getRevisionStats = async (req, res, next) => {
 const getOverdueRevisions = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPaginationParams(req);
-    const timeZone = req.userTimeZone; 
+    const timeZone = req.userTimeZone;
     const today = getStartOfDay(new Date(), timeZone);
     
-    const query = {
-      userId: req.user._id,
-      status: 'active',
-      $expr: {
-        $and: [
-          { $lt: ['$currentRevisionIndex', { $size: '$schedule' }] },
-          { $lt: [{ $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }, today] },
-        ],
+    const overdue = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: 'active' } },
+      {
+        $addFields: {
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        }
       },
-    };
-    
-    const [revisions, total] = await Promise.all([
-      RevisionSchedule.find(query)
-        .populate({
-          path: 'questionId',
-          select: 'title platform difficulty tags platformQuestionId', 
-        })
-        .sort({ schedule: 1 })
-        .skip(skip)
-        .limit(limit),
-      RevisionSchedule.countDocuments(query),
+      { $match: { pendingDue: { $lt: today } } },
+      { $sort: { pendingDue: 1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'questions',
+          localField: 'questionId',
+          foreignField: '_id',
+          as: 'question'
+        }
+      },
+      { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          questionId: '$question._id',
+          platformQuestionId: '$question.platformQuestionId',
+          title: { $ifNull: ['$question.title', 'Unknown'] },
+          platform: '$question.platform',
+          difficulty: '$question.difficulty',
+          tags: '$question.tags',
+          scheduledDate: '$pendingDue',
+          overdue: { $literal: true },
+          currentRevisionIndex: 1,
+          totalTimeSpent: { $sum: '$completedRevisions.timeSpent' },
+          confidenceAfter: { $arrayElemAt: ['$completedRevisions.confidenceAfter', -1] }
+        }
+      }
     ]);
     
-    const enhancedRevisions = revisions.map(rev => {
-      const revObj = rev.toObject();
-      revObj.currentStatus = revisionService.getRevisionStatusLabel(rev, null, 'actionable', timeZone);
-      return revObj;
-    });
+    const total = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: 'active' } },
+      {
+        $addFields: {
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        }
+      },
+      { $match: { pendingDue: { $lt: today } } },
+      { $count: 'count' }
+    ]);
+    const totalCount = total[0]?.count || 0;
     
     res.json(formatResponse('Overdue revisions retrieved', {
-      revisions: enhancedRevisions,
+      revisions: overdue,
     }, {
-      pagination: paginate(total, page, limit),
+      pagination: paginate(totalCount, page, limit),
     }));
   } catch (error) {
     next(error);
@@ -742,6 +809,7 @@ module.exports = {
   createRevision,
   completeRevision,
   completeQuestionRevision,
+  completePastRevision,
   recordTimeSpent,
   rescheduleRevision,
   deleteRevision,
