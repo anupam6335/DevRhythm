@@ -620,19 +620,20 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth(); // 0-indexed
-  const startOfMonth = getStartOfDay(new Date(year, month, 1), timeZone);
-  const endOfMonth = getEndOfDay(new Date(year, month + 1, 0), timeZone);
+
+  // Use UTC-based dates to avoid timezone rollover
+  const startOfMonth = getStartOfDay(new Date(Date.UTC(year, month, 1)), timeZone);
+  const endOfMonth = getEndOfDay(new Date(Date.UTC(year, month + 1, 0)), timeZone);
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
   const heatmap = await HeatmapData.findOne({ userId, year })
     .select('dailyData')
     .lean();
 
   if (!heatmap?.dailyData) {
-    // Return empty array with all dates of the month (zero activity)
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
     const result = [];
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = getStartOfDay(new Date(year, month, d), timeZone);
+      const date = getStartOfDay(new Date(Date.UTC(year, month, d)), timeZone);
       result.push({
         date: date.toISOString(),
         activityCount: 0,
@@ -648,12 +649,9 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
     return dayDate >= startOfMonth && dayDate <= endOfMonth;
   });
 
-  // Map to desired format, ensure all days present
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const resultMap = new Map();
   for (const day of monthData) {
     const dateStr = day.date.toISOString().split('T')[0];
-    // Recalculate intensity level based on activityCount (totalActivities)
     const activityCount = day.totalActivities || 0;
     const intensity = calculateIntensityLevel(activityCount);
     resultMap.set(dateStr, {
@@ -665,7 +663,7 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
 
   const result = [];
   for (let d = 1; d <= daysInMonth; d++) {
-    const date = getStartOfDay(new Date(year, month, d), timeZone);
+    const date = getStartOfDay(new Date(Date.UTC(year, month, d)), timeZone);
     const dateStr = date.toISOString().split('T')[0];
     if (resultMap.has(dateStr)) {
       result.push(resultMap.get(dateStr));
