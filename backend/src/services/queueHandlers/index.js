@@ -14,6 +14,8 @@ const { handleQuestionExtractTestCases } = require('./questionExtractTestCases.h
 const { handleUserTimezoneChange } = require('./userTimezoneChange.handler');
 const { handleTestCaseExecuted } = require('./testCaseExecuted.handler');
 const { handleTimeThresholdReached } = require('./timeThresholdReached.handler');
+const { handleConfidenceIncrement } = require('./confidenceIncrement.handler');
+const { handleRevisionAutoComplete } = require('./revisionAutoComplete.handler'); // ✅ added
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -67,6 +69,12 @@ const processJob = async (job) => {
       break;
     case 'time.threshold_reached':
       await handleTimeThresholdReached(job);
+      break;
+    case 'confidence.increment':
+      await handleConfidenceIncrement(job);
+      break;
+    case 'revision.auto_complete': // ✅ added case
+      await handleRevisionAutoComplete(job);
       break;
     default:
       console.error(`Unknown job type: ${type}`);

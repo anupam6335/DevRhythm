@@ -624,7 +624,7 @@ const getDailyProblemAndGoal = async (req, res, next) => {
             platformQuestionId: rawDaily.titleSlug,
             difficulty: rawDaily.difficulty,
             tags: rawDaily.tags || [],
-            pattern: [],
+            pattern: rawDaily.tags || [],
             solutionLinks: [],
             similarQuestions: [],
             contentRef: fullDetails.description || '',

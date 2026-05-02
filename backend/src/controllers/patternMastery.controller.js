@@ -53,10 +53,42 @@ const getPatternMastery = async (req, res, next) => {
     }
     
     if (!pattern) throw new AppError('Pattern mastery not found', 404);
+
+    if (pattern.recentQuestions && pattern.recentQuestions.length > 0) {
+      // Collect question IDs where platformQuestionId is missing
+      const missingIds = pattern.recentQuestions
+        .filter(rq => !rq.platformQuestionId && rq.questionId)
+        .map(rq => rq.questionId);
+      
+      if (missingIds.length > 0) {
+        // Fetch platformQuestionId for those questions
+        const questions = await Question.find(
+          { _id: { $in: missingIds } },
+          { _id: 1, platformQuestionId: 1 }
+        ).lean();
+        
+        // Build a map of questionId -> platformQuestionId
+        const platformIdMap = new Map(
+          questions.map(q => [q._id.toString(), q.platformQuestionId])
+        );
+        
+        // Fill missing platformQuestionId in recentQuestions
+        pattern.recentQuestions = pattern.recentQuestions.map(rq => {
+          if (!rq.platformQuestionId && rq.questionId) {
+            const qid = rq.questionId.toString();
+            if (platformIdMap.has(qid)) {
+              rq.platformQuestionId = platformIdMap.get(qid);
+            }
+          }
+          return rq;
+        });
+      }
+    }
     
     res.json(formatResponse('Pattern mastery retrieved', { pattern }));
   } catch (error) { next(error); }
 };
+
 
 const getPatternStats = async (req, res, next) => {
   try {

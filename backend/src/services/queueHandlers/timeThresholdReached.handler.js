@@ -1,3 +1,4 @@
+// src/services/queueHandlers/timeThresholdReached.handler.js
 const User = require('../../models/User');
 const heatmapService = require('../heatmap.service');
 const { updateUserActivity } = require('../user.service');
@@ -25,6 +26,14 @@ const handleTimeThresholdReached = async (job) => {
       date: activityDate,
       timeZone,
       increments,
+    });
+
+    // Queue confidence increment (fixed: two arguments)
+    const { jobQueue } = require('../queue.service');
+    await jobQueue.add('confidence.increment', {
+      userId,
+      questionId,
+      action: "time_threshold_reached",
     });
   } catch (error) {
     console.error('Error handling time.threshold_reached:', error);

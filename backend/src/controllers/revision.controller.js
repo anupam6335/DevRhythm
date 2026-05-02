@@ -355,6 +355,15 @@ const completeRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
+    // Fixed: two-argument form
+    if (jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId: revision.questionId,
+        action: 'revision_completed',
+      });
+    }
+
     res.json(formatResponse(result.message, {
       revisionCompleted: true,
       overdueCompleted: result.overdueCompleted || false,
@@ -383,6 +392,15 @@ const completeQuestionRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
+    // Fixed: two-argument form
+    if (jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId,
+        action: 'revision_completed',
+      });
+    }
+
     res.json(formatResponse(result.message, {
       revisionCompleted: true,
       overdueCompleted: result.overdueCompleted || false,
@@ -393,15 +411,14 @@ const completeQuestionRevision = async (req, res, next) => {
   }
 };
 
-/**
- * NEW: Complete a specific past revision by its scheduled date.
- * Requires activity condition (20 minutes or code passed today).
- * Does NOT advance currentRevisionIndex.
- */
 const completePastRevision = async (req, res, next) => {
   try {
     const { questionId } = req.params;
     const { date, confidence } = req.body;
+
+    if (confidence !== undefined) {
+      throw new AppError('Manual confidence update is not allowed. Confidence is automatically incremented.', 400);
+    }
 
     if (!date) {
       throw new AppError('Date is required', 400);
@@ -412,10 +429,6 @@ const completePastRevision = async (req, res, next) => {
       throw new AppError('Invalid date format. Use ISO string or YYYY-MM-DD', 400);
     }
 
-    if (confidence !== undefined && (confidence < 1 || confidence > 5)) {
-      throw new AppError('Confidence must be between 1 and 5', 400);
-    }
-
     const result = await revisionActivityService.completePastRevision(
       req.user._id,
       questionId,
@@ -424,8 +437,14 @@ const completePastRevision = async (req, res, next) => {
     );
 
     if (!result.completed) {
+      if (result.message && result.message.includes('session started')) {
+        return res.status(202).json(formatResponse(result.message, null));
+      }
       throw new AppError(result.message, 400);
     }
+
+    // Confidence increment is already queued inside the service, so no need here.
+    // Remove the duplicate call.
 
     res.json(formatResponse(result.message, { revision: result.revision }));
   } catch (error) {
@@ -449,9 +468,9 @@ const recordTimeSpent = async (req, res, next) => {
     const notifiedKey = `time_threshold_notified:${req.user._id}:${questionId}:${todayStr}`;
     const alreadyNotified = await redisClient.exists(notifiedKey);
     
+    // Fixed: two-argument form
     if (totalMinutesToday >= 20 && !alreadyNotified && jobQueue) {
-      await jobQueue.add({
-        type: 'time.threshold_reached',
+      await jobQueue.add('time.threshold_reached', {
         userId: req.user._id,
         questionId,
         minutesSpent: totalMinutesToday,
@@ -479,9 +498,9 @@ const recordTimeSpent = async (req, res, next) => {
     const isTimeThresholdReached = progress.totalTimeSpent >= 20;
     const isNotSolved = progress.status !== 'Solved' && progress.status !== 'Mastered';
 
-    if (isTimeThresholdReached && isNotSolved) {
-      await jobQueue.add({
-        type: 'question.solved',
+    // Fixed: two-argument form
+    if (isTimeThresholdReached && isNotSolved && jobQueue) {
+      await jobQueue.add('question.solved', {
         userId: req.user._id,
         questionId,
         progressId: progress._id,
@@ -624,13 +643,20 @@ const deleteQuestionRevision = async (req, res, next) => {
 const fetchOverdueRevisionsForStats = async (userId, timeZone, limit = 50) => {
   const todayStart = getStartOfDay(new Date(), timeZone);
   const overdue = await RevisionSchedule.aggregate([
-    { $match: { userId, status: 'active' } },
+    { $match: { userId, status: { $in: ['active', 'overdue'] } } },
     {
       $addFields: {
-        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+        // Check if the pending due date is already in completedRevisions
+        alreadyCompleted: {
+          $in: [
+            { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+            '$completedRevisions.date'
+          ]
+        }
       }
     },
-    { $match: { pendingDue: { $lt: todayStart } } },
+    { $match: { pendingDue: { $lt: todayStart }, alreadyCompleted: false } },
     { $sort: { pendingDue: 1 } },
     { $limit: limit },
     {
@@ -736,13 +762,20 @@ const getOverdueRevisions = async (req, res, next) => {
     const today = getStartOfDay(new Date(), timeZone);
     
     const overdue = await RevisionSchedule.aggregate([
-      { $match: { userId: req.user._id, status: 'active' } },
+      { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
       {
         $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+          // Check if the pending due date is already in completedRevisions
+          alreadyCompleted: {
+            $in: [
+              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+              '$completedRevisions.date'
+            ]
+          }
         }
       },
-      { $match: { pendingDue: { $lt: today } } },
+      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
       { $sort: { pendingDue: 1 } },
       { $skip: skip },
       { $limit: limit },
@@ -773,17 +806,23 @@ const getOverdueRevisions = async (req, res, next) => {
       }
     ]);
     
-    const total = await RevisionSchedule.aggregate([
-      { $match: { userId: req.user._id, status: 'active' } },
+    const totalResult = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
       {
         $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+          alreadyCompleted: {
+            $in: [
+              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+              '$completedRevisions.date'
+            ]
+          }
         }
       },
-      { $match: { pendingDue: { $lt: today } } },
+      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
       { $count: 'count' }
     ]);
-    const totalCount = total[0]?.count || 0;
+    const totalCount = totalResult[0]?.count || 0;
     
     res.json(formatResponse('Overdue revisions retrieved', {
       revisions: overdue,

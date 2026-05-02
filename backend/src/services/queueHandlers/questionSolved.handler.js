@@ -1,3 +1,4 @@
+// src/services/queueHandlers/questionSolved.handler.js
 const User = require("../../models/User");
 const Question = require("../../models/Question");
 const PatternMastery = require("../../models/PatternMastery");
@@ -174,8 +175,7 @@ const handleQuestionSolved = async (job) => {
             title: question.title,
           };
           const { jobQueue } = require("../queue.service");
-          await jobQueue.add({
-            type: "goal.completed",
+          await jobQueue.add('goal.completed', {
             userId,
             goalId: goal._id,
             completedAt: goal.achievedAt || new Date(),
@@ -259,14 +259,14 @@ const handleQuestionSolved = async (job) => {
         await dailyGoal.save();
         if (dailyGoal.completedCount >= dailyGoal.targetCount) {
           const { jobQueue } = require("../queue.service");
-          await jobQueue.add({
-            type: "goal.completed",
+          await jobQueue.add('goal.completed', {
             userId,
             goalId: dailyGoal._id,
             completedAt: new Date(),
             goalType: dailyGoal.goalType,
             targetCount: dailyGoal.targetCount,
             completedCount: dailyGoal.completedCount,
+            triggerQuestionId: questionId,
           });
         }
       }
@@ -345,8 +345,16 @@ const handleQuestionSolved = async (job) => {
       }
     }
 
+    // Queue confidence increment (fixed: two arguments)
+    const { jobQueue } = require("../queue.service");
+    await jobQueue.add('confidence.increment', {
+      userId,
+      questionId,
+      action: "question_solved",
+    });
+
     await invalidateCache(`notifications:*:user:${userId}:*`);
-    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache
+    await invalidateDashboardCache(userId);
   } catch (error) {
     console.error(`[question.solved] Error processing for user ${userId}:`, error);
     throw error;

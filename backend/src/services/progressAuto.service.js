@@ -1,69 +1,55 @@
 /**
- * Automatically recalculate confidence level and advance status
- * based on engagement metrics.
+ * Automatically update question progress status based on engagement metrics.
+ * Handles:
+ * - Not Started → Attempted (when attempts.count > 0)
+ * - Attempted → Solved (when attempts.solvedAt is set)
+ * - Solved → Mastered (when revisionCount ≥ 3, totalTimeSpent ≥ 30 minutes,
+ *   and the "raw" confidence score (calculated only for mastery detection)
+ *   would be at least 4 – but we do not store the confidence score here,
+ *   we only set status to Mastered).
  *
- * Confidence level 5 is only assigned when the problem is truly mastered:
- * - status is Solved (or already Mastered)
- * - revisionCount ≥ 3
- * - totalTimeSpent ≥ 30 minutes
- * - and the calculated confidence score would be at least 4
+ * Confidence is NOT updated here; it is managed separately via background jobs
+ * that increment confidence by +0.25 per qualifying action (solving, revision,
+ * time threshold, goal completion).
  *
- * If those conditions are not met, confidence is capped at 4.
+ * @param {Object} progress - Mongoose document of UserQuestionProgress
+ * @returns {boolean} - Whether any change was made to the document
  */
-const recalculateProgress = (progress) => {
+const updateProgressStatus = (progress) => {
   const { status, attempts, revisionCount, totalTimeSpent } = progress;
   let changed = false;
 
-  // ----- Compute raw confidence score -----
-  const successfulAttempts = (status === 'Solved' || status === 'Mastered' ? 1 : 0) + revisionCount;
-  const successRate = attempts.count > 0 ? successfulAttempts / attempts.count : 0;
+  // ----- Helper: compute raw confidence score for mastery detection only -----
+  const computeRawConfidence = () => {
+    const successfulAttempts = (status === 'Solved' || status === 'Mastered' ? 1 : 0) + revisionCount;
+    const successRate = attempts.count > 0 ? successfulAttempts / attempts.count : 0;
 
-  let score = 1.0; // base level
+    let score = 1.0; // base level
 
-  // Solved gives a boost
-  if (status === 'Solved' || status === 'Mastered') score += 1.5;
+    if (status === 'Solved' || status === 'Mastered') score += 1.5;
+    score += Math.min(revisionCount, 5) * 0.4;
+    if (successRate >= 0.8) score += 0.5;
+    if (successRate >= 0.9) score += 0.5;
+    score += Math.min(totalTimeSpent / 60, 2) * 0.5;
 
-  // Revisions: each adds 0.4, capped at 5
-  score += Math.min(revisionCount, 5) * 0.4;
+    return Math.min(5, Math.max(1, Math.round(score)));
+  };
 
-  // High success rate bonuses
-  if (successRate >= 0.8) score += 0.5;
-  if (successRate >= 0.9) score += 0.5;
+  // ----- Mastered condition detection -----
+  const rawConfidence = computeRawConfidence();
+  const meetsMasteredConditions =
+    status === 'Solved' &&
+    revisionCount >= 3 &&
+    totalTimeSpent >= 30 &&
+    rawConfidence >= 4;
 
-  // Time invested bonus: up to +1 for 2+ hours (120 minutes)
-  score += Math.min(totalTimeSpent / 60, 2) * 0.5;
-
-  // Raw rounded confidence (1‑5)
-  let rawConfidence = Math.min(5, Math.max(1, Math.round(score)));
-
-  // ----- Determine if mastered conditions are met -----
-  const meetsMasteredConditions = 
-    status === 'Solved' && 
-    revisionCount >= 3 && 
-    totalTimeSpent >= 30 && 
-    rawConfidence >= 4;   // we also require a sufficiently high raw score
-
-  // ----- Apply mastered logic and confidence capping -----
-  let newConfidence;
-  if (meetsMasteredConditions) {
-    // Mastered: set status to Mastered (if not already) and confidence to 5
-    if (status !== 'Mastered') {
-      progress.status = 'Mastered';
-      progress.attempts.masteredAt = new Date();
-      changed = true;
-    }
-    newConfidence = 5;
-  } else {
-    // Not mastered: confidence cannot be 5
-    newConfidence = rawConfidence === 5 ? 4 : rawConfidence;
-  }
-
-  if (newConfidence !== progress.confidenceLevel) {
-    progress.confidenceLevel = newConfidence;
+  if (meetsMasteredConditions && status !== 'Mastered') {
+    progress.status = 'Mastered';
+    progress.attempts.masteredAt = new Date();
     changed = true;
   }
 
-  // ----- Other status progressions (only if not already Mastered) -----
+  // ----- Other status progressions (only if not Mastered) -----
   if (progress.status !== 'Mastered') {
     // Not Started → Attempted after first attempt
     if (progress.status === 'Not Started' && attempts.count > 0) {
@@ -82,4 +68,4 @@ const recalculateProgress = (progress) => {
   return changed;
 };
 
-module.exports = { recalculateProgress };
+module.exports = { updateProgressStatus };
