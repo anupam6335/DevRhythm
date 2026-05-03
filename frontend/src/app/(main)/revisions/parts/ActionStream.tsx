@@ -14,9 +14,10 @@ import {
   FiBarChart2,
   FiRefreshCw,
 } from 'react-icons/fi';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, startOfDay } from 'date-fns';
 import { useUpcomingRevisionsList } from '@/features/revision/hooks/useUpcomingRevisionsList';
 import { revisionService } from '@/features/revision/services/revisionService';
+import { useCompletePastRevision } from '@/features/revision/hooks/useCompletePastRevision';
 import Button from '@/shared/components/Button';
 import Pagination from '@/shared/components/Pagination';
 import SkeletonLoader from '@/shared/components/SkeletonLoader';
@@ -24,27 +25,28 @@ import NoRecordFound from '@/shared/components/NoRecordFound';
 import Tooltip from '@/shared/components/Tooltip';
 import PlatformIcon from '@/shared/components/PlatformIcon';
 import { formatDateForDisplay } from '@/shared/lib/dateUtils';
+import { toast } from '@/shared/components/Toast';
 import styles from './ActionStream.module.css';
 
 const ITEMS_PER_PAGE = 5;
 
-const safeParseDate = (dateStr: string | undefined | null): Date | null => {
+function safeParseDate(dateStr: string | undefined | null): Date | null {
   if (!dateStr) return null;
   const date = new Date(dateStr);
   return isNaN(date.getTime()) ? null : date;
-};
+}
 
-const formatDueDate = (dateStr: string) => {
+function formatDueDate(dateStr: string) {
   const date = safeParseDate(dateStr);
-  if (!date) return 'Invalid date';
+  if (!date) return 'Unknown date';
   const daysDiff = differenceInDays(date, new Date());
   if (daysDiff === 0) return 'Today';
   if (daysDiff === 1) return 'Tomorrow';
   if (daysDiff > 0) return `Due in ${daysDiff} days`;
   return `Overdue by ${Math.abs(daysDiff)} days`;
-};
+}
 
-const formatOverdueDate = (dateStr: string | undefined) => {
+function formatOverdueDate(dateStr: string | undefined) {
   const date = safeParseDate(dateStr);
   if (!date) return 'Unknown date';
   const daysDiff = differenceInDays(new Date(), date);
@@ -53,24 +55,7 @@ const formatOverdueDate = (dateStr: string | undefined) => {
   if (daysDiff < 30) return `Overdue by ${daysDiff} days`;
   if (daysDiff < 365) return `Overdue by ${Math.floor(daysDiff / 30)} months`;
   return `Overdue by ${Math.floor(daysDiff / 365)} years`;
-};
-
-const formatShortRelativeTime = (date: Date): string => {
-  const now = new Date();
-  const diffInSeconds = (now.getTime() - date.getTime()) / 1000;
-  const diffInMinutes = diffInSeconds / 60;
-  const diffInHours = diffInMinutes / 60;
-  const diffInDays = diffInHours / 24;
-  const diffInMonths = diffInDays / 30;
-  const diffInYears = diffInDays / 365;
-  if (diffInSeconds < 60) return 'now';
-  if (diffInMinutes < 60) return `${Math.floor(diffInMinutes)}m`;
-  if (diffInHours < 24) return `${Math.floor(diffInHours)}h`;
-  if (diffInDays < 7) return `${Math.floor(diffInDays)}d`;
-  if (diffInDays < 30) return `${Math.floor(diffInDays / 7)}w`;
-  if (diffInMonths < 12) return `${Math.floor(diffInMonths)}mo`;
-  return `${Math.floor(diffInYears)}y`;
-};
+}
 
 const confidenceGlow = (level: number): React.CSSProperties => {
   const spread = level * 4;
@@ -86,6 +71,17 @@ const confidenceGlow = (level: number): React.CSSProperties => {
 type SortOption = 'date-asc' | 'date-desc' | 'difficulty' | 'title';
 type DifficultyFilter = 'all' | 'Easy' | 'Medium' | 'Hard';
 
+function getOverdueDates(schedule: string[], completedRevisions: any[]): string[] {
+  const today = startOfDay(new Date());
+  const completedDates = new Set(
+    completedRevisions.map(cr => startOfDay(new Date(cr.date)).toISOString())
+  );
+  return schedule.filter(dateStr => {
+    const date = startOfDay(new Date(dateStr));
+    return date < today && !completedDates.has(date.toISOString());
+  });
+}
+
 export default function ActionStream() {
   const router = useRouter();
   const [upcomingPage, setUpcomingPage] = useState(1);
@@ -98,6 +94,13 @@ export default function ActionStream() {
   const [overdueSearch, setOverdueSearch] = useState('');
   const [overdueDifficulty, setOverdueDifficulty] = useState<DifficultyFilter>('all');
   const [overdueSort, setOverdueSort] = useState<SortOption>('date-asc');
+
+  const [openPanelForId, setOpenPanelForId] = useState<string | null>(null);
+  const [overdueDatesMap, setOverdueDatesMap] = useState<Record<string, string[]>>({});
+  const [fetchingDatesForId, setFetchingDatesForId] = useState<string | null>(null);
+  const [pendingDateForItem, setPendingDateForItem] = useState<{ itemId: string; date: string } | null>(null);
+
+  const completePastRevisionMutation = useCompletePastRevision();
 
   useEffect(() => {
     setUpcomingPage(1);
@@ -147,16 +150,20 @@ export default function ActionStream() {
     fetchAllOverdue();
   }, [fetchAllOverdue]);
 
+  const refetchOverdue = useCallback(() => {
+    fetchAllOverdue();
+  }, [fetchAllOverdue]);
+
   const allUpcomingItems = useMemo(() => {
     if (!upcomingData?.upcomingRevisions) return [];
     return upcomingData.upcomingRevisions.flatMap((group) =>
       group.questions.map((q) => ({
         id: q._id,
-        questionId: q.questionId._id,
-        platformQuestionId: q.questionId.platformQuestionId,
-        title: q.questionId.title,
-        difficulty: q.questionId.difficulty as 'Easy' | 'Medium' | 'Hard',
-        platform: q.questionId.platform,
+        questionId: q.questionId?._id,
+        platformQuestionId: q.questionId?.platformQuestionId,
+        title: q.questionId?.title ?? 'Unknown',
+        difficulty: (q.questionId?.difficulty as 'Easy' | 'Medium' | 'Hard') ?? 'Medium',
+        platform: q.questionId?.platform ?? 'Unknown',
         scheduledDate: group.date,
         revisionIndex: q.revisionIndex,
         totalTimeSpent: 0,
@@ -178,14 +185,24 @@ export default function ActionStream() {
     }
     switch (upcomingSort) {
       case 'date-asc':
-        items.sort(
-          (a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
-        );
+        items.sort((a, b) => {
+          const dateA = safeParseDate(a.scheduledDate);
+          const dateB = safeParseDate(b.scheduledDate);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateA.getTime() - dateB.getTime();
+        });
         break;
       case 'date-desc':
-        items.sort(
-          (a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime()
-        );
+        items.sort((a, b) => {
+          const dateA = safeParseDate(a.scheduledDate);
+          const dateB = safeParseDate(b.scheduledDate);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateB.getTime() - dateA.getTime();
+        });
         break;
       case 'difficulty':
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
@@ -218,18 +235,19 @@ export default function ActionStream() {
       const lastCompleted = item.completedRevisions?.slice(-1)[0];
       const confidenceLevel = lastCompleted?.confidenceAfter || 3;
       const totalTimeSpent =
-        item.completedRevisions?.reduce((sum: number, cr: any) => sum + (cr.timeSpent || 0), 0) ||
-        0;
+        item.completedRevisions?.reduce((sum: number, cr: any) => sum + (cr.timeSpent || 0), 0) || 0;
       const attemptsCount = item.completedRevisions?.length || 0;
       const revisionCount = item.currentRevisionIndex || 0;
+      const scheduledDateRaw = item.scheduledDate;
+      const scheduledDate = safeParseDate(scheduledDateRaw) ? scheduledDateRaw : null;
       return {
         _id: item._id,
-        questionId: item.questionId!._id,
-        platformQuestionId: item.questionId!.platformQuestionId,
-        title: item.questionId!.title,
-        difficulty: item.questionId!.difficulty as 'Easy' | 'Medium' | 'Hard',
-        platform: item.questionId!.platform,
-        scheduledDate: item.schedule?.[item.currentRevisionIndex],
+        questionId: item.questionId,
+        platformQuestionId: item.platformQuestionId,
+        title: item.title ?? 'Unknown',
+        difficulty: (item.difficulty as 'Easy' | 'Medium' | 'Hard') ?? 'Medium',
+        platform: item.platform ?? 'Unknown',
+        scheduledDate,
         totalTimeSpent,
         attemptsCount,
         revisionCount,
@@ -249,14 +267,24 @@ export default function ActionStream() {
     }
     switch (overdueSort) {
       case 'date-asc':
-        items.sort(
-          (a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
-        );
+        items.sort((a, b) => {
+          const dateA = safeParseDate(a.scheduledDate);
+          const dateB = safeParseDate(b.scheduledDate);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateA.getTime() - dateB.getTime();
+        });
         break;
       case 'date-desc':
-        items.sort(
-          (a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime()
-        );
+        items.sort((a, b) => {
+          const dateA = safeParseDate(a.scheduledDate);
+          const dateB = safeParseDate(b.scheduledDate);
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return dateB.getTime() - dateA.getTime();
+        });
         break;
       case 'difficulty':
         const diffOrder = { Easy: 1, Medium: 2, Hard: 3 };
@@ -288,8 +316,50 @@ export default function ActionStream() {
     router.push(`/questions/${platformQuestionId}`);
   };
 
-  const handleRescue = (platformQuestionId: string) => {
+  const startSessionAndRedirect = async (questionId: string, date: string, platformQuestionId: string) => {
+    await completePastRevisionMutation.mutateAsync({ questionId, date });
     router.push(`/questions/${platformQuestionId}`);
+  };
+
+  const handleCompleteDate = async (item: any, date: string) => {
+    setPendingDateForItem({ itemId: item._id, date });
+    try {
+      await startSessionAndRedirect(item.questionId, date, item.platformQuestionId);
+    } catch (err) {
+      // error already toasted by mutation, just re-enable buttons
+    } finally {
+      setPendingDateForItem(null);
+    }
+  };
+
+  const handleRescue = async (item: any) => {
+    const { _id, questionId, platformQuestionId } = item;
+    setFetchingDatesForId(_id);
+    try {
+      const revision = await revisionService.getQuestionRevision(questionId);
+      const overdueDates = getOverdueDates(revision.schedule, revision.completedRevisions);
+      if (overdueDates.length === 1) {
+        await handleCompleteDate(item, overdueDates[0]);
+      } else if (overdueDates.length > 1) {
+        setOverdueDatesMap((prev) => ({ ...prev, [_id]: overdueDates }));
+        setOpenPanelForId(_id);
+      } else {
+        toast.error('No overdue dates found for this question.');
+      }
+    } catch (error) {
+      toast.error('Could not load revision schedule.');
+    } finally {
+      setFetchingDatesForId(null);
+    }
+  };
+
+  const closePanel = (itemId: string) => {
+    setOpenPanelForId(null);
+    setOverdueDatesMap((prev) => {
+      const newMap = { ...prev };
+      delete newMap[itemId];
+      return newMap;
+    });
   };
 
   const isLoading = upcomingLoading || overdueLoading;
@@ -329,6 +399,136 @@ export default function ActionStream() {
       </div>
     );
   }
+
+  const renderTimelineItem = (item: any, type: 'upcoming' | 'overdue') => {
+    const scheduledDate = safeParseDate(item.scheduledDate);
+    const isDueToday = type === 'upcoming' && scheduledDate && differenceInDays(scheduledDate, new Date()) === 0;
+    const difficultyClass = item.difficulty ? styles[`difficulty${item.difficulty}`] : '';
+    const isPanelOpen = type === 'overdue' && openPanelForId === item._id;
+    const isFetchingDates = type === 'overdue' && fetchingDatesForId === item._id;
+    const isAnyPending = !!pendingDateForItem;
+
+    return (
+      <div key={item.id || item._id} className={styles.timelineItem}>
+        <div className={styles.node} style={confidenceGlow(item.confidenceLevel || 3)} />
+        <div className={styles.date}>
+          {scheduledDate ? formatDateForDisplay(scheduledDate) : 'Unknown date'}
+        </div>
+        <div className={styles.titleLine}>
+          <span className={styles.connector}>╰─</span>
+          <Link href={`/questions/${item.platformQuestionId}`} className={styles.titleLink}>
+            {item.title}
+          </Link>
+          {type === 'upcoming' && <span className={styles.status}>Upcoming</span>}
+        </div>
+        <div className={styles.meta}>
+          {item.difficulty && (
+            <span className={`${styles.difficulty} ${difficultyClass}`}>
+              {item.difficulty}
+            </span>
+          )}
+          {item.platform && <PlatformIcon platform={item.platform} size="sm" />}
+          {item.platform && <span className={styles.platform}>{item.platform}</span>}
+          <span className={type === 'upcoming' ? styles.dueDate : styles.overdueDate}>
+            {type === 'upcoming' ? (
+              <>
+                <FiClock size={12} /> {formatDueDate(item.scheduledDate)}
+              </>
+            ) : (
+              <>
+                <FiAlertCircle size={12} /> {formatOverdueDate(item.scheduledDate)}
+              </>
+            )}
+          </span>
+        </div>
+        <div className={styles.metricsRow}>
+          <Tooltip content={`Total time spent: ${item.totalTimeSpent} minutes`}>
+            <span className={styles.metric}>
+              <FiClock className={styles.metricIcon} />{' '}
+              {item.totalTimeSpent < 60
+                ? `${item.totalTimeSpent}m`
+                : `${Math.round(item.totalTimeSpent / 60)}h`}
+            </span>
+          </Tooltip>
+          <Tooltip content={`Attempts: ${item.attemptsCount}`}>
+            <span className={styles.metric}>
+              <span className={styles.metricIcon}>👣</span> {item.attemptsCount} att
+            </span>
+          </Tooltip>
+          <Tooltip content={`Revisions: ${item.revisionCount}`}>
+            <span className={styles.metric}>
+              <FiRefreshCw className={styles.metricIcon} /> {item.revisionCount} rev
+            </span>
+          </Tooltip>
+        </div>
+
+        {type === 'overdue' && (
+          <>
+            {isPanelOpen && overdueDatesMap[item._id] && (
+              <div className={styles.dateSelectionPanel}>
+                <div className={styles.panelHeader}>
+                  <span>Choose overdue date to complete:</span>
+                  <button
+                    className={styles.closePanelButton}
+                    onClick={() => closePanel(item._id)}
+                    aria-label="Close"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+                <div className={styles.dateGrid}>
+                  {overdueDatesMap[item._id].map((date) => {
+                    const isPendingForThisDate = pendingDateForItem?.itemId === item._id && pendingDateForItem?.date === date;
+                    const dateDisabled = isAnyPending && pendingDateForItem?.itemId !== item._id;
+                    return (
+                      <button
+                        key={date}
+                        className={styles.dateButton}
+                        onClick={() => handleCompleteDate(item, date)}
+                        disabled={dateDisabled}
+                      >
+                        {formatDateForDisplay(new Date(date))}
+                        {isPendingForThisDate && <span className={styles.spinner} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className={styles.itemActions}>
+              <span className={styles.actionStatus}>Overdue</span>
+              <button
+                className={`${styles.actionButton} ${styles.rescueButton}`}
+                onClick={() => handleRescue(item)}
+                disabled={isFetchingDates}
+              >
+                {isFetchingDates ? (
+                  <span className={styles.spinnerSmall} />
+                ) : (
+                  <FiCheck />
+                )}{' '}
+                Review Now
+              </button>
+            </div>
+          </>
+        )}
+
+        {type === 'upcoming' && (
+          <div className={styles.itemActions}>
+            {isDueToday && (
+              <button
+                className={styles.practiceButton}
+                onClick={() => handlePractice(item.platformQuestionId)}
+              >
+                Practice
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={styles.container}>
@@ -396,7 +596,7 @@ export default function ActionStream() {
             <div className={styles.statPill}>
               <FiClock className={styles.statPillIcon} />
               <span className={styles.statPillValue}>
-                {paginatedUpcoming.length > 0
+                {paginatedUpcoming.length > 0 && paginatedUpcoming[0].scheduledDate
                   ? formatDueDate(paginatedUpcoming[0].scheduledDate)
                   : '-'}
               </span>
@@ -412,74 +612,7 @@ export default function ActionStream() {
             ) : (
               <>
                 <div className={styles.timeline}>
-                  {paginatedUpcoming.map((item) => {
-                    const isDueToday =
-                      safeParseDate(item.scheduledDate) &&
-                      differenceInDays(new Date(item.scheduledDate), new Date()) === 0;
-                    return (
-                      <div key={item.id} className={styles.timelineItem}>
-                        <div
-                          className={styles.node}
-                          style={confidenceGlow(item.confidenceLevel || 3)}
-                        />
-                        <div className={styles.date}>
-                          {formatDateForDisplay(new Date(item.scheduledDate))}
-                        </div>
-                        <div className={styles.titleLine}>
-                          <span className={styles.connector}>╰─</span>
-                          <Link
-                            href={`/questions/${item.platformQuestionId}`}
-                            className={styles.titleLink}
-                          >
-                            {item.title}
-                          </Link>
-                          <span className={styles.status}>Upcoming</span>
-                        </div>
-                        <div className={styles.meta}>
-                          <span
-                            className={`${styles.difficulty} ${styles[`difficulty${item.difficulty}`]}`}
-                          >
-                            {item.difficulty}
-                          </span>
-                          <PlatformIcon platform={item.platform} size="sm" />
-                          <span className={styles.platform}>{item.platform}</span>
-                          <span className={styles.dueDate}>
-                            <FiClock size={12} /> {formatDueDate(item.scheduledDate)}
-                          </span>
-                        </div>
-                        <div className={styles.metricsRow}>
-                          <Tooltip content={`Total time spent: ${item.totalTimeSpent} minutes`}>
-                            <span className={styles.metric}>
-                              <FiClock className={styles.metricIcon} />{' '}
-                              {item.totalTimeSpent < 60
-                                ? `${item.totalTimeSpent}m`
-                                : `${Math.round(item.totalTimeSpent / 60)}h`}
-                            </span>
-                          </Tooltip>
-                          <Tooltip content={`Attempts: ${item.attemptsCount}`}>
-                            <span className={styles.metric}>
-                              <span className={styles.metricIcon}>👣</span> {item.attemptsCount} att
-                            </span>
-                          </Tooltip>
-                          <Tooltip content={`Revisions: ${item.revisionCount}`}>
-                            <span className={styles.metric}>
-                              <FiRefreshCw className={styles.metricIcon} /> {item.revisionCount} rev
-                            </span>
-                          </Tooltip>
-                        </div>
-                        {isDueToday && (
-                          <div className={styles.itemActions}>
-                            <button
-                              className={styles.practiceButton}
-                              onClick={() => handlePractice(item.platformQuestionId)}
-                            >
-                              Practice
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {paginatedUpcoming.map((item) => renderTimelineItem(item, 'upcoming'))}
                 </div>
                 {upcomingTotalPages > 1 && (
                   <div className={styles.paginationWrapper}>
@@ -560,7 +693,7 @@ export default function ActionStream() {
             <div className={styles.statPill}>
               <FiClock className={styles.statPillIcon} />
               <span className={styles.statPillValue}>
-                {paginatedOverdue.length > 0
+                {paginatedOverdue.length > 0 && paginatedOverdue[0].scheduledDate
                   ? formatOverdueDate(paginatedOverdue[0].scheduledDate)
                   : '-'}
               </span>
@@ -576,67 +709,7 @@ export default function ActionStream() {
             ) : (
               <>
                 <div className={styles.timeline}>
-                  {paginatedOverdue.map((item) => (
-                    <div key={item._id} className={styles.timelineItem}>
-                      <div
-                        className={styles.node}
-                        style={confidenceGlow(item.confidenceLevel || 3)}
-                      />
-                      <div className={styles.date}>
-                        {formatDateForDisplay(new Date(item.scheduledDate))}
-                      </div>
-                      <div className={styles.titleLine}>
-                        <span className={styles.connector}>╰─</span>
-                        <Link
-                          href={`/questions/${item.platformQuestionId}`}
-                          className={styles.titleLink}
-                        >
-                          {item.title}
-                        </Link>
-                      </div>
-                      <div className={styles.meta}>
-                        <span
-                          className={`${styles.difficulty} ${styles[`difficulty${item.difficulty}`]}`}
-                        >
-                          {item.difficulty}
-                        </span>
-                        <PlatformIcon platform={item.platform} size="sm" />
-                        <span className={styles.platform}>{item.platform}</span>
-                        <span className={styles.overdueDate}>
-                          <FiAlertCircle size={12} /> {formatOverdueDate(item.scheduledDate)}
-                        </span>
-                      </div>
-                      <div className={styles.metricsRow}>
-                        <Tooltip content={`Total time spent: ${item.totalTimeSpent} minutes`}>
-                          <span className={styles.metric}>
-                            <FiClock className={styles.metricIcon} />{' '}
-                            {item.totalTimeSpent < 60
-                              ? `${item.totalTimeSpent}m`
-                              : `${Math.round(item.totalTimeSpent / 60)}h`}
-                          </span>
-                        </Tooltip>
-                        <Tooltip content={`Attempts: ${item.attemptsCount}`}>
-                          <span className={styles.metric}>
-                            <span className={styles.metricIcon}>👣</span> {item.attemptsCount} att
-                          </span>
-                        </Tooltip>
-                        <Tooltip content={`Revisions: ${item.revisionCount}`}>
-                          <span className={styles.metric}>
-                            <FiRefreshCw className={styles.metricIcon} /> {item.revisionCount} rev
-                          </span>
-                        </Tooltip>
-                      </div>
-                      <div className={styles.itemActions}>
-                        <span className={styles.actionStatus}>Overdue</span>
-                        <button
-                          className={`${styles.actionButton} ${styles.rescueButton}`}
-                          onClick={() => handleRescue(item.platformQuestionId)}
-                        >
-                          <FiCheck /> Review Now
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  {paginatedOverdue.map((item) => renderTimelineItem(item, 'overdue'))}
                 </div>
                 {overdueTotalPages > 1 && (
                   <div className={styles.paginationWrapper}>

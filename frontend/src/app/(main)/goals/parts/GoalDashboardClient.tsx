@@ -6,7 +6,7 @@ import LazySection from '@/shared/components/LazySection';
 import HeroStats from './HeroStats';
 import CurrentMomentum from './CurrentMomentum';
 import DailyProblemCard from './DailyProblemCard';
-import GoalCreationReminder from './GoalCreationReminder'; // <-- new import
+import GoalCreationReminder from './GoalCreationReminder';
 import { TrendsChartsSkeleton } from './TrendsChartsSkeleton';
 import { PlannedGoalsListSkeleton } from './PlannedGoalsListSkeleton';
 import { HistoryListSkeleton } from './HistoryListSkeleton';
@@ -17,7 +17,7 @@ export default function GoalDashboardClient() {
   const { dailyProblem: initialDaily, goalStats: initialStats, currentGoals: initialCurrent } = useGoalData();
 
   const { data: statsData, isLoading: statsLoading, error: statsError } = useGoalStats(initialStats);
-  const { daily, weekly, isLoading: currentLoading, error: currentError } = useCurrentGoalProgress(initialCurrent);
+  const { daily, weekly, isLoading: currentLoading, error: currentError } = useCurrentGoalProgress({ initialData: initialCurrent });
 
   const isLoading = statsLoading || currentLoading;
 

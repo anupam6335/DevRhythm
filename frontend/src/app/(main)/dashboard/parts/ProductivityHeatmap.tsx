@@ -133,19 +133,23 @@ export default function ProductivityHeatmap({ data, isLoading }: ProductivityHea
       </div>
       <div className={styles.monthLabel}>{monthName}</div>
       <div className={styles.heatmapGrid}>
-        {rows.map((row, rowIdx) => (
-          <div key={rowIdx} className={styles.row}>
-            {row.map(day => {
-              const dayData = activityMap.get(day);
-              const count = dayData?.count ?? 0;
-              const intensity = (dayData?.intensity ?? 0) as 0 | 1 | 2 | 3 | 4;
-              const dateStr = dayData?.date || '';
-              return (
-                <HeatmapCell key={day} day={day} count={count} intensity={intensity} dateStr={dateStr} />
-              );
-            })}
-          </div>
-        ))}
+        {rows.map((row, rowIdx) => {
+          const columnsCount = row.length;
+          const rowClass = columnsCount === 11 ? styles['row--11cols'] : styles['row--10cols'];
+          return (
+            <div key={rowIdx} className={`${styles.row} ${rowClass}`}>
+              {row.map(day => {
+                const dayData = activityMap.get(day);
+                const count = dayData?.count ?? 0;
+                const intensity = (dayData?.intensity ?? 0) as 0 | 1 | 2 | 3 | 4;
+                const dateStr = dayData?.date || '';
+                return (
+                  <HeatmapCell key={day} day={day} count={count} intensity={intensity} dateStr={dateStr} />
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

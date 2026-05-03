@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { recalculateProgress } = require('../services/progressAuto.service');
+const { updateProgressStatus } = require('../services/progressAuto.service');
 
 const UserQuestionProgressSchema = new mongoose.Schema({
   userId: {
@@ -55,9 +55,9 @@ const UserQuestionProgressSchema = new mongoose.Schema({
   },
   confidenceLevel: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 5,
-    default: 1,
+    default: 0,
   },
   customTestCases: [{
     stdin: { type: String, required: true },
@@ -89,39 +89,41 @@ UserQuestionProgressSchema.index({ userId: 1, "attempts.count": 1 });
 UserQuestionProgressSchema.index({ userId: 1, personalDifficulty: 1 });
 UserQuestionProgressSchema.index({ userId: 1, lastActivityDate: 1 });
 
-// Auto‑recalculation hooks (unchanged)
+// ========== AUTO STATUS PROGRESSION HOOKS ==========
+// These hooks update status (Not Started → Attempted → Solved → Mastered)
+// but do NOT modify confidenceLevel. Confidence is managed separately
+// via background jobs (confidence.increment).
 UserQuestionProgressSchema.post('save', async function(doc) {
-  if (doc.__recursing) return;
-  doc.__recursing = true;
+  if (doc.__statusUpdating) return;
+  doc.__statusUpdating = true;
   try {
-    const changed = recalculateProgress(doc);
+    const changed = updateProgressStatus(doc);
     if (changed) {
       await doc.save();
     }
   } catch (error) {
-    console.error('Progress auto‑recalc error (save):', error);
+    console.error('Auto status update error (save):', error);
   } finally {
-    delete doc.__recursing;
+    delete doc.__statusUpdating;
   }
 });
 
 UserQuestionProgressSchema.post('findOneAndUpdate', async function(doc) {
-  if (!doc) return;
-  if (doc.__recursing) return;
-  doc.__recursing = true;
+  if (!doc || doc.__statusUpdating) return;
+  doc.__statusUpdating = true;
   try {
-    const changed = recalculateProgress(doc);
+    const changed = updateProgressStatus(doc);
     if (changed) {
       await doc.save();
     }
   } catch (error) {
-    console.error('Progress auto‑recalc error (update):', error);
+    console.error('Auto status update error (update):', error);
   } finally {
-    delete doc.__recursing;
+    delete doc.__statusUpdating;
   }
 });
 
-// Pattern‑mastery hooks (unchanged)
+// ========== PATTERN MASTERY HOOKS (unchanged) ==========
 UserQuestionProgressSchema.post('save', async function(doc) {
   try {
     const patternMasteryService = require('../services/patternMastery.service');

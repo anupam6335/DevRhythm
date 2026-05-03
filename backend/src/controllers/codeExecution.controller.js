@@ -8,6 +8,7 @@ const RevisionSchedule = require("../models/RevisionSchedule");
 const { invalidateCache, invalidateProgressCache } = require('../middleware/cache');
 const revisionActivityService = require("../services/revisionActivity.service");
 const { jobQueue } = require('../services/queue.service');
+const { markTestPassedForQuestion, cancelAllAutoCompletionsForQuestion } = require('../services/revisionActivity.service');
 
 const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript"];
 const normalize = (str) => (str || "").replace(/\s/g, "");
@@ -3353,6 +3354,10 @@ const runCode = async (req, res, next) => {
       }
 
       await revisionActivityService.recordCodeSubmission(req.user._id, questionId, new Date());
+      
+      // Mark test passed for active revision sessions AND cancel any pending auto-completion jobs
+      await markTestPassedForQuestion(req.user._id, questionId);
+      await cancelAllAutoCompletionsForQuestion(req.user._id, questionId); // NEW LINE
 
       // Automatically complete today's revision by skipping any overdue revisions
       const revisionResult = await revisionActivityService.checkAndCompleteRevision(

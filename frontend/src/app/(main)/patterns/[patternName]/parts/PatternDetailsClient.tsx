@@ -57,6 +57,8 @@ export default function PatternDetailsClient({ patternName }: PatternDetailsClie
   const otherPatterns =
     otherPatternsData?.patterns?.filter((p) => p.patternName !== patternName).slice(0, 10) || [];
 
+
+    console.log("===========pattern ", pattern);
   return (
     <div className={styles.container}>
       {/* Hero section: 60% metrics / 40% name */}

@@ -27,14 +27,10 @@ export const useSession = () => {
   });
 
   const login = (provider: 'google' | 'github') => {
-    // Store the intended return path, but avoid storing /login or /
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname + window.location.search + window.location.hash;
       const existingReturnTo = localStorage.getItem('returnTo');
-      
-      // Only set a new returnTo if:
-      // 1. There's no existing valid returnTo, or
-      // 2. The existing one is /login or /, and current path is not /login
+
       if (!existingReturnTo || existingReturnTo === '/login' || existingReturnTo === '/') {
         if (!currentPath.startsWith('/login') && currentPath !== '/') {
           localStorage.setItem('returnTo', currentPath);
@@ -48,7 +44,6 @@ export const useSession = () => {
   };
 
   const logout = async () => {
-    // Store current path before redirecting to login (except if it's login itself)
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname + window.location.search + window.location.hash;
       if (!currentPath.startsWith('/login')) {
@@ -61,10 +56,22 @@ export const useSession = () => {
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
+      // Clear tokens
       tokenStorage.clearTokens();
+
+      // Invalidate all user‑related queries
+      await queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+
+      // Explicitly set user data to null for both auth hooks
       queryClient.setQueryData(['currentUser'], null);
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      router.push('/login');
+      queryClient.setQueryData(['users', 'me'], null);
+
+      // Clear entire cache
+      queryClient.clear();
+
+      // Force hard redirect to break any cookie session
+      window.location.href = '/login';
     }
   };
 

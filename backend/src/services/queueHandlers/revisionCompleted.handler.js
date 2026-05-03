@@ -1,3 +1,4 @@
+// src/services/queueHandlers/revisionCompleted.handler.js
 const User = require('../../models/User');
 const Question = require('../../models/Question');
 const UserQuestionProgress = require('../../models/UserQuestionProgress');
@@ -12,7 +13,6 @@ const { DateTime } = require('luxon');
 
 const handleRevisionCompleted = async (job) => {
   const { userId, revisionId, questionId, completedAt, revisionIndex, status } = job.data;
-
   const revisionDate = parseDate(completedAt);
 
   try {
@@ -87,6 +87,8 @@ const handleRevisionCompleted = async (job) => {
       endDate: { $gte: startUTC },
     });
 
+    const { jobQueue } = require('../queue.service');
+
     for (const goal of activePlannedGoals) {
       const alreadyCompleted = goal.completedQuestions.some(
         (cq) => cq.questionId.toString() === questionId.toString()
@@ -105,9 +107,7 @@ const handleRevisionCompleted = async (job) => {
             platformQuestionId,
             title: questionTitle,
           };
-          const { jobQueue } = require('../queue.service');
-          await jobQueue.add({
-            type: "goal.completed",
+          await jobQueue.add('goal.completed', {
             userId,
             goalId: goal._id,
             completedAt: goal.achievedAt || new Date(),
@@ -120,8 +120,15 @@ const handleRevisionCompleted = async (job) => {
       }
     }
 
+    // Queue confidence increment (fixed: two arguments)
+    await jobQueue.add('confidence.increment', {
+      userId,
+      questionId,
+      action: "revision_completed",
+    });
+
     await invalidateCache(`notifications:*:user:${userId}:*`);
-    await invalidateDashboardCache(userId);  // NEW: invalidate dashboard cache
+    await invalidateDashboardCache(userId);
   } catch (error) {
     console.error('Error processing revision.completed:', error);
     throw error;

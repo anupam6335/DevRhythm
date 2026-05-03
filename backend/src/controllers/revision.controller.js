@@ -355,6 +355,15 @@ const completeRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
+    // Confidence increment for completing a revision
+    if (jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId: revision.questionId,
+        action: 'revision_completed',
+      });
+    }
+
     res.json(formatResponse(result.message, {
       revisionCompleted: true,
       overdueCompleted: result.overdueCompleted || false,
@@ -383,6 +392,14 @@ const completeQuestionRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
+    if (jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId,
+        action: 'revision_completed',
+      });
+    }
+
     res.json(formatResponse(result.message, {
       revisionCompleted: true,
       overdueCompleted: result.overdueCompleted || false,
@@ -393,27 +410,76 @@ const completeQuestionRevision = async (req, res, next) => {
   }
 };
 
-/**
- * NEW: Complete a specific past revision by its scheduled date.
- * Requires activity condition (20 minutes or code passed today).
- * Does NOT advance currentRevisionIndex.
- */
 const completePastRevision = async (req, res, next) => {
+  const lockKey = `lock:complete-past:user:${req.user._id}`;
+  let lockAcquired = false;
+
   try {
     const { questionId } = req.params;
     const { date, confidence } = req.body;
 
+    if (confidence !== undefined) {
+      throw new AppError('Manual confidence update is not allowed. Confidence is automatically incremented.', 400);
+    }
     if (!date) {
       throw new AppError('Date is required', 400);
     }
-
     const targetDate = new Date(date);
     if (isNaN(targetDate.getTime())) {
       throw new AppError('Invalid date format. Use ISO string or YYYY-MM-DD', 400);
     }
 
-    if (confidence !== undefined && (confidence < 1 || confidence > 5)) {
-      throw new AppError('Confidence must be between 1 and 5', 400);
+    const question = await Question.findById(questionId).select('title').lean();
+    if (!question) {
+      throw new AppError('Question not found', 404);
+    }
+
+    // Acquire persistent lock with stale detection
+    const lockValue = JSON.stringify({
+      questionId,
+      title: question.title,
+      startedAt: new Date().toISOString(),
+    });
+    let lockSet = await redisClient.set(lockKey, lockValue, { NX: true });
+    if (!lockSet) {
+      const existingLockRaw = await redisClient.get(lockKey);
+      let stale = false;
+      let existingTitle = 'another question';
+      if (existingLockRaw) {
+        try {
+          const existingLock = JSON.parse(existingLockRaw);
+          existingTitle = existingLock.title || existingLock.questionId || 'another question';
+          const startedAt = new Date(existingLock.startedAt);
+          if (Date.now() - startedAt > 120000) stale = true;
+        } catch (e) {}
+      }
+      if (stale) {
+        await redisClient.set(lockKey, lockValue);
+      } else {
+        return res.status(409).json(formatResponse(
+          `Another revision completion for "${existingTitle}" is already in progress. Please try again later.`,
+          null,
+          null,
+          { code: 'CONCURRENT_OPERATION', currentQuestion: existingTitle }
+        ));
+      }
+    }
+    lockAcquired = true;
+
+    // --- Session creation / completion ---
+    let session;
+    try {
+      session = await revisionActivityService.getRevisionSession(req.user._id, questionId, targetDate);
+      if (!session) {
+        await revisionActivityService.startRevisionSession(req.user._id, questionId, targetDate);
+        return res.status(202).json(formatResponse('Revision session started. Open the question page to track active time.', null));
+      }
+    } catch (err) {
+      // Catch the "already active session" error from the service
+      if (err.message === 'You already have an active revision session for another question. Please complete it first.') {
+        return res.status(409).json(formatResponse(err.message, null, null, { code: 'ACTIVE_SESSION_EXISTS' }));
+      }
+      throw err;
     }
 
     const result = await revisionActivityService.completePastRevision(
@@ -427,9 +493,21 @@ const completePastRevision = async (req, res, next) => {
       throw new AppError(result.message, 400);
     }
 
+    if (jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId,
+        action: 'past_revision_completed',
+      });
+    }
+
     res.json(formatResponse(result.message, { revision: result.revision }));
   } catch (error) {
     next(error);
+  } finally {
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
   }
 };
 
@@ -439,27 +517,10 @@ const recordTimeSpent = async (req, res, next) => {
     const { minutes } = req.body;
     const today = new Date();
 
+    // Store the time spent in the daily activity Redis (for heatmap)
     await revisionActivityService.recordTimeSpent(req.user._id, questionId, today, minutes);
 
-    const todayStr = formatDate(today);
-    const redisKey = `revision:activity:${req.user._id}:${questionId}:${todayStr}`;
-    const activity = await redisClient.hGetAll(redisKey);
-    const totalMinutesToday = parseInt(activity.timeSpent) || 0;
-
-    const notifiedKey = `time_threshold_notified:${req.user._id}:${questionId}:${todayStr}`;
-    const alreadyNotified = await redisClient.exists(notifiedKey);
-    
-    if (totalMinutesToday >= 20 && !alreadyNotified && jobQueue) {
-      await jobQueue.add({
-        type: 'time.threshold_reached',
-        userId: req.user._id,
-        questionId,
-        minutesSpent: totalMinutesToday,
-        date: today,
-      });
-      await redisClient.setEx(notifiedKey, 86400, '1');
-    }
-
+    // Update cumulative total in UserQuestionProgress
     let progress = await UserQuestionProgress.findOne({
       userId: req.user._id,
       questionId
@@ -476,65 +537,83 @@ const recordTimeSpent = async (req, res, next) => {
       progress.totalTimeSpent += minutes;
     }
 
+    // Update status if this is the first time reaching 20 minutes (but not yet solved)
     const isTimeThresholdReached = progress.totalTimeSpent >= 20;
     const isNotSolved = progress.status !== 'Solved' && progress.status !== 'Mastered';
-
-    if (isTimeThresholdReached && isNotSolved) {
-      await jobQueue.add({
-        type: 'question.solved',
-        userId: req.user._id,
-        questionId,
-        progressId: progress._id,
-        timeSpent: minutes,
-        solvedAt: new Date(),
-        source: 'time_based'
-      });
-    }
-
-    if (progress.totalTimeSpent >= 20 && progress.status === 'Not Started') {
+    if (isTimeThresholdReached && isNotSolved && progress.status === 'Not Started') {
       progress.status = 'Attempted';
     }
 
     await progress.save();
 
-    const existingRevision = await RevisionSchedule.findOne({
-      userId: req.user._id,
-      questionId
-    });
-    if (!existingRevision && progress.totalTimeSpent >= 20) {
-      const baseDate = new Date();
-      const schedule = [1, 3, 7, 14, 30].map(days => {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + days);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      });
-      await RevisionSchedule.create({
-        userId: req.user._id,
-        questionId,
-        schedule,
-        baseDate,
-        status: 'active'
-      });
-      await invalidateCache(`revisions:*:user:${req.user._id}:*`);
+    // ========== NEW: Increment active seconds for any past revision session ==========
+    // We need to find which targetDate the user is working on. Since the frontend
+    // does not send the targetDate, we look for any active session for this (userId, questionId).
+    // For simplicity, we will iterate through all sessions and add the active seconds to each.
+    // In practice, a user may have multiple past revision dates for the same question,
+    // but they are likely working on the earliest one. We'll add active seconds to all.
+    const pattern = `revision:session:${req.user._id}:${questionId}:*`;
+    let cursor = 0;
+    let keys = [];
+    do {
+      const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+      cursor = reply.cursor;
+      keys.push(...reply.keys);
+    } while (cursor !== 0);
+
+    let anyCompleted = false;
+    for (const key of keys) {
+      const parts = key.split(':');
+      const targetDateStr = parts[parts.length - 1];
+      if (targetDateStr) {
+        const targetDate = new Date(targetDateStr);
+        const completed = await revisionActivityService.addActiveSecondsToSession(
+          req.user._id,
+          questionId,
+          targetDate,
+          minutes * 60  // convert minutes to seconds
+        );
+        if (completed) anyCompleted = true;
+      }
     }
 
-    const result = await revisionActivityService.checkAndCompleteRevision(
+    // If any session completed due to active time, we already queued confidence increment
+    // inside addActiveSecondsToSession? Actually addActiveSecondsToSession calls completePastRevision,
+    // which does NOT queue confidence increment. We'll queue it here if any completed.
+    if (anyCompleted && jobQueue) {
+      await jobQueue.add('confidence.increment', {
+        userId: req.user._id,
+        questionId,
+        action: 'active_time_reached',
+      });
+    }
+
+    // Also handle the existing auto‑completion for today's revision (standard revision)
+    const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       req.user._id,
       questionId,
       today,
       'auto'
     );
 
-    if (result.completed) {
-      return res.json(formatResponse(result.message, { revisionCompleted: true }));
+    if (revisionResult.completed) {
+      if (jobQueue) {
+        await jobQueue.add('confidence.increment', {
+          userId: req.user._id,
+          questionId,
+          action: 'revision_completed_standard',
+        });
+      }
+      return res.json(formatResponse(revisionResult.message, { revisionCompleted: true }));
     }
 
+    // Fallback response if only time recorded
     res.json(formatResponse('Time recorded successfully', { minutes }));
   } catch (error) {
     next(error);
   }
 };
+
 
 const rescheduleRevision = async (req, res, next) => {
   try {
@@ -624,13 +703,20 @@ const deleteQuestionRevision = async (req, res, next) => {
 const fetchOverdueRevisionsForStats = async (userId, timeZone, limit = 50) => {
   const todayStart = getStartOfDay(new Date(), timeZone);
   const overdue = await RevisionSchedule.aggregate([
-    { $match: { userId, status: 'active' } },
+    { $match: { userId, status: { $in: ['active', 'overdue'] } } },
     {
       $addFields: {
-        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+        pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+        // Check if the pending due date is already in completedRevisions
+        alreadyCompleted: {
+          $in: [
+            { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+            '$completedRevisions.date'
+          ]
+        }
       }
     },
-    { $match: { pendingDue: { $lt: todayStart } } },
+    { $match: { pendingDue: { $lt: todayStart }, alreadyCompleted: false } },
     { $sort: { pendingDue: 1 } },
     { $limit: limit },
     {
@@ -736,13 +822,20 @@ const getOverdueRevisions = async (req, res, next) => {
     const today = getStartOfDay(new Date(), timeZone);
     
     const overdue = await RevisionSchedule.aggregate([
-      { $match: { userId: req.user._id, status: 'active' } },
+      { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
       {
         $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+          // Check if the pending due date is already in completedRevisions
+          alreadyCompleted: {
+            $in: [
+              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+              '$completedRevisions.date'
+            ]
+          }
         }
       },
-      { $match: { pendingDue: { $lt: today } } },
+      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
       { $sort: { pendingDue: 1 } },
       { $skip: skip },
       { $limit: limit },
@@ -773,17 +866,23 @@ const getOverdueRevisions = async (req, res, next) => {
       }
     ]);
     
-    const total = await RevisionSchedule.aggregate([
-      { $match: { userId: req.user._id, status: 'active' } },
+    const totalResult = await RevisionSchedule.aggregate([
+      { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
       {
         $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] }
+          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+          alreadyCompleted: {
+            $in: [
+              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
+              '$completedRevisions.date'
+            ]
+          }
         }
       },
-      { $match: { pendingDue: { $lt: today } } },
+      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
       { $count: 'count' }
     ]);
-    const totalCount = total[0]?.count || 0;
+    const totalCount = totalResult[0]?.count || 0;
     
     res.json(formatResponse('Overdue revisions retrieved', {
       revisions: overdue,

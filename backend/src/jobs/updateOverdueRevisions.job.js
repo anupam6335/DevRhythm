@@ -58,9 +58,6 @@ const updateOverdueRevisions = async () => {
       updatedCount++;
     }
 
-    if (updatedCount > 0) {
-      console.log(`[OverdueRevisions] Advanced index for ${updatedCount} schedules (no auto‑completion)`);
-    }
   } catch (error) {
     console.error('[OverdueRevisions] Job failed:', error);
   }
@@ -71,12 +68,10 @@ const overdueJob = new cron.CronJob('0 * * * *', updateOverdueRevisions);
 
 const startOverdueRevisionsJob = () => {
   overdueJob.start();
-  console.log('Overdue revisions cron job started (every hour) – index auto‑advance only');
 };
 
 const stopOverdueRevisionsJob = () => {
   overdueJob.stop();
-  console.log('Overdue revisions cron job stopped');
 };
 
 module.exports = {

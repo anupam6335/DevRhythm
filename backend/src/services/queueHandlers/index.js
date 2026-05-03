@@ -1,3 +1,4 @@
+// src/services/queueHandlers/index.js
 const { handleQuestionSolved } = require('./questionSolved.handler');
 const { handleQuestionMastered } = require('./questionMastered.handler');
 const { handleQuestionAttempted } = require('./questionAttempted.handler');
@@ -14,6 +15,8 @@ const { handleQuestionExtractTestCases } = require('./questionExtractTestCases.h
 const { handleUserTimezoneChange } = require('./userTimezoneChange.handler');
 const { handleTestCaseExecuted } = require('./testCaseExecuted.handler');
 const { handleTimeThresholdReached } = require('./timeThresholdReached.handler');
+const { handleConfidenceIncrement } = require('./confidenceIncrement.handler');
+// REMOVED: const { handleRevisionAutoComplete } = require('./revisionAutoComplete.handler');
 
 const processJob = async (job) => {
   const { type } = job.data;
@@ -68,6 +71,10 @@ const processJob = async (job) => {
     case 'time.threshold_reached':
       await handleTimeThresholdReached(job);
       break;
+    case 'confidence.increment':
+      await handleConfidenceIncrement(job);
+      break;
+    // REMOVED: case 'revision.auto_complete':
     default:
       console.error(`Unknown job type: ${type}`);
       throw new Error(`Unknown job type: ${type}`);
