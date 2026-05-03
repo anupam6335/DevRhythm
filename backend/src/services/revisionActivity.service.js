@@ -5,6 +5,7 @@ const UserQuestionProgress = require('../models/UserQuestionProgress');
 const User = require('../models/User');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
+const heatmapService = require('./heatmap.service');
 
 // ========== Helper: Check if user already has any active past‑revision session ==========
 const userHasActiveSession = async (userId) => {
@@ -327,6 +328,18 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
   updateRevisionState(revision, timeZone);
   revision.updatedAt = new Date();
   await revision.save();
+
+  const completionDate = new Date();
+  await heatmapService.incrementDailyActivity({
+    userId,
+    date: completionDate,
+    timeZone,
+    increments: {
+      totalActivities: 1,
+      revisionProblems: 1,
+      totalSubmissions: 1,
+    }
+  });
 
   await deleteRevisionSession(userId, questionId, targetDate);
   await invalidateCache(`revisions:*:user:${userId}:*`);
