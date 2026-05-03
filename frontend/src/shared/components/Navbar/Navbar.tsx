@@ -136,7 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 rightIcon={<FiChevronDown />}
               >
                 Progress
-                {pendingRevisionsCount > 0 && (
+                {pendingRevisionsCount > 0 && user && (
                   <span
                     className={styles.badge}
                     aria-label={`${pendingRevisionsCount} pending revisions`}
@@ -152,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </Link>
                   <Link href={ROUTES.REVISIONS.ROOT} className={styles.dropdownItem}>
                     Revisions
-                    {pendingRevisionsCount > 0 && (
+                    {pendingRevisionsCount > 0 && user && (
                       <span className={styles.badgeInline}>{pendingRevisionsCount}</span>
                     )}
                   </Link>
@@ -185,8 +185,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Streak pill with animated fire */}
-            {streakCount > 0 && (
+            {/* Streak pill with animated fire – only when user is logged in */}
+            {user && streakCount > 0 && (
               <div className={styles.streakPill} title={`${streakCount} day streak`}>
                 <FaFire className={styles.streakFireIcon} />
                 <span>{streakCount}</span>
@@ -322,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Link>
                 <Link href={ROUTES.REVISIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   Revisions
-                  {pendingRevisionsCount > 0 && (
+                  {pendingRevisionsCount > 0 && user && (
                     <span className={styles.drawerBadge}>{pendingRevisionsCount}</span>
                   )}
                 </Link>
@@ -395,7 +395,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FiClock className={styles.mobileIcon} />
             <span className={styles.mobileLabel}>Revisions</span>
-            {pendingRevisionsCount > 0 && (
+            {pendingRevisionsCount > 0 && user && (
               <span className={styles.mobileBadge}>{pendingRevisionsCount}</span>
             )}
           </Link>

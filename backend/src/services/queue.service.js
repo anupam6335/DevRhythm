@@ -1,3 +1,4 @@
+// src/services/queue.service.js
 const Bull = require('bull');
 const config = require('../config');
 
@@ -35,7 +36,7 @@ jobQueue.on('failed', (job, err) => {
   console.error(`Job ${job.id} (${job.data.type}) failed:`, err);
 });
 
-// Import handlers directly from their files (not via index.js)
+// Import handlers directly from their files
 const { handleQuestionSolved } = require('./queueHandlers/questionSolved.handler');
 const { handleQuestionMastered } = require('./queueHandlers/questionMastered.handler');
 const { handleQuestionAttempted } = require('./queueHandlers/questionAttempted.handler');
@@ -53,7 +54,7 @@ const { handleUserTimezoneChange } = require('./queueHandlers/userTimezoneChange
 const { handleTestCaseExecuted } = require('./queueHandlers/testCaseExecuted.handler');
 const { handleTimeThresholdReached } = require('./queueHandlers/timeThresholdReached.handler');
 const { handleConfidenceIncrement } = require('./queueHandlers/confidenceIncrement.handler');
-const { handleRevisionAutoComplete } = require('./queueHandlers/revisionAutoComplete.handler');
+// REMOVED: const { handleRevisionAutoComplete } = require('./queueHandlers/revisionAutoComplete.handler');
 
 // Register each job type with its dedicated processor
 jobQueue.process('question.solved', handleQuestionSolved);
@@ -73,7 +74,7 @@ jobQueue.process('user.timezone_change', handleUserTimezoneChange);
 jobQueue.process('test_case.executed', handleTestCaseExecuted);
 jobQueue.process('time.threshold_reached', handleTimeThresholdReached);
 jobQueue.process('confidence.increment', handleConfidenceIncrement);
-jobQueue.process('revision.auto_complete', handleRevisionAutoComplete);
+// REMOVED: jobQueue.process('revision.auto_complete', handleRevisionAutoComplete);
 
 const startQueueWorkers = async () => {
   if (!jobQueue) {

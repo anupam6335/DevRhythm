@@ -144,6 +144,13 @@ if (typeof window !== 'undefined') {
     },
     async (error: AxiosError) => {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+      const requestUrl = originalRequest?.url || '';
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
+      // 🛡️ Homepage guard: skip 401 handling for /users/me on the root path
+      if (currentPath === '/' && requestUrl.includes('/users/me')) {
+        return Promise.reject(error);
+      }
 
       // ---- Guards to prevent loops ----
       const pathname = window.location.pathname;
@@ -151,8 +158,7 @@ if (typeof window !== 'undefined') {
         return Promise.reject(error);
       }
 
-      const url = originalRequest?.url || '';
-      if (url.includes('/auth/refresh') || url.includes('/auth/exchange')) {
+      if (requestUrl.includes('/auth/refresh') || requestUrl.includes('/auth/exchange')) {
         return Promise.reject(error);
       }
 

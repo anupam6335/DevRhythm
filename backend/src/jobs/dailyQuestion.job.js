@@ -12,7 +12,6 @@ const fetchDailyQuestion = async () => {
   const key = getTodayKey();
   const alreadyFetched = await redisClient.get(key);
   if (alreadyFetched) {
-    console.log('[DailyQuestion] Already fetched today, skipping');
     return;
   }
 
@@ -30,7 +29,6 @@ const fetchDailyQuestion = async () => {
 
       if (dailyDate === todayUTC) {
         await redisClient.setEx(key, 86400, '1');
-        console.log(`[DailyQuestion] Successfully fetched and cached for ${todayUTC}`);
       } else {
         console.warn(`[DailyQuestion] Fetched problem date ${dailyDate} does not match today (${todayUTC}). Will retry next hour.`);
         // Do NOT set the Redis key – job will run again next hour
@@ -54,12 +52,10 @@ const startDailyQuestionJob = async () => {
   await fetchDailyQuestion();
   // Then start the cron schedule
   dailyQuestionJob.start();
-  console.log('[DailyQuestion] Daily question fetch job started (runs every hour, with immediate check)');
 };
 
 const stopDailyQuestionJob = () => {
   dailyQuestionJob.stop();
-  console.log('[DailyQuestion] Daily question fetch job stopped');
 };
 
 module.exports = {

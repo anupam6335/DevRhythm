@@ -395,6 +395,134 @@
   transform: scale(0.98);
 }
 
+
+/* Add these styles to the end of ActionStream.module.css */
+
+/* Date Selection Panel */
+.dateSelectionPanel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.closePanelButton {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.closePanelButton:hover {
+  background: var(--hover-surface);
+  color: var(--text-primary);
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, auto));
+  gap: 0.5rem;
+}
+
+.dateButton {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dateButton:hover:not(:disabled) {
+  background: var(--accent-moss);
+  border-color: var(--accent-moss);
+  color: var(--primary-text-on-action);
+  transform: translateY(-1px);
+}
+
+.dateButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Spinner for date button */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 4px;
+}
+
+/* Small spinner for the "Review Now" button while fetching dates */
+.spinnerSmall {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive adjustments for the panel */
+@media (max-width: 767px) {
+  .dateSelectionPanel {
+    padding: 0.5rem;
+  }
+  .dateGrid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, auto));
+    gap: 0.4rem;
+  }
+  .dateButton {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    white-space: normal;
+    word-break: keep-all;
+  }
+  .panelHeader {
+    font-size: 0.8rem;
+  }
+}
+
 /* Rescue button (Overdue) – uses error color */
 .actionButton {
   background: none;

@@ -7,8 +7,8 @@ import clsx from 'clsx';
 import { ROUTES } from '@/shared/config';
 import Logo from '@/shared/components/Logo';
 import Button from '@/shared/components/Button';
-
-import { useUser } from '@/features/user/hooks/useUser';
+import OAuthButton from '@/shared/components/OAuthButton'; // ✅ Import OAuthButton
+import { useSession } from '@/features/auth/hooks/useSession';
 import { useTodayProgress } from '@/features/user/hooks/useTodayProgress';
 import { usePendingRevisions } from '@/features/revision/hooks/usePendingRevisions';
 
@@ -19,9 +19,6 @@ export interface FooterProps {
   className?: string;
 }
 
-/**
- * Modern stat display – large numbers with labels.
- */
 const StatDisplay: React.FC<{
   icon: React.ReactNode;
   value: number;
@@ -53,9 +50,6 @@ const StatDisplay: React.FC<{
   return content;
 };
 
-/**
- * Link group – minimal column of links.
- */
 const LinkGroup: React.FC<{
   title: string;
   links: Array<{ label: string; href: string }>;
@@ -74,9 +68,6 @@ const LinkGroup: React.FC<{
   </div>
 );
 
-/**
- * BackToTop – floating action button.
- */
 const BackToTop: React.FC = () => {
   const [visible, setVisible] = useState(false);
 
@@ -105,41 +96,40 @@ export const Footer: React.FC<FooterProps> = ({
   version = '1.0.0',
   className,
 }) => {
-  const { user } = useUser();
+  const { user } = useSession();
   const { solvedToday } = useTodayProgress();
   const { pendingCount } = usePendingRevisions();
 
   const isLoggedIn = !!user;
   const streak = user?.streak?.current ?? 0;
 
-  const statDisplays = (
+  const statDisplays = isLoggedIn ? (
     <div className={styles.statRow}>
       <StatDisplay
         icon={<FiAward />}
         value={streak}
         label="day streak"
-        href={isLoggedIn ? ROUTES.USER_PROFILE.OWN(user!.username) : undefined}
+        href={ROUTES.USER_PROFILE.OWN(user.username)}
       />
       <StatDisplay
         icon={<FiCheckCircle />}
         value={solvedToday}
         label="solved today"
-        href={isLoggedIn ? ROUTES.PROGRESS : undefined}
+        href={ROUTES.PROGRESS}
       />
       <StatDisplay
         icon={<FiClock />}
         value={pendingCount}
         label="revisions"
-        href={isLoggedIn ? ROUTES.REVISIONS.OVERDUE : undefined}
+        href={ROUTES.REVISIONS.OVERDUE}
         badge={pendingCount}
       />
     </div>
-  );
+  ) : null;
 
   return (
     <footer className={clsx(styles.footer, className)}>
       <div className={styles.container}>
-        {/* Hero section */}
         <div className={styles.hero}>
           <div className={styles.brand}>
             <Logo size="md" layout="horizontal" />
@@ -147,23 +137,28 @@ export const Footer: React.FC<FooterProps> = ({
               Master coding patterns through deliberate practice.
             </p>
           </div>
-          {isLoggedIn ? (
+          {statDisplays ? (
             statDisplays
           ) : (
-            <Link href={ROUTES.LOGIN} className={styles.cta}>
+            // ✅ Direct Google OAuth – no intermediate login page
+            <OAuthButton
+              provider="google"
+              variant="outline"
+              size="md"
+              showIcon
+              className={styles.cta}
+            >
               Start your journey →
-            </Link>
+            </OAuthButton>
           )}
         </div>
 
-        {/* Link grid */}
         <div className={styles.linkGrid}>
           <LinkGroup
             title="Learn"
             links={[
               { label: 'Questions', href: ROUTES.QUESTIONS.ROOT },
               { label: 'Patterns', href: ROUTES.QUESTIONS.PATTERNS },
-              // { label: 'Tags', href: ROUTES.QUESTIONS.TAGS },
             ]}
           />
           <LinkGroup
@@ -171,14 +166,12 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Revisions', href: ROUTES.REVISIONS.ROOT },
               { label: 'Goals', href: ROUTES.GOALS.ROOT },
-              // { label: 'Tags', href: ROUTES.QUESTIONS.TAGS },
             ]}
           />
           <LinkGroup
             title="Community"
             links={[
               { label: 'My Groups', href: ROUTES.GROUPS.MY },
-              // { label: 'Discover', href: ROUTES.GROUPS.ROOT },
               { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
             ]}
           />
@@ -187,7 +180,6 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Profile', href: user ? ROUTES.USER_PROFILE.OWN(user.username) : ROUTES.LOGIN },
               { label: 'Shares', href: ROUTES.SHARES.ROOT },
-              // { label: 'Settings', href: '/settings' },
             ]}
           />
           <LinkGroup
@@ -195,12 +187,10 @@ export const Footer: React.FC<FooterProps> = ({
             links={[
               { label: 'Privacy', href: '/privacy' },
               { label: 'Terms', href: '/terms' },
-              // { label: 'Cookies', href: '/cookies' },
             ]}
           />
         </div>
 
-        {/* Bottom bar */}
         <div className={styles.bottomBar}>
           <div className={styles.copyright}>
             © {new Date().getFullYear()} DevRhythm

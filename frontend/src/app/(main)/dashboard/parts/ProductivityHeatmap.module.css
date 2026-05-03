@@ -34,6 +34,7 @@
   margin-bottom: 0.75rem;
 }
 
+/* ===== Heatmap Row Layout ===== */
 .heatmapGrid {
   display: flex;
   flex-direction: column;
@@ -42,15 +43,24 @@
 }
 
 .row {
-  display: flex;
+  display: grid;
   gap: 0.5rem;
-  justify-content: space-between;
   width: 100%;
 }
 
+/* 31‑day month: 11 columns */
+.row--11cols {
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+}
+
+/* 30, 29, 28‑day month: 10 columns */
+.row--10cols {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+
+/* Individual cell */
 .cell {
   position: relative;
-  flex: 1;
   aspect-ratio: 1 / 1;
   border-radius: 4px;
   display: flex;
@@ -60,9 +70,28 @@
   font-weight: 500;
   color: var(--text-primary);
   background-color: var(--heat-0);
-  min-width: 28px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  min-width: 0;
+  cursor: default;
 }
 
+.cell:hover {
+  transform: scale(1.05);
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.cellNumber {
+  opacity: 0.8;
+}
+
+/* Intensity levels */
+.level0 { background-color: var(--heat-0); }
+.level1 { background-color: var(--heat-1); }
+.level2 { background-color: var(--heat-2); }
+.level3 { background-color: var(--heat-3); }
+.level4 { background-color: var(--heat-4); }
 
 /* CSS-only tooltip on hover */
 .cell:hover::after {
@@ -86,7 +115,6 @@
   line-height: 1.4;
 }
 
-/* Optional: arrow for tooltip */
 .cell:hover::before {
   content: '';
   position: absolute;
@@ -101,16 +129,7 @@
   pointer-events: none;
 }
 
-.cellNumber {
-  opacity: 0.8;
-}
-
-.level0 { background-color: var(--heat-0); }
-.level1 { background-color: var(--heat-1); }
-.level2 { background-color: var(--heat-2); }
-.level3 { background-color: var(--heat-3); }
-.level4 { background-color: var(--heat-4); }
-
+/* Skeleton loader */
 .skeletonHeatmap {
   width: 100%;
   height: 160px;
@@ -124,13 +143,24 @@
   50% { opacity: 0.5; }
 }
 
-/* Responsive: on small screens, allow row wrapping but cells shrink */
-@media (max-width: 640px) {
+/* Responsive adjustments */
+@media (max-width: 767px) {
+  .heatmapGrid {
+    gap: 0.25rem;
+  }
   .row {
     gap: 0.25rem;
   }
   .cell {
     font-size: 0.7rem;
-    min-width: 22px;
+  }
+  .cellNumber {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cell {
+    font-size: 0.55rem;
   }
 }

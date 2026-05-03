@@ -2,12 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { goalService } from '../services/goalService';
 import { goalKeys } from '@/shared/lib/react-query';
 
-export function useCurrentGoalProgress(initialData?: any) {
+interface UseCurrentGoalProgressOptions {
+  enabled?: boolean;
+  initialData?: any;
+}
+
+export function useCurrentGoalProgress(options?: UseCurrentGoalProgressOptions) {
   const { data, isLoading, error } = useQuery({
     queryKey: goalKeys.current(),
     queryFn: () => goalService.getCurrentGoals(),
-    initialData,
+    initialData: options?.initialData,
     staleTime: 10 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 
   return {

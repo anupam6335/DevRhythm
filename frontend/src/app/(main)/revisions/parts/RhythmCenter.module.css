@@ -1,3 +1,4 @@
+/* ===== Layout & Header ===== */
 .container {
   margin-bottom: 2rem;
 }
@@ -17,6 +18,7 @@
   margin: 0;
 }
 
+/* ===== Graphs Row ===== */
 .graphsRow {
   display: flex;
   gap: 1rem;
@@ -74,12 +76,13 @@
   white-space: nowrap;
 }
 
-/* Compact heatmap – cells ~28px */
+/* ===== Heatmap – Base ===== */
 .heatmapContainer {
   background: var(--bg-elevated);
   border-radius: 12px;
   padding: 0.75rem;
   margin-top: 0.5rem;
+  width: 100%;
 }
 
 .heatmapHeader {
@@ -89,48 +92,64 @@
   color: var(--text-secondary);
 }
 
+/* Row‑based layout for daily (month view) */
+.heatmapGridRows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Each row uses CSS Grid – column count based on month length */
+.row {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* 31‑day month rows (11 columns) */
+.row--11cols {
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+}
+
+/* 30, 29, 28‑day month rows (10 columns) */
+.row--10cols {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+
+/* Wrap‑grid layout for weekly/monthly periods */
 .heatmapGrid {
   display: grid;
-  grid-template-columns: repeat(15, minmax(50px, 50px));
-  gap: 4px;
-  justify-content: center;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 0.5rem;
+  justify-items: stretch;
 }
 
-@media (max-width: 767px) {
-  .heatmapGrid {
-    grid-template-columns: repeat(7, minmax(24px, 24px));
-    gap: 3px;
-  }
-}
-
-@media (max-width: 480px) {
-  .heatmapGrid {
-    grid-template-columns: repeat(7, minmax(20px, 20px));
-    gap: 2px;
-  }
-}
-
-.heatmapCell {
-  aspect-ratio: 1;
+/* Individual cell */
+.cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  position: relative;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background-color: var(--heat-0);
   transition: transform 0.1s ease;
+  width: 100%;
+  min-width: 0; /* allows shrinking */
 }
 
-.heatmapCell:hover {
+.cell:hover {
   transform: scale(1.05);
   z-index: 2;
 }
 
-.cellLabel {
-  font-size: 0.65rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1;
+.cellNumber {
+  opacity: 0.8;
 }
 
 .confidenceDot {
@@ -142,36 +161,49 @@
   right: 2px;
 }
 
-@media (max-width: 767px) {
-  .confidenceDot {
-    width: 4px;
-    height: 4px;
-    top: 1px;
-    right: 1px;
-  }
-  .cellLabel {
-    font-size: 0.6rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .confidenceDot {
-    width: 3px;
-    height: 3px;
-    top: 1px;
-    right: 1px;
-  }
-  .cellLabel {
-    font-size: 0.55rem;
-  }
-}
-
-/* Responsive graphs row */
+/* ===== Responsive Breakpoints ===== */
 @media (max-width: 939px) {
   .graphsRow {
     flex-direction: column;
   }
   .graphCard {
     width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .row {
+    gap: 0.25rem;
+  }
+  .heatmapGrid {
+    gap: 0.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  }
+  .cell {
+    font-size: 0.7rem;
+  }
+  .cellNumber {
+    font-size: 0.6rem;
+  }
+  .confidenceDot {
+    width: 4px;
+    height: 4px;
+    top: 1px;
+    right: 1px;
+  }
+}
+
+@media (max-width: 480px) {
+  .heatmapGrid {
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  }
+  .cell {
+    font-size: 0.55rem;
+  }
+  .confidenceDot {
+    width: 3px;
+    height: 3px;
+    top: 1px;
+    right: 1px;
   }
 }

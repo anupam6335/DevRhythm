@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Protected routes (require authentication)
-const protectedRoutes = ['/dashboard', '/user/u/']; // Add more as needed
+// Routes that require authentication (redirect to login if not authenticated)
+const protectedRoutes = ['/dashboard', '/user/u/'];
 
-// Auth routes (redirect to dashboard if already authenticated)
+// Auth routes – if user is already authenticated, redirect to dashboard
 const authRoutes = ['/login'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth_token')?.value;
+
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
 
   // Redirect authenticated users away from auth routes (e.g., /login)
   if (token && authRoutes.some(route => pathname.startsWith(route))) {
@@ -23,6 +27,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Allow all other requests
   return NextResponse.next();
 }
 

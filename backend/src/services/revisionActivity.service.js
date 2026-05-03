@@ -6,24 +6,17 @@ const User = require('../models/User');
 const { getStartOfDay, getEndOfDay, formatDate, isToday } = require('../utils/helpers/date');
 const { invalidateCache } = require('../middleware/cache');
 
-// ========== PRODUCTION SETTINGS ==========
-const JOB_DELAY_MS = 20 * 60 * 1000 + 5000; // 20 minutes + 5 seconds buffer
-const CONDITION_MINUTES = 19.9;              // 19.9 minutes (buffer)
-// =========================================
-
-/**
- * Lazy-loaded jobQueue to avoid circular dependency
- */
-let _jobQueue = null;
-const getJobQueue = () => {
-  if (!_jobQueue) {
-    const { jobQueue } = require('./queue.service');
-    if (!jobQueue) {
-      throw new Error('Job queue is not available. Make sure Redis is connected and workers are started.');
-    }
-    _jobQueue = jobQueue;
-  }
-  return _jobQueue;
+// ========== Helper: Check if user already has any active past‑revision session ==========
+const userHasActiveSession = async (userId) => {
+  const pattern = `revision:session:${userId}:*:*`;
+  let cursor = 0;
+  let keys = [];
+  do {
+    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+    cursor = reply.cursor;
+    keys.push(...reply.keys);
+  } while (cursor !== 0);
+  return keys.length > 0;
 };
 
 // ========== Helper: Redis key for daily activity ==========
@@ -32,7 +25,7 @@ const getRevisionActivityKey = (userId, questionId, date) => {
   return `revision:activity:${userId}:${questionId}:${dateStr}`;
 };
 
-// ========== Record time spent for a day ==========
+// ========== Record time spent for a day (frontend heartbeat) ==========
 const recordTimeSpent = async (userId, questionId, date, minutes) => {
   const key = getRevisionActivityKey(userId, questionId, date);
   await redisClient.hIncrBy(key, 'timeSpent', minutes);
@@ -177,18 +170,6 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   revision.updatedAt = new Date();
   await revision.save();
 
-  const jobQueue = getJobQueue();
-  await jobQueue.add('revision.completed', {
-    userId,
-    revisionId: revision._id,
-    questionId,
-    completedAt: new Date(),
-    revisionIndex: targetIndex,
-    status: 'completed',
-    overdueCompleted: isOverdue,
-    outOfOrder,
-  });
-
   await invalidateCache(`revisions:*:user:${userId}:*`);
 
   return {
@@ -202,7 +183,7 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   };
 };
 
-// ========== Revision Session Management (for complete-past) ==========
+// ========== Past Revision Session Management ==========
 
 const getRevisionSessionKey = (userId, questionId, targetDate) => {
   const dateStr = formatDate(targetDate);
@@ -210,26 +191,16 @@ const getRevisionSessionKey = (userId, questionId, targetDate) => {
 };
 
 const startRevisionSession = async (userId, questionId, targetDate) => {
+  // Prevent multiple active sessions for the same user
+  const hasActive = await userHasActiveSession(userId);
+  if (hasActive) {
+    throw new Error('You already have an active revision session for another question. Please complete or cancel it first.');
+  }
+
   const key = getRevisionSessionKey(userId, questionId, targetDate);
-  const startTime = Date.now();
-
-  console.log(`[revision.session] Creating auto-completion job for user ${userId}, question ${questionId}, date ${formatDate(targetDate)}, delay ${JOB_DELAY_MS}ms`);
-
-  const jobQueue = getJobQueue();
-  const job = await jobQueue.add(
-    'revision.auto_complete',
-    {
-      userId,
-      questionId,
-      targetDate: targetDate.toISOString(),
-    },
-    { delay: JOB_DELAY_MS }
-  );
-
-  console.log(`[revision.session] Job created with id ${job.id}`);
-
-  const session = { startTime, testPassed: false, jobId: job.id };
+  const session = { activeSeconds: 0, testPassed: false };
   await redisClient.setEx(key, 7200, JSON.stringify(session));
+  console.log(`[revision.session] Session created for user ${userId}, question ${questionId}, date ${targetDate}`);
   return session;
 };
 
@@ -239,53 +210,24 @@ const getRevisionSession = async (userId, questionId, targetDate) => {
   return data ? JSON.parse(data) : null;
 };
 
-const cancelAutoCompletion = async (userId, questionId, targetDate) => {
+const deleteRevisionSession = async (userId, questionId, targetDate) => {
   const key = getRevisionSessionKey(userId, questionId, targetDate);
-  const data = await redisClient.get(key);
-  if (data) {
-    const session = JSON.parse(data);
-    if (session.jobId) {
-      try {
-        const jobQueue = getJobQueue();
-        const job = await jobQueue.getJob(session.jobId);
-        if (job && !job.finishedOn) {
-          await job.remove();
-        }
-      } catch (err) {
-        console.warn(`[cancelAutoCompletion] Failed to remove job ${session.jobId}: ${err.message}`);
-        // Do not rethrow – allow completion to proceed
-      }
-    }
-  }
+  await redisClient.del(key);
 };
 
-const cancelAllAutoCompletionsForQuestion = async (userId, questionId) => {
-  const pattern = `revision:session:${userId}:${questionId}:*`;
-  let cursor = 0;
-  let keys = [];
-  do {
-    const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
-    cursor = reply.cursor;
-    keys.push(...reply.keys);
-  } while (cursor !== 0);
+const addActiveSecondsToSession = async (userId, questionId, targetDate, seconds) => {
+  const key = getRevisionSessionKey(userId, questionId, targetDate);
+  let session = await getRevisionSession(userId, questionId, targetDate);
+  if (!session) return false;
 
-  for (const key of keys) {
-    const data = await redisClient.get(key);
-    if (data) {
-      const session = JSON.parse(data);
-      if (session.jobId) {
-        try {
-          const jobQueue = getJobQueue();
-          const job = await jobQueue.getJob(session.jobId);
-          if (job && !job.finishedOn) {
-            await job.remove();
-          }
-        } catch (err) {
-          console.warn(`[cancelAllAutoCompletionsForQuestion] Failed to remove job ${session.jobId}: ${err.message}`);
-        }
-      }
-    }
+  session.activeSeconds += seconds;
+  await redisClient.setEx(key, 7200, JSON.stringify(session));
+
+  if (session.activeSeconds >= 1200 || session.testPassed === true) {
+    const result = await completePastRevision(userId, questionId, targetDate);
+    return result.completed;
   }
+  return false;
 };
 
 const markTestPassedForQuestion = async (userId, questionId) => {
@@ -306,38 +248,27 @@ const markTestPassedForQuestion = async (userId, questionId) => {
         session.testPassed = true;
         await redisClient.setEx(key, 7200, JSON.stringify(session));
       }
-      if (session.jobId) {
-        try {
-          const jobQueue = getJobQueue();
-          const job = await jobQueue.getJob(session.jobId);
-          if (job && !job.finishedOn) {
-            await job.remove();
-          }
-        } catch (err) {
-          console.warn(`[markTestPassedForQuestion] Failed to remove job ${session.jobId}: ${err.message}`);
+      if (session.activeSeconds >= 1200 || session.testPassed) {
+        const parts = key.split(':');
+        const targetDateStr = parts[parts.length - 1];
+        if (targetDateStr) {
+          const targetDate = new Date(targetDateStr);
+          await completePastRevision(userId, questionId, targetDate);
         }
       }
     }
   }
 };
 
-const deleteRevisionSession = async (userId, questionId, targetDate) => {
-  const key = getRevisionSessionKey(userId, questionId, targetDate);
-  await redisClient.del(key);
-};
-
-// ========== Updated completePastRevision with session logic ==========
 const completePastRevision = async (userId, questionId, targetDate, confidence = null, auto = false) => {
   const timeZone = await getUserTimeZone(userId);
   const todayStart = getStartOfDay(new Date(), timeZone);
   const targetDayStart = getStartOfDay(targetDate, timeZone);
 
-  // 1. Ensure target date is in the past
   if (targetDayStart >= todayStart) {
     return { completed: false, message: 'Cannot complete a future or today’s revision with this endpoint. Use the standard completion endpoint.' };
   }
 
-  // 2. Find the revision schedule
   const revision = await RevisionSchedule.findOne({
     userId,
     questionId,
@@ -347,7 +278,6 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     return { completed: false, message: 'No active revision schedule found' };
   }
 
-  // 3. Find the matching revision index by date
   let targetIndex = -1;
   for (let i = 0; i < revision.schedule.length; i++) {
     if (getStartOfDay(revision.schedule[i], timeZone).getTime() === targetDayStart.getTime()) {
@@ -359,7 +289,6 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     return { completed: false, message: 'No revision scheduled on the given date' };
   }
 
-  // 4. Check if already completed
   const alreadyCompleted = revision.completedRevisions.some(cr =>
     getStartOfDay(cr.date, timeZone).getTime() === targetDayStart.getTime()
   );
@@ -367,34 +296,21 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     return { completed: true, message: 'Revision already completed' };
   }
 
-  // ========== SESSION‑BASED VALIDATION ==========
-  let session = await getRevisionSession(userId, questionId, targetDate);
+  const session = await getRevisionSession(userId, questionId, targetDate);
   if (!session) {
-    // First call – start session and return "session started" message
-    await startRevisionSession(userId, questionId, targetDate);
-    return {
-      completed: false,
-      message: 'Revision session started. You need to spend 20 minutes (after this request) or pass all test cases before completing this past revision.'
-    };
+    return { completed: false, message: 'Revision session not started. Please open the question page first.' };
   }
 
-  // Session exists – check conditions
-  const now = Date.now();
-  const elapsedMinutes = (now - session.startTime) / (1000 * 60);
-  const conditionMet = elapsedMinutes >= CONDITION_MINUTES || session.testPassed === true;
-
+  const conditionMet = session.activeSeconds >= 1200 || session.testPassed === true;
   if (!conditionMet) {
-    const remainingMinutes = Math.ceil(CONDITION_MINUTES - elapsedMinutes);
-    const elapsedWhole = Math.floor(elapsedMinutes);
-    const friendlyMessage = `You need to spend at least 20 minutes on this question before completing this past revision. You have spent ${elapsedWhole} minute(s) so far. ${remainingMinutes} more minute(s) required. Alternatively, solve the question (pass all test cases) to complete it immediately.`;
+    const remainingSeconds = Math.max(0, 1200 - session.activeSeconds);
+    const remainingMinutes = Math.ceil(remainingSeconds / 60);
     return {
       completed: false,
-      message: friendlyMessage
+      message: `You need to spend at least 20 active minutes on this question. ${remainingMinutes} more minute(s) required or pass all test cases.`
     };
   }
 
-  // ---------- Conditions satisfied – proceed to mark completion ----------
-  // Record time spent for this day (optional)
   const activity = await getRevisionActivity(userId, questionId, new Date());
 
   revision.completedRevisions.push({
@@ -408,30 +324,12 @@ const completePastRevision = async (userId, questionId, targetDate, confidence =
     outOfOrder: false,
   });
 
-  // Do NOT change currentRevisionIndex
   updateRevisionState(revision, timeZone);
   revision.updatedAt = new Date();
   await revision.save();
 
-  // Delete the session now that it's completed
   await deleteRevisionSession(userId, questionId, targetDate);
-
   await invalidateCache(`revisions:*:user:${userId}:*`);
-
-  // Queue confidence increment
-  const jobQueue = getJobQueue();
-  await jobQueue.add('confidence.increment', {
-    userId,
-    questionId,
-    action: 'past_revision_completed',
-  });
-
-  // Attempt to cancel the auto‑completion job (best effort, do not block on error)
-  try {
-    await cancelAutoCompletion(userId, questionId, targetDate);
-  } catch (err) {
-    console.warn(`Failed to cancel auto‑completion job for ${userId}/${questionId}/${targetDate}: ${err.message}`);
-  }
 
   return {
     completed: true,
@@ -449,7 +347,6 @@ module.exports = {
   startRevisionSession,
   getRevisionSession,
   markTestPassedForQuestion,
-  cancelAutoCompletion,
-  cancelAllAutoCompletionsForQuestion,
+  addActiveSecondsToSession,
   deleteRevisionSession,
 };

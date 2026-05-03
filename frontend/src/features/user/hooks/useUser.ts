@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { userService } from '../services/userService';
 import { userKeys } from '@/shared/lib/react-query';
+import { tokenStorage } from '@/features/auth/utils/tokenStorage';
 
 export function useUser() {
   const {
@@ -11,6 +12,7 @@ export function useUser() {
   } = useQuery({
     queryKey: userKeys.me(),
     queryFn: userService.getCurrentUser,
+    enabled: !!tokenStorage.getToken(),
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
