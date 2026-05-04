@@ -1,3 +1,4 @@
+// frontend/src/app/sitemap.ts
 import { MetadataRoute } from 'next';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devrhythm.com';
@@ -15,6 +16,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
+    },
+    {
+      url: `${APP_URL}/user`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
     },
     {
       url: `${APP_URL}/questions`,

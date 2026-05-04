@@ -54,6 +54,17 @@ const getUserPublicProgress = Joi.object({
   sortOrder: Joi.string().valid('asc', 'desc').default('desc')
 });
 
+// ========== Validation for GET /users (list all users) ==========
+const getAllUsers = Joi.object({
+  page: Joi.number().integer().min(1).max(100).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  sortBy: Joi.string().pattern(
+    /^(totalSolved|masteryRate|totalTimeSpent|createdAt|mutualFriends|iFollow|followsMe)(,(totalSolved|masteryRate|totalTimeSpent|createdAt|mutualFriends|iFollow|followsMe)){0,4}$/
+  ).default('totalSolved'),
+  sortOrder: Joi.string().pattern(/^(asc|desc)(,(asc|desc)){0,4}$/).optional(),
+  search: Joi.string().trim().min(1).max(100).optional()
+});
+
 module.exports = {
   updateUser,
   getUserByUsername,
@@ -62,5 +73,6 @@ module.exports = {
   checkUsername,
   followUser,
   getPublicFollowing,
-  getUserPublicProgress
+  getUserPublicProgress,
+  getAllUsers,   // exported for use in routes
 };

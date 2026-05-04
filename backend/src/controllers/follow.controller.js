@@ -4,7 +4,6 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
-// const { followerQueue } = require('../services/queue.service');
 const { jobQueue } = require('../services/queue.service');
 
 const getFollowing = async (req, res, next) => {
@@ -78,6 +77,20 @@ const followUser = async (req, res, next) => {
     await invalidateCache(`follow:*:user:${req.user._id}:*`);
     await invalidateCache(`follow:*:user:${followedId}:*`);
     await invalidateCache(`users:*:public:*`);
+    
+    // ========== NEW: Invalidate user list caches ==========
+    // The authenticated user's list (their view of users) changes because mutual friends counts may change
+    await invalidateCache(`users:auth:${req.user._id}:*`);
+    // Also the target user's list (their view of users) changes because their mutual friends with others may change
+    await invalidateCache(`users:auth:${followedId}:*`);
+    // Public user list (unauthenticated) does NOT change because mutual friends are not shown, 
+    // but visibility of private users might change if a mutual relationship is formed.
+    // To be safe, we also invalidate the public list (since a private user may become visible to the authenticated user only,
+    // but the public list remains the same; however, if the target user's privacy is private, they remain hidden from public.
+    // No need to invalidate public list; it's unaffected.
+    // However, if the user who followed was private and now has a mutual follow with the target, 
+    // the target might see them in their own authenticated list. That's already covered by invalidating target's auth cache.
+    // So we skip public cache invalidation to avoid unnecessary purges.
 
     // Emit event for new follower
     await jobQueue.add({
@@ -117,6 +130,10 @@ const unfollowUser = async (req, res, next) => {
     await invalidateCache(`follow:*:user:${req.user._id}:*`);
     await invalidateCache(`follow:*:user:${followedId}:*`);
     await invalidateCache(`users:*:public:*`);
+    
+    // ========== NEW: Invalidate user list caches ==========
+    await invalidateCache(`users:auth:${req.user._id}:*`);
+    await invalidateCache(`users:auth:${followedId}:*`);
 
     const [followingCount, followersCount] = await Promise.all([
       Follow.countDocuments({ followerId: req.user._id, isActive: true }),

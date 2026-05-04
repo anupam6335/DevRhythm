@@ -86,6 +86,7 @@ const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
             className={styles.image}
             width={sizeMap[size]}
             height={sizeMap[size]}
+            loading="lazy"
           />
         ) : (
           <div className={styles.fallback}>{fallbackContent}</div>

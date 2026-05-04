@@ -77,4 +77,13 @@ module.exports = {
       memoryLimit: parseInt(process.env.JUDGE0_MEMORY_LIMIT) || 128000,
     },
   },
+
+  // ========== USER LIST OPTIMIZATION CONSTANTS ==========
+  userList: {
+    maxPage: parseInt(process.env.USER_LIST_MAX_PAGE) || 100,
+    maxLimit: parseInt(process.env.USER_LIST_MAX_LIMIT) || 100,
+    defaultLimit: 20,
+    cacheTtlPublic: parseInt(process.env.USER_LIST_CACHE_TTL_PUBLIC) || 60,   // seconds
+    cacheTtlAuth: parseInt(process.env.USER_LIST_CACHE_TTL_AUTH) || 30,       // seconds
+  },
 };
