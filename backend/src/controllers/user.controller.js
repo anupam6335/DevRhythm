@@ -1,10 +1,13 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Follow = require('../models/Follow');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const AppError = require('../utils/errors/AppError');
 const { generateToken } = require('../middleware/auth');
 const { invalidateUserCache, invalidateDashboardCache } = require('../middleware/cache');
 const { paginate } = require('../utils/helpers/pagination');
 const { formatResponse } = require('../utils/helpers/response');
+const config = require('../config');
 
 const getCurrentUser = async (req, res, next) => {
   try {
@@ -28,6 +31,7 @@ const updateCurrentUser = async (req, res, next) => {
   try {
     const updates = {};
     let dashboardInvalidate = false;
+    let privacyChanged = false;
     
     if (req.body.displayName) updates.displayName = req.body.displayName;
     if (req.body.preferences) {
@@ -37,7 +41,10 @@ const updateCurrentUser = async (req, res, next) => {
         dashboardInvalidate = true;
       }
     }
-    if (req.body.privacy) updates.privacy = req.body.privacy;
+    if (req.body.privacy) {
+      updates.privacy = req.body.privacy;
+      privacyChanged = true;
+    }
     
     const user = await User.findByIdAndUpdate(
       req.user._id,
@@ -48,6 +55,18 @@ const updateCurrentUser = async (req, res, next) => {
     await invalidateUserCache(req.user._id);
     if (dashboardInvalidate) {
       await invalidateDashboardCache(req.user._id);
+    }
+    
+    // ========== NEW: Invalidate user list caches if privacy changed ==========
+    if (privacyChanged) {
+      // Invalidate all authenticated user lists (because visibility of this user for others may change)
+      // We cannot invalidate all patterns easily, but we can invalidate the public list cache as well.
+      // Since privacy change affects who can see this user, we need to purge all caches that include this user.
+      // The safest approach: invalidate all user list caches (both public and any authenticated).
+      await invalidateCache('users:public:*');
+      await invalidateCache('users:auth:*'); // careful: this removes all authenticated user caches (could be many)
+      // A more granular approach would iterate over all users who might have this user in their list,
+      // but that's too expensive. Given that privacy changes are relatively rare, the cache purge is acceptable.
     }
     
     // Round masteryRate for response
@@ -333,6 +352,335 @@ const changeTimezone = async (req, res, next) => {
   }
 };
 
+// ========== HELPER: Batch fetch mutual friends counts for given user IDs ==========
+const getMutualFriendsCounts = async (targetUserIds, currentUserFollowingIds) => {
+  if (!targetUserIds.length || !currentUserFollowingIds.length) {
+    return new Map();
+  }
+  // Fetch all follow relationships where followerId is in targetUserIds
+  const follows = await Follow.find({
+    followerId: { $in: targetUserIds },
+    isActive: true
+  }).select('followerId followedId').lean();
+  
+  // Group followed IDs by followerId
+  const userFollowingMap = new Map();
+  follows.forEach(f => {
+    const followerStr = f.followerId.toString();
+    if (!userFollowingMap.has(followerStr)) userFollowingMap.set(followerStr, []);
+    userFollowingMap.get(followerStr).push(f.followedId.toString());
+  });
+  
+  // For each target user, compute intersection with currentUserFollowingIds
+  const mutualCounts = new Map();
+  const currentFollowingSet = new Set(currentUserFollowingIds);
+  for (const userId of targetUserIds) {
+    const following = userFollowingMap.get(userId.toString()) || [];
+    let mutual = 0;
+    for (const followed of following) {
+      if (currentFollowingSet.has(followed)) mutual++;
+    }
+    mutualCounts.set(userId.toString(), mutual);
+  }
+  return mutualCounts;
+};
+
+// ========== GET /users - OPTIMIZED VERSION ==========
+const getAllUsers = async (req, res, next) => {
+  try {
+    // 1. Pagination
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || config.userList?.defaultLimit || 20;
+    const maxPage = config.userList?.maxPage || 100;
+    const maxLimit = config.userList?.maxLimit || 100;
+    if (page > maxPage) page = maxPage;
+    if (limit > maxLimit) limit = maxLimit;
+    const skip = (page - 1) * limit;
+    const searchTerm = req.query.search ? req.query.search.trim() : null;
+
+    // 2. Multi‑field sort parsing
+    let sortByFields = ['totalSolved'];
+    let sortOrders = ['desc'];
+    if (req.query.sortBy) {
+      sortByFields = req.query.sortBy.split(',').slice(0, 5);
+    }
+    if (req.query.sortOrder) {
+      const orderParts = req.query.sortOrder.split(',');
+      sortOrders = orderParts.slice(0, sortByFields.length);
+      while (sortOrders.length < sortByFields.length) {
+        sortOrders.push(sortOrders[sortOrders.length - 1] || 'desc');
+      }
+    } else {
+      sortOrders = sortByFields.map(() => 'desc');
+    }
+
+    const sortObj = {};
+    for (let i = 0; i < sortByFields.length; i++) {
+      const field = sortByFields[i];
+      const order = sortOrders[i] === 'asc' ? 1 : -1;
+      let dbField = field;
+      if (field === 'mutualFriends') dbField = 'mutualFriendsCount';
+      else if (field === 'iFollow') dbField = 'iFollow';
+      else if (field === 'followsMe') dbField = 'followsMe';
+      sortObj[dbField] = order;
+    }
+
+    // 3. Get authenticated user info (following/followers sets)
+    let currentUserId = null;
+    let currentUserFollowingIds = [];
+    let currentUserFollowersSet = null;
+    let mutualUserIdsSet = new Set();
+
+    if (req.user) {
+      currentUserId = req.user._id;
+      const Follow = require('../models/Follow');
+      
+      const following = await Follow.find({ followerId: currentUserId, isActive: true })
+        .select('followedId').lean();
+      currentUserFollowingIds = following.map(f => f.followedId.toString());
+      
+      const followers = await Follow.find({ followedId: currentUserId, isActive: true })
+        .select('followerId').lean();
+      const followerIds = followers.map(f => f.followerId.toString());
+      currentUserFollowersSet = new Set(followerIds);
+      
+      mutualUserIdsSet = new Set(
+        currentUserFollowingIds.filter(id => currentUserFollowersSet.has(id))
+      );
+    }
+
+    // 4. Visibility match (public/link‑only OR private + mutual)
+    const visibilityMatch = {
+      $or: [
+        { privacy: { $in: ['public', 'link-only'] }, isActive: true },
+        ...(req.user && mutualUserIdsSet.size > 0 ? [{
+          privacy: 'private',
+          isActive: true,
+          _id: { $in: Array.from(mutualUserIdsSet).map(id => new mongoose.Types.ObjectId(id)) }
+        }] : [])
+      ]
+    };
+
+    // Helper: build base pipeline (visibility, exclude self, search, projection)
+    const getBasePipeline = () => {
+      const pipeline = [
+        { $match: visibilityMatch },
+        ...(currentUserId ? [{ $match: { _id: { $ne: currentUserId } } }] : []),
+      ];
+      if (searchTerm) {
+        const regex = new RegExp('^' + searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        pipeline.push({
+          $match: {
+            $or: [
+              { username: regex },
+              { displayName: regex }
+            ]
+          }
+        });
+      }
+      pipeline.push({
+        $project: {
+          _id: 1,
+          username: 1,
+          displayName: 1,
+          avatarUrl: 1,
+          lastOnline: 1,
+          totalSolved: '$stats.totalSolved',
+          masteryRate: '$stats.masteryRate',
+          totalTimeSpent: '$stats.totalTimeSpent',
+          createdAt: 1,
+        }
+      });
+      return pipeline;
+    };
+
+    // Determine if we need aggregation (dynamic sort fields)
+    const dynamicFields = ['mutualFriends', 'iFollow', 'followsMe'];
+    const hasDynamicSort = sortByFields.some(f => dynamicFields.includes(f));
+    const needsAggregation = (req.user && hasDynamicSort);
+
+    let users = [];
+    let total = 0;
+
+    if (needsAggregation) {
+      // ---------- Strategy A: full aggregation with $lookup ----------
+      const pipeline = getBasePipeline();
+      
+      pipeline.push({
+        $lookup: {
+          from: 'follows',
+          let: { targetUserId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$followerId', '$$targetUserId'] },
+              { $eq: ['$isActive', true] }
+            ] } } },
+            { $project: { followedId: 1, _id: 0 } }
+          ],
+          as: 'targetFollowing'
+        }
+      });
+      pipeline.push({
+        $addFields: {
+          mutualFriendsCount: {
+            $size: {
+              $setIntersection: [
+                currentUserFollowingIds,
+                { $map: { input: '$targetFollowing', as: 'tf', in: { $toString: '$$tf.followedId' } } }
+              ]
+            }
+          },
+          iFollow: { $in: [{ $toString: '$_id' }, currentUserFollowingIds] },
+          followsMe: { $in: [{ $toString: '$_id' }, Array.from(currentUserFollowersSet || [])] }
+        }
+      });
+      pipeline.push({ $project: { targetFollowing: 0 } });
+      
+      // Apply filter when the first sort field is a dynamic one (same as original)
+      const firstSortField = sortByFields[0];
+      if (firstSortField === 'mutualFriends') {
+        pipeline.push({ $match: { mutualFriendsCount: { $gt: 0 } } });
+      } else if (firstSortField === 'iFollow') {
+        pipeline.push({ $match: { iFollow: true } });
+      } else if (firstSortField === 'followsMe') {
+        pipeline.push({ $match: { followsMe: true } });
+      }
+      
+      pipeline.push({ $sort: sortObj });
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+      
+      users = await User.aggregate(pipeline);
+      
+      // Count total (with same filters)
+      const countPipeline = getBasePipeline();
+      countPipeline.push({
+        $lookup: {
+          from: 'follows',
+          let: { targetUserId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$followerId', '$$targetUserId'] },
+              { $eq: ['$isActive', true] }
+            ] } } },
+            { $project: { followedId: 1 } }
+          ],
+          as: 'targetFollowing'
+        }
+      });
+      countPipeline.push({
+        $addFields: {
+          mutualFriendsCount: {
+            $size: {
+              $setIntersection: [
+                currentUserFollowingIds,
+                { $map: { input: '$targetFollowing', as: 'tf', in: { $toString: '$$tf.followedId' } } }
+              ]
+            }
+          },
+          iFollow: { $in: [{ $toString: '$_id' }, currentUserFollowingIds] },
+          followsMe: { $in: [{ $toString: '$_id' }, Array.from(currentUserFollowersSet || [])] }
+        }
+      });
+      if (firstSortField === 'mutualFriends') {
+        countPipeline.push({ $match: { mutualFriendsCount: { $gt: 0 } } });
+      } else if (firstSortField === 'iFollow') {
+        countPipeline.push({ $match: { iFollow: true } });
+      } else if (firstSortField === 'followsMe') {
+        countPipeline.push({ $match: { followsMe: true } });
+      }
+      countPipeline.push({ $count: 'total' });
+      const countResult = await User.aggregate(countPipeline);
+      total = countResult.length ? countResult[0].total : 0;
+      
+    } else {
+      // ---------- Strategy B: fetch paginated users, compute follow fields after ----------
+      const pipeline = getBasePipeline();
+      
+      pipeline.push({ $sort: sortObj });
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+      
+      users = await User.aggregate(pipeline);
+      
+      if (req.user) {
+        const userIds = users.map(u => u._id.toString());
+        const mutualCounts = await getMutualFriendsCounts(userIds, currentUserFollowingIds);
+        const currentFollowingSet = new Set(currentUserFollowingIds);
+        const currentFollowersSet = currentUserFollowersSet || new Set();
+        
+        users = users.map(u => {
+          const uid = u._id.toString();
+          return {
+            ...u,
+            mutualFriendsCount: mutualCounts.get(uid) || 0,
+            iFollow: currentFollowingSet.has(uid),
+            followsMe: currentFollowersSet.has(uid)
+          };
+        });
+      } else {
+        users = users.map(u => ({ ...u }));
+      }
+      
+      // Count total (without dynamic filters)
+      const countPipeline = getBasePipeline();
+      countPipeline.push({ $count: 'total' });
+      const countResult = await User.aggregate(countPipeline);
+      total = countResult.length ? countResult[0].total : 0;
+    }
+
+    // 5. Compute `isOnline` (based on lastOnline, threshold 5 minutes)
+    const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    users = users.map(user => {
+      let isOnline = false;
+      if (user.lastOnline) {
+        const lastOnlineTime = new Date(user.lastOnline).getTime();
+        isOnline = (now - lastOnlineTime) < ONLINE_THRESHOLD_MS;
+      }
+      return { ...user, isOnline };
+    });
+
+    // 6. Format response
+    users.forEach(user => {
+      if (user.masteryRate) user.masteryRate = Math.round(user.masteryRate * 100) / 100;
+      if (user.totalTimeSpent === undefined) user.totalTimeSpent = 0;
+    });
+
+    const formattedUsers = users.map(user => {
+      const result = {
+        id: user._id,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        totalSolved: user.totalSolved,
+        masteryRate: user.masteryRate,
+        totalTimeSpent: user.totalTimeSpent,
+        isOnline: user.isOnline,
+      };
+      if (req.user && user.mutualFriendsCount !== undefined) {
+        result.mutualFriends = user.mutualFriendsCount;
+      }
+      if (req.user) {
+        result.iFollow = user.iFollow === true;
+        result.followsMe = user.followsMe === true;
+      }
+      return result;
+    });
+
+    const pagination = {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    };
+
+    res.json(formatResponse('Users retrieved successfully', { users: formattedUsers }, { pagination }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
@@ -346,4 +694,5 @@ module.exports = {
   checkUsernameAvailability,
   getUserPublicProgress,
   changeTimezone,
+  getAllUsers,
 };

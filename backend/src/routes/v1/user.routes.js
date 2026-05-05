@@ -10,6 +10,7 @@ const validate = require('../../middleware/validator');
 const userValidator = require('../../utils/validators/user.validator');
 const rateLimiters = require('../../middleware/rateLimiter');
 const { cache } = require('../../middleware/cache');
+const config = require('../../config');
 const Joi = require('joi');   
 
 router.get('/me', auth, userController.getCurrentUser);
@@ -60,6 +61,28 @@ router.put('/me/timezone',
     confirm: Joi.boolean().default(false)
   })),
   userController.changeTimezone
+);
+
+// ========== GET /users - list all public users (optimized with caching) ==========
+router.get(
+  '/',
+  optionalAuth,
+  rateLimiters.publicLimiter,
+  (req, res, next) => {
+    // Use different cache keys and TTL based on authentication
+    if (req.user) {
+      // Authenticated users: include mutual friends, shorter TTL
+      const ttl = config.userList?.cacheTtlAuth || 30;
+      const cacheKey = `users:auth:${req.user._id}:${req.originalUrl}`;
+      return cache(ttl, cacheKey)(req, res, next);
+    }
+    // Unauthenticated users: no mutual friends, longer TTL
+    const ttl = config.userList?.cacheTtlPublic || 60;
+    const cacheKey = `users:public:${req.originalUrl}`;
+    return cache(ttl, cacheKey)(req, res, next);
+  },
+  validate(userValidator.getAllUsers, 'query'),
+  userController.getAllUsers
 );
 
 module.exports = router;

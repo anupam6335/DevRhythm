@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
       'avatars.githubusercontent.com',
       'res.cloudinary.com',
     ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ui-avatars.com',
+        pathname: '/api/**',
+      },
+    ],
   },
   reactStrictMode: true,
   poweredByHeader: false,
