@@ -21,6 +21,16 @@
   margin: 0;
   color: var(--text-secondary);
 }
+.messageLink {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.messageLink:hover .messageText {
+  color: var(--accent-moss);
+}
 
 .viewAllLink {
   font-size: 0.875rem;
@@ -74,6 +84,11 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-bottom: 0.125rem;
+  transition: transform 0.2s ease;
+}
+
+.activityMessage:hover {
+  transform: translateX(4px);
 }
 
 .messageText {

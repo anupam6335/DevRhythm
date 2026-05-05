@@ -44,6 +44,12 @@ const formatActivityMessage = (activity: ActivityItem): string => {
   }
 };
 
+// Helper to determine if activity is clickable (leads to question page)
+const isClickableActivity = (activity: ActivityItem): boolean => {
+  const clickableTypes = ['question_solved', 'question_mastered', 'revision_completed', 'revision'];
+  return clickableTypes.includes(activity.type) && !!activity.platformQuestionId;
+};
+
 export default function RecentActivity({ activities, isLoading }: RecentActivityProps) {
   if (isLoading) {
     return (
@@ -77,7 +83,6 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
     );
   }
 
-  // Wireframe shows up to 3 items
   const displayActivities = activities.slice(0, 7);
 
   return (
@@ -92,13 +97,21 @@ export default function RecentActivity({ activities, isLoading }: RecentActivity
         {displayActivities.map((activity, index) => {
           const timeAgo = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
           const message = formatActivityMessage(activity);
+          const isClickable = isClickableActivity(activity);
+          const questionLink = `/questions/${activity.platformQuestionId}`;
 
           return (
             <div key={activity._id || `fallback-${index}`} className={styles.activityItem}>
               <div className={styles.activityIcon}>{getActivityIcon(activity.type)}</div>
               <div className={styles.activityContent}>
                 <div className={styles.activityMessage}>
-                  <span className={styles.messageText}>{message}</span>
+                  {isClickable ? (
+                    <Link href={questionLink} className={styles.messageLink}>
+                      <span className={styles.messageText}>{message}</span>
+                    </Link>
+                  ) : (
+                    <span className={styles.messageText}>{message}</span>
+                  )}
                   {activity.difficulty && (
                     <Badge
                       variant={activity.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard'}
