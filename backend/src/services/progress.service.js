@@ -1,6 +1,7 @@
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const Question = require('../models/Question');
 const { getStartOfDay, getEndOfDay, formatDate, getDaysBetween } = require('../utils/helpers/date');
+const { slugify } = require('../utils/helpers/string');
 
 const calculateProgressStats = async (userId) => {
   const progressRecords = await UserQuestionProgress.find({ userId })
@@ -176,16 +177,7 @@ const getUserRecentProgress = async (userId, limit = 10) => {
 
 /**
  * Retrieve all questions solved on a specific day (status 'Solved' or 'Mastered' with solvedAt timestamp within the day).
- * Includes full question details and progress metadata.
- *
- * @param {string} userId - User ObjectId
- * @param {Date|string} date - Target date (will be converted to start/end of day in user's timezone)
- * @param {string} timeZone - IANA timezone
- * @returns {Promise<Array>} - Array of solved question objects, each containing:
- *   - questionId, platformQuestionId, title, platform, difficulty
- *   - solvedAt (timestamp)
- *   - totalTimeSpent, revisionCount, attemptsCount, confidenceLevel, status
- *   - lastPracticed (lastRevisedAt or updatedAt or lastAttemptAt)
+ * Includes full question details, progress metadata, and pattern slugs.
  */
 const getDaySolvedQuestions = async (userId, date, timeZone) => {
   const dayStart = getStartOfDay(date, timeZone);
@@ -203,6 +195,8 @@ const getDaySolvedQuestions = async (userId, date, timeZone) => {
   const result = solvedRecords.map(record => {
     const question = record.questionId;
     if (!question) return null;
+    const pattern = question.pattern || [];
+    const patternSlugs = pattern.map(p => slugify(p));
     return {
       questionId: question._id,
       platformQuestionId: question.platformQuestionId,
@@ -210,7 +204,8 @@ const getDaySolvedQuestions = async (userId, date, timeZone) => {
       platform: question.platform,
       difficulty: question.difficulty,
       tags: question.tags,
-      pattern: question.pattern,
+      pattern,
+      patternSlugs,
       solvedAt: record.attempts?.solvedAt,
       totalTimeSpent: record.totalTimeSpent || 0,
       revisionCount: record.revisionCount || 0,
@@ -233,5 +228,5 @@ module.exports = {
   updateQuestionNotes,
   updateQuestionConfidence,
   getUserRecentProgress,
-  getDaySolvedQuestions, // newly exported
+  getDaySolvedQuestions,
 };

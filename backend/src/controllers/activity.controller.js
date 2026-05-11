@@ -2,9 +2,11 @@ const ActivityLog = require('../models/ActivityLog');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const Follow = require('../models/Follow');
 const Goal = require('../models/Goal');
+const Question = require('../models/Question');
 const { formatResponse } = require('../utils/helpers/response');
 const { getPaginationParams, paginate } = require('../utils/helpers/pagination');
 const { getStartOfDay, getEndOfDay } = require('../utils/helpers/date');
+const { slugify } = require('../utils/helpers/string');
 const AppError = require('../utils/errors/AppError');
 
 // All possible action values from ActivityLog schema
@@ -19,10 +21,13 @@ const ALL_ACTIONS = [
   'group_challenge_completed'
 ];
 
+// ----------------------------------------------------------------------
+//  HELPERS
+// ----------------------------------------------------------------------
+
 /**
- * Helper to split revision logs into on_time / overdue and compute ratio.
- * @param {Array} logs - Array of revision log objects (each must have a `metadata.overdueCompleted` flag).
- * @returns {Object} - { on_time, overdue, ratio, message }
+ * Split revision logs into on_time / overdue and compute ratio.
+ * Returns { on_time: [], overdue: [], ratio: {}, message }
  */
 const processRevisionLogs = (logs) => {
   const onTime = logs.filter(log => !log.metadata?.overdueCompleted);
@@ -33,7 +38,7 @@ const processRevisionLogs = (logs) => {
 
   let message = null;
   if (overdueCount > onTimeCount && total > 0) {
-    message = 'Most users complete revisions on time to stay consistent with their learning flow.';
+    message = 'Most users complete revisions on time to stay consistent with their learning flow. Try solving on time or reschedule in your preferences.';
   }
 
   return {
@@ -49,10 +54,43 @@ const processRevisionLogs = (logs) => {
 };
 
 /**
- * Fetch revision logs directly from RevisionSchedule (for 'revision_completed' action).
- * Supports pagination, date filtering, and sorting.
+ * Group revision logs by question ID (for on_time or overdue array).
+ * Returns object keyed by questionId: { question: {...}, revision_timeline: [...] }
  */
-const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page, limit, skip, sortBy, sortOrder }) => {
+const groupRevisionLogs = (logs) => {
+  const grouped = {};
+  for (const log of logs) {
+    if (!log.targetId || !log.targetId._id) continue;
+    const questionId = log.targetId._id.toString();
+    if (!grouped[questionId]) {
+      grouped[questionId] = {
+        question: { ...log.targetId },
+        revision_timeline: []
+      };
+    }
+    grouped[questionId].revision_timeline.push({
+      _id: log._id,
+      timestamp: log.timestamp,
+      overdueCompleted: log.metadata?.overdueCompleted || false,
+      outOfOrder: log.metadata?.outOfOrder || false,
+      timeSpent: log.metadata?.timeSpent || 0,
+      confidenceAfter: log.metadata?.confidenceAfter || null,
+      scheduledDate: log.metadata?.scheduledDate,
+      revisionIndex: log.metadata?.revisionIndex
+    });
+  }
+  for (const qid in grouped) {
+    grouped[qid].revision_timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+  return grouped;
+};
+
+/**
+ * Fetch revision logs from RevisionSchedule (paginated).
+ * Returns { logs, total }
+ */
+const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page = 1, limit = 20, sortBy = 'timestamp', sortOrder = 'desc' }) => {
+  const skip = (page - 1) * limit;
   const matchStage = { userId };
   if (startDate || endDate) {
     matchStage['completedRevisions.completedAt'] = {};
@@ -83,7 +121,8 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page, 
           title: '$targetId.title',
           platform: '$targetId.platform',
           platformQuestionId: '$targetId.platformQuestionId',
-          difficulty: '$targetId.difficulty'
+          difficulty: '$targetId.difficulty',
+          pattern: '$targetId.pattern'
         },
         targetModel: { $literal: 'Question' },
         metadata: {
@@ -102,7 +141,18 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page, 
     { $limit: limit }
   ];
 
-  const logs = await RevisionSchedule.aggregate(pipeline);
+  let logs = await RevisionSchedule.aggregate(pipeline);
+  logs = logs.filter(log => log.targetId && log.targetId._id);
+  logs = logs.map(log => {
+    if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+      log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
+    } else {
+      log.targetId.pattern = [];
+      log.targetId.patternSlugs = [];
+    }
+    return log;
+  });
+
   const totalPipeline = [
     { $match: matchStage },
     { $unwind: '$completedRevisions' },
@@ -116,11 +166,73 @@ const getRevisionLogsFromSchedules = async (userId, { startDate, endDate, page, 
 };
 
 /**
- * Fetch completed and failed goals for the user with pagination.
- * @param {string} userId - User ID
- * @param {number} page - Page number (default 1)
- * @param {number} limit - Items per page (default 20, max 100)
- * @returns {Promise<{completed: Array, failed: Array, pagination: Object}>}
+ * Group question logs (solved/mastered) by question ID.
+ * Returns object keyed by questionId: { question: {...}, solves_timeline: [...] }
+ */
+const groupQuestionLogs = (logs) => {
+  const grouped = {};
+  for (const log of logs) {
+    if (!log.targetId || !log.targetId._id) continue;
+    const questionId = log.targetId._id.toString();
+    if (!grouped[questionId]) {
+      grouped[questionId] = {
+        question: { ...log.targetId },
+        solves_timeline: []
+      };
+    }
+    grouped[questionId].solves_timeline.push({
+      _id: log._id,
+      timestamp: log.timestamp,
+      timeSpent: log.metadata?.timeSpent || 0,
+      isFirstSolve: log.metadata?.isFirstSolve || false
+    });
+  }
+  for (const qid in grouped) {
+    grouped[qid].solves_timeline.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+  return grouped;
+};
+
+/**
+ * Get question logs (solved/mastered) with pagination and grouping.
+ * Returns { grouped, total } where total is number of logs (for pagination).
+ */
+const getGroupedQuestionLogs = async (userId, action, startDate, endDate, page, limit, sortBy = 'timestamp', sortOrder = 'desc') => {
+  const effectiveLimit = Math.min(limit, 100);
+  const skip = (page - 1) * effectiveLimit;
+  const matchStage = { userId, action };
+  if (startDate) matchStage.timestamp = { $gte: startDate };
+  if (endDate) matchStage.timestamp = { ...matchStage.timestamp, $lte: endDate };
+
+  const query = ActivityLog.find(matchStage)
+    .sort({ [sortBy]: sortOrder === 'asc' ? 1 : -1 })
+    .skip(skip)
+    .limit(effectiveLimit)
+    .populate({
+      path: 'targetId',
+      select: 'title platform platformQuestionId difficulty pattern'
+    })
+    .lean();
+
+  let logs = await query;
+  logs = logs.filter(log => log.targetId && log.targetId._id);
+  logs = logs.map(log => {
+    if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+      log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
+    } else {
+      log.targetId.pattern = [];
+      log.targetId.patternSlugs = [];
+    }
+    return log;
+  });
+
+  const total = await ActivityLog.countDocuments(matchStage);
+  const grouped = groupQuestionLogs(logs);
+  return { grouped, total };
+};
+
+/**
+ * Fetch completed and failed goals with pagination.
  */
 const getGoalStatusArrays = async (userId, page = 1, limit = 20) => {
   const effectiveLimit = Math.min(limit, 100);
@@ -173,144 +285,297 @@ const getGoalStatusArrays = async (userId, page = 1, limit = 20) => {
   };
 };
 
-/**
- * Get activity logs for the authenticated user, grouped by action.
- * For 'revision_completed', fetches data from RevisionSchedule.
- * All other actions come from ActivityLog.
- * For 'goal_achieved', we fetch from Goal model (completed & failed) with its own pagination.
- * For 'group_goal_progress' and 'group_challenge_progress', we filter to keep only logs where progress > 50% or ==100%.
- */
+// ----------------------------------------------------------------------
+//  MAIN CONTROLLER
+// ----------------------------------------------------------------------
+
 const getActivityLogs = async (req, res, next) => {
   try {
-    const { page, limit, skip } = getPaginationParams(req);
     const { action, startDate, endDate, sortBy = 'timestamp', sortOrder = 'desc' } = req.query;
-
-    // Separate pagination for goals (default 1, 20)
-    const goalPage = parseInt(req.query.goalPage) || 1;
-    const goalLimit = parseInt(req.query.goalLimit) || 20;
-
     const timeZone = req.userTimeZone;
-
     const dateFilter = {};
     if (startDate) dateFilter.start = getStartOfDay(new Date(startDate), timeZone);
     if (endDate) dateFilter.end = getEndOfDay(new Date(endDate), timeZone);
 
-    // Initialize grouped result with all action keys as empty arrays
-    const grouped = Object.fromEntries(ALL_ACTIONS.map(k => [k, []]));
+    // ----- SPECIFIC ACTION (full paginated view) -----
+    if (action === 'question_solved' || action === 'question_mastered') {
+      const { page, limit } = getPaginationParams(req);
+      const { grouped, total } = await getGroupedQuestionLogs(
+        req.user._id, action, dateFilter.start, dateFilter.end, page, limit, sortBy, sortOrder
+      );
+      const responseData = { [action]: grouped };
+      const paginationMeta = paginate(total, page, limit);
+      return res.json(formatResponse('Activity logs retrieved successfully', responseData, { pagination: paginationMeta }));
+    }
 
-    // Handle revision_completed separately
-    if (!action || action === 'revision_completed') {
+    if (action === 'revision_completed') {
+      const { page, limit } = getPaginationParams(req);
+      const { type } = req.query; // 'on_time' or 'overdue'
+
+      // If type is specified, fetch only that category and wrap it under that key
+      if (type === 'on_time' || type === 'overdue') {
+        const overdueFlag = (type === 'overdue');
+        const matchStage = { userId: req.user._id };
+        matchStage['completedRevisions.overdueCompleted'] = overdueFlag;
+        if (dateFilter.start) matchStage['completedRevisions.completedAt'] = { $gte: dateFilter.start };
+        if (dateFilter.end) matchStage['completedRevisions.completedAt'] = { ...matchStage['completedRevisions.completedAt'], $lte: dateFilter.end };
+
+        const skip = (page - 1) * limit;
+        const pipeline = [
+          { $match: matchStage },
+          { $unwind: '$completedRevisions' },
+          { $match: { 'completedRevisions.status': 'completed' } },
+          { $sort: { 'completedRevisions.completedAt': sortOrder === 'asc' ? 1 : -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: 'questions',
+              localField: 'questionId',
+              foreignField: '_id',
+              as: 'targetId'
+            }
+          },
+          { $unwind: '$targetId' },
+          {
+            $project: {
+              _id: '$_id',
+              userId: 1,
+              action: { $literal: 'revision_completed' },
+              targetId: {
+                _id: '$targetId._id',
+                title: '$targetId.title',
+                platform: '$targetId.platform',
+                platformQuestionId: '$targetId.platformQuestionId',
+                difficulty: '$targetId.difficulty',
+                pattern: '$targetId.pattern'
+              },
+              targetModel: { $literal: 'Question' },
+              metadata: {
+                revisionIndex: '$completedRevisions.revisionIndex',
+                scheduledDate: '$completedRevisions.date',
+                overdueCompleted: { $ifNull: ['$completedRevisions.overdueCompleted', false] },
+                outOfOrder: { $ifNull: ['$completedRevisions.outOfOrder', false] },
+                timeSpent: '$completedRevisions.timeSpent',
+                confidenceAfter: '$completedRevisions.confidenceAfter'
+              },
+              timestamp: '$completedRevisions.completedAt'
+            }
+          }
+        ];
+
+        let logs = await RevisionSchedule.aggregate(pipeline);
+        logs = logs.filter(log => log.targetId && log.targetId._id);
+        logs = logs.map(log => {
+          if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+            log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
+          } else {
+            log.targetId.pattern = [];
+            log.targetId.patternSlugs = [];
+          }
+          return log;
+        });
+
+        const totalPipeline = [
+          { $match: matchStage },
+          { $unwind: '$completedRevisions' },
+          { $match: { 'completedRevisions.status': 'completed' } },
+          { $count: 'total' }
+        ];
+        const totalResult = await RevisionSchedule.aggregate(totalPipeline);
+        const total = totalResult.length ? totalResult[0].total : 0;
+
+        const grouped = groupRevisionLogs(logs);
+        // Wrap the grouped object under the requested type key
+        const responseData = { revision_completed: { [type]: grouped } };
+        const paginationMeta = paginate(total, page, limit);
+        return res.json(formatResponse('Activity logs retrieved successfully', responseData, { pagination: paginationMeta }));
+      }
+
+      // Default (no type) – return both categories with ratio/message
       const { logs, total } = await getRevisionLogsFromSchedules(req.user._id, {
         startDate: dateFilter.start,
         endDate: dateFilter.end,
         page,
         limit,
-        skip,
         sortBy,
         sortOrder
       });
-      grouped.revision_completed = logs;
-      if (action === 'revision_completed') {
-        const pagination = paginate(total, page, limit);
-        const processed = processRevisionLogs(logs);
-        return res.json(formatResponse('Activity logs retrieved successfully', { revision_completed: processed }, { pagination }));
-      }
+      const { on_time: onTimeRaw, overdue: overdueRaw, ratio, message } = processRevisionLogs(logs);
+      const onTimeGrouped = groupRevisionLogs(onTimeRaw);
+      const overdueGrouped = groupRevisionLogs(overdueRaw);
+      const responseData = {
+        revision_completed: {
+          on_time: onTimeGrouped,
+          overdue: overdueGrouped,
+          ratio,
+          message
+        }
+      };
+      const paginationMeta = paginate(total, page, limit);
+      return res.json(formatResponse('Activity logs retrieved successfully', responseData, { pagination: paginationMeta }));
     }
 
-    // Handle goal_achieved: fetch from Goal model with its own pagination
-    if (!action || action === 'goal_achieved') {
+    if (action === 'goal_achieved') {
+      const goalPage = parseInt(req.query.goalPage) || 1;
+      const goalLimit = parseInt(req.query.goalLimit) || 20;
       const goalData = await getGoalStatusArrays(req.user._id, goalPage, goalLimit);
-      grouped.goal_achieved = goalData; // includes completed, failed, and pagination
+      const responseData = { goal_achieved: goalData };
+      return res.json(formatResponse('Activity logs retrieved successfully', responseData, { pagination: goalData.pagination }));
     }
 
-    // Build query for ActivityLog (exclude revision_completed and goal_achieved if not specifically requested)
-    const query = { userId: req.user._id };
-    if (action) {
-      if (action !== 'revision_completed' && action !== 'goal_achieved') {
-        query.action = action;
+    // ----- COMBINED FEED (no action) – limited items per action, grouped consistently -----
+    const limitPerAction = 5;
+
+    // 1. question_solved
+    const qSolvedQuery = { userId: req.user._id, action: 'question_solved' };
+    if (dateFilter.start) qSolvedQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) qSolvedQuery.timestamp = { ...qSolvedQuery.timestamp, $lte: dateFilter.end };
+    let qSolvedLogs = await ActivityLog.find(qSolvedQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .populate({ path: 'targetId', select: 'title platform platformQuestionId difficulty pattern' })
+      .lean();
+    qSolvedLogs = qSolvedLogs.filter(log => log.targetId && log.targetId._id);
+    qSolvedLogs = qSolvedLogs.map(log => {
+      if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+        log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
       } else {
-        query.action = { $nin: ['revision_completed', 'goal_achieved'] };
+        log.targetId.pattern = [];
+        log.targetId.patternSlugs = [];
       }
-    } else {
-      query.action = { $nin: ['revision_completed', 'goal_achieved'] };
-    }
+      return log;
+    });
+    const groupedSolved = groupQuestionLogs(qSolvedLogs);
 
-    if (dateFilter.start) query.timestamp = { $gte: dateFilter.start };
-    if (dateFilter.end) query.timestamp = { ...query.timestamp, $lte: dateFilter.end };
-
-    const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-
-    const [logs, total] = await Promise.all([
-      ActivityLog.find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .populate({
-          path: 'targetId',
-          select: 'title platform platformQuestionId difficulty'
-        })
-        .lean(),
-      ActivityLog.countDocuments(query)
-    ]);
-
-    // Group logs by action
-    for (const log of logs) {
-      const actionType = log.action;
-      if (grouped.hasOwnProperty(actionType)) {
-        grouped[actionType].push(log);
+    // 2. question_mastered
+    const qMasteredQuery = { userId: req.user._id, action: 'question_mastered' };
+    if (dateFilter.start) qMasteredQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) qMasteredQuery.timestamp = { ...qMasteredQuery.timestamp, $lte: dateFilter.end };
+    let qMasteredLogs = await ActivityLog.find(qMasteredQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .populate({ path: 'targetId', select: 'title platform platformQuestionId difficulty pattern' })
+      .lean();
+    qMasteredLogs = qMasteredLogs.filter(log => log.targetId && log.targetId._id);
+    qMasteredLogs = qMasteredLogs.map(log => {
+      if (log.targetId?.pattern && Array.isArray(log.targetId.pattern)) {
+        log.targetId.patternSlugs = log.targetId.pattern.map(p => slugify(p));
       } else {
-        grouped[actionType] = [log];
+        log.targetId.pattern = [];
+        log.targetId.patternSlugs = [];
       }
-    }
+      return log;
+    });
+    const groupedMastered = groupQuestionLogs(qMasteredLogs);
 
-    // Process revision_completed grouping if it exists (when no specific action filter)
-    if (grouped.revision_completed && Array.isArray(grouped.revision_completed)) {
-      grouped.revision_completed = processRevisionLogs(grouped.revision_completed);
-    }
+    // 3. revision_completed
+    const { logs: revisionLogs } = await getRevisionLogsFromSchedules(req.user._id, {
+      startDate: dateFilter.start,
+      endDate: dateFilter.end,
+      page: 1,
+      limit: limitPerAction,
+      sortBy,
+      sortOrder
+    });
+    const { on_time: onTimeRaw, overdue: overdueRaw, ratio, message } = processRevisionLogs(revisionLogs);
+    const onTimeGrouped = groupRevisionLogs(onTimeRaw);
+    const overdueGrouped = groupRevisionLogs(overdueRaw);
 
-    // Filter group_goal_progress: keep only where progress > 50% or ==100%
-    if (grouped.group_goal_progress && Array.isArray(grouped.group_goal_progress)) {
-      grouped.group_goal_progress = grouped.group_goal_progress.filter(log => {
-        const newProgress = log.metadata?.newProgress;
-        const target = log.metadata?.target;
-        if (newProgress === undefined || target === undefined) return false;
-        const percentage = (newProgress / target) * 100;
-        return percentage > 50 || percentage === 100;
-      });
-    }
+    // 4. goal_achieved (latest 5 completed and 5 failed)
+    const goalData = await getGoalStatusArrays(req.user._id, 1, limitPerAction);
+    const goalAchieved = {
+      completed: goalData.completed,
+      failed: goalData.failed
+    };
 
-    // Filter group_challenge_progress: keep only where progress > 50% or ==100% (newProgress is already percentage)
-    if (grouped.group_challenge_progress && Array.isArray(grouped.group_challenge_progress)) {
-      grouped.group_challenge_progress = grouped.group_challenge_progress.filter(log => {
-        const newProgress = log.metadata?.newProgress;
-        if (newProgress === undefined) return false;
-        return newProgress > 50 || newProgress === 100;
-      });
-    }
+    // 5. group_goal_progress (latest 5, filter >50% or 100%)
+    const groupGoalProgressQuery = { userId: req.user._id, action: 'group_goal_progress' };
+    if (dateFilter.start) groupGoalProgressQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) groupGoalProgressQuery.timestamp = { ...groupGoalProgressQuery.timestamp, $lte: dateFilter.end };
+    let groupGoalProgressLogs = await ActivityLog.find(groupGoalProgressQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .lean();
+    groupGoalProgressLogs = groupGoalProgressLogs.filter(log => {
+      const newProgress = log.metadata?.newProgress;
+      const target = log.metadata?.target;
+      if (newProgress === undefined || target === undefined) return false;
+      const percentage = (newProgress / target) * 100;
+      return percentage > 50 || percentage === 100;
+    });
 
-    res.json(formatResponse('Activity logs retrieved successfully', grouped, { pagination: paginate(total, page, limit) }));
+    // 6. group_goal_completed (latest 5)
+    const groupGoalCompletedQuery = { userId: req.user._id, action: 'group_goal_completed' };
+    if (dateFilter.start) groupGoalCompletedQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) groupGoalCompletedQuery.timestamp = { ...groupGoalCompletedQuery.timestamp, $lte: dateFilter.end };
+    const groupGoalCompletedLogs = await ActivityLog.find(groupGoalCompletedQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .lean();
+
+    // 7. group_challenge_progress (latest 5, filter >50% or 100%)
+    const groupChallengeProgressQuery = { userId: req.user._id, action: 'group_challenge_progress' };
+    if (dateFilter.start) groupChallengeProgressQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) groupChallengeProgressQuery.timestamp = { ...groupChallengeProgressQuery.timestamp, $lte: dateFilter.end };
+    let groupChallengeProgressLogs = await ActivityLog.find(groupChallengeProgressQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .lean();
+    groupChallengeProgressLogs = groupChallengeProgressLogs.filter(log => {
+      const newProgress = log.metadata?.newProgress;
+      if (newProgress === undefined) return false;
+      return newProgress > 50 || newProgress === 100;
+    });
+
+    // 8. group_challenge_completed (latest 5)
+    const groupChallengeCompletedQuery = { userId: req.user._id, action: 'group_challenge_completed' };
+    if (dateFilter.start) groupChallengeCompletedQuery.timestamp = { $gte: dateFilter.start };
+    if (dateFilter.end) groupChallengeCompletedQuery.timestamp = { ...groupChallengeCompletedQuery.timestamp, $lte: dateFilter.end };
+    const groupChallengeCompletedLogs = await ActivityLog.find(groupChallengeCompletedQuery)
+      .sort({ timestamp: -1 })
+      .limit(limitPerAction)
+      .lean();
+
+    const combinedData = {
+      question_solved: groupedSolved,
+      question_mastered: groupedMastered,
+      revision_completed: {
+        on_time: onTimeGrouped,
+        overdue: overdueGrouped,
+        ratio,
+        message
+      },
+      goal_achieved: goalAchieved,
+      group_goal_progress: groupGoalProgressLogs,
+      group_goal_completed: groupGoalCompletedLogs,
+      group_challenge_progress: groupChallengeProgressLogs,
+      group_challenge_completed: groupChallengeCompletedLogs
+    };
+
+    res.json(formatResponse('Recent activity retrieved successfully', combinedData, {
+      limited: true,
+      limitPerAction
+    }));
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Get today's solved questions from followed users, grouped by user, with pagination.
- * Returns an object keyed by user ID, each containing user info and an array of solved questions.
- * Pagination metadata follows the existing format (page, limit, total, pages, hasNext, hasPrev).
- */
+// ----------------------------------------------------------------------
+//  TODAY GROUPED FEED (unchanged)
+// ----------------------------------------------------------------------
+
 const getTodayGroupedFeed = async (req, res, next) => {
   try {
     const timeZone = req.userTimeZone || 'UTC';
     const todayStart = getStartOfDay(new Date(), timeZone);
     const todayEnd = getEndOfDay(new Date(), timeZone);
 
-    // Pagination params
     const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100); // cap at 100
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const skip = (page - 1) * limit;
 
-    // 1. Get list of users the authenticated user follows
     const following = await Follow.find({ followerId: req.user._id, isActive: true }).distinct('followedId');
     if (following.length === 0) {
       return res.json(formatResponse('No activity from followed users', { users: {} }, {
@@ -319,7 +584,6 @@ const getTodayGroupedFeed = async (req, res, next) => {
       }));
     }
 
-    // 2. Aggregation pipeline: group logs per user, paginate, and collect solved questions
     const pipeline = [
       {
         $match: {
@@ -328,7 +592,6 @@ const getTodayGroupedFeed = async (req, res, next) => {
           timestamp: { $gte: todayStart, $lte: todayEnd }
         }
       },
-      // Lookup user details
       {
         $lookup: {
           from: 'users',
@@ -338,7 +601,6 @@ const getTodayGroupedFeed = async (req, res, next) => {
         }
       },
       { $unwind: '$userDoc' },
-      // Lookup question details (minimal fields)
       {
         $lookup: {
           from: 'questions',
@@ -348,7 +610,6 @@ const getTodayGroupedFeed = async (req, res, next) => {
         }
       },
       { $unwind: { path: '$questionDoc', preserveNullAndEmptyArrays: true } },
-      // Group by user
       {
         $group: {
           _id: '$userId',
@@ -368,7 +629,8 @@ const getTodayGroupedFeed = async (req, res, next) => {
                 title: '$questionDoc.title',
                 platform: '$questionDoc.platform',
                 platformQuestionId: '$questionDoc.platformQuestionId',
-                difficulty: '$questionDoc.difficulty'
+                difficulty: '$questionDoc.difficulty',
+                pattern: '$questionDoc.pattern'
               },
               solvedAt: '$timestamp',
               timeSpent: { $ifNull: ['$metadata.timeSpent', 0] }
@@ -377,9 +639,7 @@ const getTodayGroupedFeed = async (req, res, next) => {
           latestSolve: { $max: '$timestamp' }
         }
       },
-      // Sort users by most recent solve (descending)
       { $sort: { latestSolve: -1 } },
-      // Pagination using $facet
       {
         $facet: {
           metadata: [{ $count: 'totalUsers' }],
@@ -390,9 +650,23 @@ const getTodayGroupedFeed = async (req, res, next) => {
 
     const result = await ActivityLog.aggregate(pipeline);
     const totalUsers = result[0]?.metadata[0]?.totalUsers || 0;
-    const usersArray = result[0]?.users || [];
+    let usersArray = result[0]?.users || [];
 
-    // Convert array back to object keyed by user ID (matches required structure)
+    usersArray = usersArray.map(user => {
+      if (user.solvedToday && Array.isArray(user.solvedToday)) {
+        user.solvedToday = user.solvedToday.map(solve => {
+          if (solve.question && solve.question.pattern && Array.isArray(solve.question.pattern)) {
+            solve.question.patternSlugs = solve.question.pattern.map(p => slugify(p));
+          } else {
+            solve.question.pattern = [];
+            solve.question.patternSlugs = [];
+          }
+          return solve;
+        });
+      }
+      return user;
+    });
+
     const usersObject = {};
     for (const user of usersArray) {
       usersObject[user._id.toString()] = {

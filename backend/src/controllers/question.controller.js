@@ -55,7 +55,7 @@ const getQuestions = async (req, res, next) => {
     let query = { isActive: true };
     if (platform) query.platform = platform;
     if (difficulty) query.difficulty = difficulty;
-    if (pattern) query.pattern = pattern;
+    if (pattern) query.pattern = { $in: Array.isArray(tags) ? tags : [tags] };
     if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
     if (search) query.$text = { $search: search };
 
