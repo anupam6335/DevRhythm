@@ -71,10 +71,16 @@ module.exports = {
 
   codeExecution: {
     provider: process.env.CODE_EXECUTION_PROVIDER || 'judge0',
+    normalizationEnabled: process.env.CODE_NORMALIZATION_ENABLED !== 'false', 
     judge0: {
       apiUrl: process.env.JUDGE0_API_URL || 'http://localhost:2358',
       cpuTimeLimit: parseFloat(process.env.JUDGE0_CPU_TIME_LIMIT) || 2,
       memoryLimit: parseInt(process.env.JUDGE0_MEMORY_LIMIT) || 128000,
+    },
+    onlineCompiler: {
+      apiUrl: process.env.ONLINECOMPILER_API_URL,
+      apiKey: process.env.ONLINECOMPILER_API_KEY,
+      timeout: parseInt(process.env.ONLINECOMPILER_TIMEOUT) || 30000,
     },
   },
 
