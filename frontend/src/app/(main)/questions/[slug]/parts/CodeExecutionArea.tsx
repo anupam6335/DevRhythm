@@ -47,7 +47,6 @@ interface CodeExecutionAreaProps {
   onTabChange: (tabId: string) => void;
 }
 
-
 const languageMap: Record<string, string> = {
   python: 'python3',
   java: 'java',
@@ -136,6 +135,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const autoSwitched = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
   const partyPopperRef = useRef<PartyPopperRef>(null);
+  const hasLoadedInitialHistory = useRef(false);
 
   const getLanguageExtension = (lang: string) => {
     switch (lang) {
@@ -149,7 +149,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const getCurrentStarterCode = useCallback(() => {
     if (!starterCodeByLanguage) return '';
     const backendLang = languageMap[language];
-    // backendLang now is 'python', 'java', or 'cpp' – matches the keys in starterCodeByLanguage
     return starterCodeByLanguage[backendLang] || `# Write your solution here for ${language}\n`;
   }, [starterCodeByLanguage, language]);
 
@@ -164,26 +163,31 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   }, [code, checkIfModified]);
 
+  // Load history only on initial mount – never on later updates
   useEffect(() => {
-    if (initialHistory.length > 0) {
-      const sorted = [...initialHistory].sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime());
-      const last = sorted[0];
-      if (last) {
-        let frontendLang = initialLanguage;
-        for (const [key, val] of Object.entries(languageMap)) {
-          if (val.toLowerCase() === last.language.toLowerCase()) {
-            frontendLang = key;
-            break;
+    if (!hasLoadedInitialHistory.current) {
+      if (initialHistory.length > 0) {
+        const sorted = [...initialHistory].sort((a, b) => new Date(b.executedAt).getTime() - new Date(a.executedAt).getTime());
+        const last = sorted[0];
+        if (last) {
+          let frontendLang = initialLanguage;
+          for (const [key, val] of Object.entries(languageMap)) {
+            if (val.toLowerCase() === last.language.toLowerCase()) {
+              frontendLang = key;
+              break;
+            }
           }
+          skipStarterLoad.current = true;
+          setLanguage(frontendLang);
+          setCode(last.code);
+          if (onCodeChange) onCodeChange(last.code);
+          setTimeout(() => { skipStarterLoad.current = false; }, 100);
         }
-        skipStarterLoad.current = true;
-        setLanguage(frontendLang);
-        setCode(last.code);
-        if (onCodeChange) onCodeChange(last.code);
-        setTimeout(() => { skipStarterLoad.current = false; }, 100);
       }
+      // Mark as processed so future history changes (e.g., after a run) are ignored
+      hasLoadedInitialHistory.current = true;
     }
-  }, [initialHistory, initialLanguage, onCodeChange]);
+  }, []); // Empty dependency array – runs once on mount
 
   useEffect(() => {
     if (skipStarterLoad.current) return;
@@ -382,8 +386,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
               </div>
             )}
           </div>
-
-          {/* Results removed from here – only in Results tab */}
         </>
       )}
 
