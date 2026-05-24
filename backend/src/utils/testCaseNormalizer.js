@@ -1,14 +1,17 @@
 /**
- * Normalize a test case input string into a JSON object with an "args" array.
+ * Normalize a test case input string into a JSON object with an "args" array,
+ * or preserve an interactive JSON object (with "constructor" and "methods").
  *
  * Supported formats:
- * - Already JSON: {"args": [...]} or [...] → returns as‑is (or wrapped).
+ * - Already interactive JSON: {"constructor": [...], "methods": [...]} → returned as‑is.
+ * - Already simple JSON: {"args": [...]} → returned as‑is.
+ * - JSON array: [1,2,3] → becomes {"args": [1,2,3]}.
  * - Legacy key‑value: "arr1 = [1,10,100], arr2 = [1000]" → becomes {"args": [[1,10,100], [1000]]}.
  * - Multi‑line: "[1,10,100]\n[1000]" → becomes {"args": [[1,10,100], [1000]]}.
  * - Single value (no '=', no newline) → becomes {"args": [value]}.
  *
- * @param {string} stdin - The raw input string.
- * @returns {string} - JSON string of the form {"args": [...]}.
+ * @param {string} stdin – The raw input string.
+ * @returns {string} – JSON string in the format expected by the wrapper.
  */
 function normalizeTestCaseInput(stdin) {
   if (!stdin || typeof stdin !== 'string') {
@@ -16,8 +19,23 @@ function normalizeTestCaseInput(stdin) {
   }
 
   const trimmed = stdin.trim();
+  if (trimmed === '') {
+    return JSON.stringify({ args: [] });
+  }
 
-  // If it's already a valid JSON object with "args", return as‑is.
+  // 1. Already valid interactive JSON (contains "constructor" and "methods")
+  if (trimmed.startsWith('{') && trimmed.includes('"constructor"') && trimmed.includes('"methods"')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.constructor !== undefined && parsed.methods !== undefined) {
+        return trimmed;
+      }
+    } catch (e) {
+      // Not valid JSON, continue
+    }
+  }
+
+  // 2. Already valid simple JSON object with "args"
   if (trimmed.startsWith('{') && trimmed.includes('"args"')) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -29,7 +47,7 @@ function normalizeTestCaseInput(stdin) {
     }
   }
 
-  // If it's a JSON array, wrap it as {"args": [...]}
+  // 3. JSON array (standalone, e.g., [1,2,3] or [[1,2],[3,4]])
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
     try {
       const arr = JSON.parse(trimmed);
@@ -39,18 +57,16 @@ function normalizeTestCaseInput(stdin) {
     }
   }
 
-  // Check for multi‑line input where each line is a JSON array or value
+  // 4. Multi‑line input where each line is a JSON value
   const lines = trimmed.split(/\r?\n/).filter(line => line.trim().length > 0);
   if (lines.length > 1) {
     const parsedLines = [];
     let allValid = true;
     for (const line of lines) {
       const trimmedLine = line.trim();
-      // Try to parse as JSON array, number, string, or boolean
       try {
         parsedLines.push(JSON.parse(trimmedLine));
       } catch (e) {
-        // Not valid JSON on its own, fall back to legacy parsing for this line
         allValid = false;
         break;
       }
@@ -60,12 +76,11 @@ function normalizeTestCaseInput(stdin) {
     }
   }
 
-  // Legacy format: split by commas not inside brackets/braces/quotes
+  // 5. Legacy format: split by commas not inside brackets/braces/quotes
   const parts = splitLegacyInput(trimmed);
   const args = [];
 
   for (const part of parts) {
-    // Extract value after '=' if present
     let valueStr = part;
     const eqIndex = part.indexOf('=');
     if (eqIndex !== -1) {
@@ -73,8 +88,6 @@ function normalizeTestCaseInput(stdin) {
     } else {
       valueStr = part.trim();
     }
-
-    // Convert the value string to a JavaScript value
     const converted = parseValue(valueStr);
     args.push(converted);
   }
@@ -122,7 +135,7 @@ function splitLegacyInput(input) {
 
 /**
  * Parse a single value string into its proper JavaScript type.
- * Supports numbers, strings, booleans, null, arrays, and objects.
+ * Supports numbers, strings, booleans, null, arrays, objects.
  */
 function parseValue(valueStr) {
   valueStr = valueStr.trim();
@@ -130,7 +143,10 @@ function parseValue(valueStr) {
   if (valueStr === 'null') return null;
   if (valueStr === 'true') return true;
   if (valueStr === 'false') return false;
-  if (/^-?\d+(\.\d+)?$/.test(valueStr)) return Number(valueStr);
+  if (/^-?\d+(\.\d+)?$/.test(valueStr)) {
+    const num = Number(valueStr);
+    if (!isNaN(num)) return num;
+  }
   if ((valueStr.startsWith('"') && valueStr.endsWith('"')) ||
       (valueStr.startsWith("'") && valueStr.endsWith("'"))) {
     return valueStr.slice(1, -1);

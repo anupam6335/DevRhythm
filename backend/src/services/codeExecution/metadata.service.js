@@ -4,7 +4,6 @@ const JavaExtractor = require('./metadataExtractor/javaExtractor');
 const CppExtractor = require('./metadataExtractor/cppExtractor');
 const JavascriptExtractor = require('./metadataExtractor/javascriptExtractor');
 
-// Map of language names to extractor instances
 const extractors = {
   python: new PythonExtractor(),
   java: new JavaExtractor(),
@@ -13,16 +12,16 @@ const extractors = {
 };
 
 /**
- * MetadataService - Retrieves or extracts execution metadata for a given problem and language.
+ * MetadataService – Retrieves or extracts execution metadata for a given problem and language.
  * Stores extracted metadata back into the Question document for future reuse.
  */
 class MetadataService {
   /**
    * Get execution metadata for a question and language.
    * First checks the database cache; if not present, extracts from starter code and stores.
-   * @param {string} questionId - MongoDB ObjectId of the question.
-   * @param {string} language - One of 'python', 'java', 'cpp', 'javascript'.
-   * @returns {Promise<Object>} Metadata object (shape defined in extractors).
+   * @param {string} questionId – MongoDB ObjectId of the question.
+   * @param {string} language – One of 'python', 'java', 'cpp', 'javascript'.
+   * @returns {Promise<Object>} Metadata object.
    * @throws {Error} If language is unsupported or extraction fails.
    */
   async getExecutionMetadata(questionId, language) {
@@ -33,7 +32,6 @@ class MetadataService {
     const question = await Question.findById(questionId).lean();
     if (!question) throw new Error(`Question not found: ${questionId}`);
 
-    // Normalize language key for lookup (handle LeetCode's "Python3", "C++", etc.)
     const langMap = {
       python: ['python', 'python3'],
       cpp: ['cpp', 'c++'],
@@ -42,7 +40,6 @@ class MetadataService {
     };
     const possibleKeys = langMap[language] || [language];
 
-    // Helper to get starter code from either Map or plain object
     const getStarterCode = (starterCode, langKey) => {
       if (!starterCode) return null;
       if (starterCode instanceof Map) return starterCode.get(langKey);
@@ -60,31 +57,25 @@ class MetadataService {
       throw new Error(`Starter code missing for language ${language} in question ${questionId}`);
     }
 
-    // Check cache
     const metadataMap = question.executionMetadata || {};
     let metadata = metadataMap[language];
     if (metadata) return metadata;
 
-    // Extract
     try {
       metadata = extractors[language].extract(starterCode);
     } catch (extractError) {
       throw new Error(`Failed to extract metadata for ${language}: ${extractError.message}`);
     }
 
-    // Store back (asynchronous)
-    this._storeMetadata(questionId, language, metadata).catch(err => {
-      console.error(`Failed to store metadata for question ${questionId}, language ${language}:`, err);
-    });
-
+    await this._storeMetadata(questionId, language, metadata);
     return metadata;
   }
 
   /**
    * Store extracted metadata in the database.
-   * @param {string} questionId - MongoDB ObjectId.
-   * @param {string} language - Language key.
-   * @param {Object} metadata - Extracted metadata.
+   * @param {string} questionId – MongoDB ObjectId.
+   * @param {string} language – Language key.
+   * @param {Object} metadata – Extracted metadata.
    * @returns {Promise<void>}
    */
   async _storeMetadata(questionId, language, metadata) {
@@ -97,7 +88,7 @@ class MetadataService {
   /**
    * Pre‑extract metadata for all supported languages of a question.
    * Useful for background jobs after question creation/update.
-   * @param {string} questionId - MongoDB ObjectId.
+   * @param {string} questionId – MongoDB ObjectId.
    * @returns {Promise<Object>} Map of language -> metadata.
    */
   async preExtractAll(questionId) {
@@ -109,7 +100,12 @@ class MetadataService {
     const results = {};
 
     for (const [lang, extractor] of Object.entries(extractors)) {
-      const starterCode = starterCodeMap[lang];
+      let starterCode = null;
+      if (starterCodeMap instanceof Map) {
+        starterCode = starterCodeMap.get(lang);
+      } else if (typeof starterCodeMap === 'object') {
+        starterCode = starterCodeMap[lang];
+      }
       if (starterCode && typeof starterCode === 'string' && starterCode.trim() !== '') {
         try {
           const metadata = extractor.extract(starterCode);
@@ -117,7 +113,6 @@ class MetadataService {
           await this._storeMetadata(questionId, lang, metadata);
         } catch (err) {
           console.error(`Pre‑extraction failed for ${lang} on question ${questionId}:`, err);
-          // Continue with other languages
         }
       }
     }

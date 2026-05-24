@@ -6,6 +6,7 @@ const JavaGenerator = require('../services/codeExecution/wrappers/javaGenerator'
 const CppGenerator = require('../services/codeExecution/wrappers/cppGenerator');
 const JsGenerator = require('../services/codeExecution/wrappers/jsGenerator');
 const { normalizeTestCaseInput } = require('../utils/testCaseNormalizer');
+const OutputComparator = require('../utils/helpers/outputComparator');
 const { formatResponse } = require('../utils/helpers/response');
 const AppError = require('../utils/errors/AppError');
 const Question = require('../models/Question');
@@ -35,7 +36,6 @@ const normalizeLanguage = (lang) => {
 };
 
 const normalizeForCompare = (str) => (str || '').replace(/\s+/g, ' ').trim();
-const normalize = (str) => (str || '').replace(/\s/g, '');
 
 /**
  * Build the complete set of test cases to run (default + custom + request).
@@ -64,7 +64,6 @@ const buildTestCases = (question, userProgress, requestTestCases, stdin, expecte
 
   const allTests = [...defaultTestCases, ...userCustomTestCases, ...requestTests, ...singleTest];
 
-  // Deduplicate
   const uniqueMap = new Map();
   for (const tc of allTests) {
     const key = `${normalizeForCompare(tc.stdin)}|${normalizeForCompare(tc.expected)}`;
@@ -135,7 +134,6 @@ const runCode = async (req, res, next) => {
     ]);
     if (!question) throw new AppError('Question not found', 404);
 
-    // --- Retrieve or extract metadata for the given language ---
     let metadata;
     try {
       metadata = await metadataService.getExecutionMetadata(questionId, language);
@@ -143,7 +141,6 @@ const runCode = async (req, res, next) => {
       throw new AppError(`Failed to extract problem metadata: ${err.message}`, 400);
     }
 
-    // --- Build and normalize test cases ---
     const defaultTestCases = (question.testCases || []).map(tc => ({
       stdin: tc.stdin || '',
       expected: tc.expected,
@@ -151,7 +148,6 @@ const runCode = async (req, res, next) => {
     const finalTestCases = buildTestCases(question, userProgress, testCases, stdin, expected);
     if (finalTestCases.length === 0) throw new AppError('No test cases available for this question', 400);
 
-    // --- Generate the fully runnable wrapper using the language‑specific generator ---
     const generator = GENERATORS[language];
     if (!generator) throw new AppError(`No wrapper generator for language: ${language}`, 500);
     let fullCode;
@@ -161,7 +157,6 @@ const runCode = async (req, res, next) => {
       throw new AppError(`Wrapper generation failed: ${err.message}`, 400);
     }
 
-    // --- Execute via the execution provider with improved error capture ---
     let batchResults;
     try {
       batchResults = await executeBatch({
@@ -171,7 +166,6 @@ const runCode = async (req, res, next) => {
       });
     } catch (execError) {
       console.error('Execution provider error:', execError);
-      // Return a response with all test cases failed and the error message
       const failedResults = finalTestCases.map(tc => ({
         input: tc.stdin,
         output: '',
@@ -191,33 +185,37 @@ const runCode = async (req, res, next) => {
         customTestCasesCount: 0,
       }));
     }
-console.log('Full generated code for language', language, ':\n', fullCode);
-    // --- Process results ---
+
     const isOrderIrrelevant = question.contentRef ? /any order/i.test(question.contentRef) : false;
     const results = batchResults.map((res, idx) => {
       const testCase = finalTestCases[idx];
       const actualOutput = res.stdout || '';
       const expectedOutput = testCase.expected || '';
       const errorMessage = res.stderr || '';
-      const normalizedActual = normalize(actualOutput);
-      const normalizedExpected = normalize(expectedOutput);
 
+      let actualParsed = null;
+      let expectedParsed = null;
       let passed = false;
-      if (isOrderIrrelevant) {
-        try {
-          const actualParsed = JSON.parse(actualOutput);
-          const expectedParsed = JSON.parse(expectedOutput);
-          if (Array.isArray(actualParsed) && Array.isArray(expectedParsed)) {
-            const actualSorted = [...actualParsed].sort((a, b) => a - b);
-            const expectedSorted = [...expectedParsed].sort((a, b) => a - b);
-            passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted);
-          } else {
-            passed = normalizedActual === normalizedExpected;
-          }
-        } catch {
-          passed = normalizedActual === normalizedExpected;
+
+      try {
+        if (actualOutput.trim() !== '') {
+          actualParsed = JSON.parse(actualOutput);
         }
+        if (expectedOutput.trim() !== '') {
+          expectedParsed = JSON.parse(expectedOutput);
+        }
+      } catch (e) {
+        // If JSON parsing fails, fall back to string comparison
+      }
+
+      if (actualParsed !== null && expectedParsed !== null) {
+        passed = OutputComparator.compare(actualParsed, expectedParsed, {
+          unordered: isOrderIrrelevant,
+          floatTolerance: 1e-9,
+        });
       } else {
+        const normalizedActual = (actualOutput || '').replace(/\s/g, '');
+        const normalizedExpected = (expectedOutput || '').replace(/\s/g, '');
         passed = normalizedActual === normalizedExpected;
       }
 
@@ -235,7 +233,6 @@ console.log('Full generated code for language', language, ':\n', fullCode);
     const totalCount = finalTestCases.length;
     const allPassed = passedCount === totalCount;
 
-    // --- Emit aggregated test case event ---
     if (jobQueue) {
       await jobQueue.add('test_case.executed', {
         userId: req.user._id,
@@ -249,13 +246,11 @@ console.log('Full generated code for language', language, ':\n', fullCode);
       });
     }
 
-    // --- Save custom test cases (only those sent in this request) ---
     let customToSave = [];
     if (testCases && Array.isArray(testCases)) customToSave = testCases;
     else if (stdin !== undefined) customToSave = [{ stdin: stdin || '', expected: expected || '' }];
     await saveCustomTestCases(req.user._id, questionId, customToSave, defaultTestCases);
 
-    // --- Save execution history ---
     await CodeExecutionHistory.create({
       userId: req.user._id,
       questionId,
@@ -281,9 +276,8 @@ console.log('Full generated code for language', language, ':\n', fullCode);
 
     await cleanupExecutionHistory(req.user._id, questionId, language);
 
-    // --- Create revision schedule on first submission (any result) ---
     const existingRevision = await RevisionSchedule.findOne({ userId: req.user._id, questionId });
-    if (!existingRevision) {
+    if (!existingRevision && allPassed) {
       const timeZone = req.user.preferences?.timezone || 'UTC';
       const solvedLocal = DateTime.fromJSDate(new Date(), { zone: timeZone });
       const scheduleDays = constants.REVISION_SCHEDULE;
@@ -301,7 +295,6 @@ console.log('Full generated code for language', language, ':\n', fullCode);
       await invalidateCache(`question-details:*:${questionId}:*`);
     }
 
-    // --- If all tests passed, mark question as Solved ---
     const responseData = {
       questionId,
       results,

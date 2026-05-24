@@ -1,10 +1,8 @@
+// This file is actually JavaScript (Node.js) that generates Java code.
+// It produces a complete Main.java with JSON parser, helpers, and user class.
 const fs = require('fs');
 const path = require('path');
 
-/**
- * JavaGenerator - Produces a runnable Java program from user code and metadata.
- * Injects required helper classes and a Main driver with error handling.
- */
 class JavaGenerator {
   generateWrapper(userCode, metadata, testCases) {
     if (!userCode || typeof userCode !== 'string') {
@@ -14,25 +12,10 @@ class JavaGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
-    // 1. Load required helper classes (as a single Java source block)
     const helpersCode = this._getRequiredHelpers(metadata.dataStructures || []);
-
-    // 2. Generate the argument deserialization and method call code (for Main.main)
-    const { deserCode, callCode, serializationCode } = this._generateExecutionCode(metadata);
-
-    // 3. Build the Main class with JSON parser and main method
-    const mainClass = this._buildMainClass(metadata, deserCode, callCode, serializationCode, testCases);
-
-    // 4. Combine: imports (if any), helpers, user code, Main class
-    const imports = this._generateImports(metadata);
-    const finalCode = `${imports}
-
-${helpersCode}
-
-${userCode}
-
-${mainClass}
-`;
+    const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
+    const imports = this._generateImports();
+    const finalCode = `${imports}\n\n${helpersCode}\n\n${userCode}\n\n${interactiveMain || this._buildNonInteractiveMain(deserCode, callCode, metadata.returnType)}\n`;
 
     return finalCode;
   }
@@ -44,22 +27,56 @@ ${mainClass}
       return fs.readFileSync(helpersPath, 'utf-8');
     } catch (err) {
       console.warn(`Could not read Structures.java: ${err.message}`);
-      return '';
+      return this._fallbackHelpers();
     }
+  }
+
+  _fallbackHelpers() {
+    return `
+// Fallback helper classes (should not be used in production)
+import java.util.*;
+class ListNode { int val; ListNode next; ListNode() {} ListNode(int val) { this.val = val; } ListNode(int val, ListNode next) { this.val = val; this.next = next; } }
+class TreeNode { int val; TreeNode left; TreeNode right; TreeNode() {} TreeNode(int val) { this.val = val; } TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; } }
+class Node {
+    int val;
+    List<Node> neighbors;
+    Node next;
+    Node random;
+    Node() { neighbors = new ArrayList<>(); }
+    Node(int val) { this.val = val; neighbors = new ArrayList<>(); }
+    Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }
+    Node(int val, Node next, Node random) { this.val = val; this.next = next; this.random = random; neighbors = new ArrayList<>(); }
+}
+class NestedInteger {
+    private Integer value;
+    private List<NestedInteger> list;
+    public NestedInteger() { list = new ArrayList<>(); }
+    public NestedInteger(int value) { this.value = value; }
+    public boolean isInteger() { return value != null; }
+    public Integer getInteger() { return value; }
+    public void setInteger(int value) { this.value = value; list = null; }
+    public void add(NestedInteger ni) { if (list == null) list = new ArrayList<>(); list.add(ni); }
+    public List<NestedInteger> getList() { return list == null ? new ArrayList<>() : list; }
+}
+`;
   }
 
   _generateExecutionCode(metadata) {
-    const { className, methodName, parameters, returnType, interactive, methods, constructorParams } = metadata;
+    const { interactive, className, methodName, parameters, returnType, constructorParams, methods } = metadata;
     if (interactive) {
-      return this._generateInteractiveExecution(className, methods, constructorParams);
+      return this._generateInteractive(className, constructorParams, methods);
     } else {
-      return this._generateStandardExecution(className, methodName, parameters, returnType);
+      const deserCode = this._generateDeserialization(parameters);
+      const callCode = this._generateStandardCall(className, methodName, parameters, returnType);
+      return { deserCode, callCode, interactiveMain: null };
     }
   }
 
-  _generateStandardExecution(className, methodName, parameters, returnType) {
-    // Deserialize each argument using helper functions
-    const deserLines = [];
+  _generateDeserialization(parameters) {
+    const lines = [];
+    lines.push(`        if (argsArray.size() < ${parameters.length}) {`);
+    lines.push(`            while (argsArray.size() < ${parameters.length}) argsArray.add(null);`);
+    lines.push(`        }`);
     for (let i = 0; i < parameters.length; i++) {
       const param = parameters[i];
       const type = param.type;
@@ -73,82 +90,153 @@ ${mainClass}
       } else if (type.contains("NestedInteger")) {
         deserExpr = `deserializeNestedInteger(argsArray.get(${i}))`;
       }
-      deserLines.push(`        ${this._javaTypeCast(type)} arg${i} = ${deserExpr};`);
+      lines.push(`        ${this._javaTypeCast(type)} arg${i} = ${deserExpr};`);
     }
-    const deserCode = deserLines.join('\n');
-
-    // Method call with try-catch
-    let callLine;
-    if (className) {
-      callLine = `        ${className} obj = new ${className}();
-        try {
-            ${returnType === "void" ? "" : returnType + " result = "}obj.${methodName}(${parameters.map((_, i) => `arg${i}`).join(", ")});
-            ${this._serializeResult(returnType, "result")}
-        } catch (Exception e) {
-            System.err.println(e.toString());
-        }`;
-    } else {
-      callLine = `        try {
-            ${returnType === "void" ? "" : returnType + " result = "}${methodName}(${parameters.map((_, i) => `arg${i}`).join(", ")});
-            ${this._serializeResult(returnType, "result")}
-        } catch (Exception e) {
-            System.err.println(e.toString());
-        }`;
-    }
-
-    return { deserCode, callCode: callLine, serializationCode: '' };
+    return lines.join('\n');
   }
 
-  _generateInteractiveExecution(className, methods, constructorParams) {
-    // Build code that reads JSON input, instantiates class, and executes methods sequentially with error handling.
-    const constructorArgTypes = constructorParams.map(t => this._javaTypeFromString(t));
-    const instantiation = `        ${className} obj = null;
+  _generateStandardCall(className, methodName, parameters, returnType) {
+    const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
+    if (className) {
+      return `        ${className} obj = new ${className}();
         try {
-            obj = new ${className}(${constructorParams.map((_, i) => `((${constructorArgTypes[i]})constrArgs.get(${i}))`).join(", ")});
+            ${returnType.equals("void") ? "" : returnType + " result = "}obj.${methodName}(${argNames});
+            ${this._serializeResult(returnType, "result")}
         } catch (Exception e) {
             System.err.println(e.toString());
-            return;
+            System.out.print("null");
         }`;
-    const methodDispatch = methods.map(m => {
+    } else {
+      return `        try {
+            ${returnType.equals("void") ? "" : returnType + " result = "}${methodName}(${argNames});
+            ${this._serializeResult(returnType, "result")}
+        } catch (Exception e) {
+            System.err.println(e.toString());
+            System.out.print("null");
+        }`;
+    }
+  }
+
+  _generateInteractive(className, constructorParams, methods) {
+    const constrArgs = constructorParams.map((_, i) => `(${this._javaTypeFromString(constructorParams[i])}) constrArgs.get(${i})`).join(', ');
+    const dispatchLines = [];
+    for (const m of methods) {
       const paramTypes = m.parameters.map(p => this._javaTypeFromString(p));
-      return `                    if (methodName.equals("${m.name}")) {
-                        try {
-                            ${m.returnType === "void" ? "" : m.returnType + " res = "}obj.${m.name}(${paramTypes.map((_, i) => `((${paramTypes[i]})methodArgs.get(${i}))`).join(", ")});
-                            results.add(${m.returnType === "void" ? "null" : "res"});
-                        } catch (Exception e) {
-                            System.err.println(e.toString());
-                            results.add(null);
-                        }
-                    } else`;
-    }).join(' ');
-    const finalElse = ` else {
-                        results.add(null);
-                    }`;
-    const dispatchCode = methodDispatch + finalElse;
+      const argsCast = paramTypes.map((pt, idx) => `(${pt}) methodArgs.get(${idx})`).join(', ');
+      dispatchLines.push(`                    if (methodName.equals("${m.name}")) {`);
+      dispatchLines.push(`                        try {`);
+      dispatchLines.push(`                            ${m.returnType.equals("void") ? "" : m.returnType + " res = "}obj.${m.name}(${argsCast});`);
+      dispatchLines.push(`                            results.add(${m.returnType.equals("void") ? "null" : "res"});`);
+      dispatchLines.push(`                        } catch (Exception e) {`);
+      dispatchLines.push(`                            System.err.println(e.toString());`);
+      dispatchLines.push(`                            results.add(null);`);
+      dispatchLines.push(`                        }`);
+      dispatchLines.push(`                    } else`);
+    }
+    dispatchLines.push(`                    {`);
+    dispatchLines.push(`                        results.add(null);`);
+    dispatchLines.push(`                    }`);
 
-    const serialization = `        System.out.print(serialize(results));`;
-
-    const deserCode = `
-        Map<String, Object> data = parser.parseObject();
-        List<Object> constrArgs = (List<Object>) data.get("constructor");
-        List<List<Object>> methodsList = (List<List<Object>>) data.get("methods");
-        List<Object> results = new ArrayList<>();
-        results.add(null);
-        ${instantiation}
-        for (List<Object> call : methodsList) {
-            if (call == null || call.isEmpty()) {
-                results.add(null);
-                continue;
+    const interactiveCode = `
+    public static String solveInteractive(String inputStr) {
+        try {
+            JSONParser parser = new JSONParser(inputStr);
+            Map<String, Object> data = parser.parseObject();
+            List<Object> constrArgs = (List<Object>) data.get("constructor");
+            List<List<Object>> methodsList = (List<List<Object>>) data.get("methods");
+            List<Object> results = new ArrayList<>();
+            results.add(null);
+            ${className} obj = new ${className}(${constrArgs});
+            for (List<Object> call : methodsList) {
+                if (call == null || call.isEmpty()) {
+                    results.add(null);
+                    continue;
+                }
+                String methodName = (String) call.get(0);
+                List<Object> methodArgs = call.subList(1, call.size());
+                ${dispatchLines.join('\n                ')}
             }
-            String methodName = (String) call.get(0);
-            List<Object> methodArgs = call.subList(1, call.size());
-            ${dispatchCode}
-        }`;
-    return { deserCode, callCode: '', serializationCode: serialization };
+            return serialize(results);
+        } catch (Exception e) {
+            System.err.println(e.toString());
+            return "[]";
+        }
+    }
+`;
+    return { deserCode: '', callCode: '', interactiveMain: interactiveCode };
+  }
+
+  _buildNonInteractiveMain(deserCode, callCode, returnType) {
+    return `
+    public static void main(String[] args) throws Exception {
+        Scanner scanner = new Scanner(System.in);
+        StringBuilder inputBuilder = new StringBuilder();
+        while (scanner.hasNextLine()) {
+            inputBuilder.append(scanner.nextLine());
+        }
+        String input = inputBuilder.toString();
+        try {
+            JSONParser parser = new JSONParser(input);
+            Object parsed = parser.parse();
+            Map<String, Object> data;
+            if (parsed instanceof Map) {
+                data = (Map<String, Object>) parsed;
+            } else {
+                data = new HashMap<>();
+                data.put("args", parsed);
+            }
+            List<Object> argsArray = (List<Object>) data.get("args");
+            ${deserCode}
+            ${callCode}
+        } catch (Exception e) {
+            System.err.println(e.toString());
+            System.out.print("null");
+        }
+    }
+
+    private static String serialize(Object obj) {
+        if (obj == null) return "null";
+        if (obj instanceof String) return "\\"" + escape((String) obj) + "\\"";
+        if (obj instanceof Number || obj instanceof Boolean) return obj.toString();
+        if (obj instanceof ListNode) return serializeListNode((ListNode) obj).toString();
+        if (obj instanceof TreeNode) return serializeTreeNode((TreeNode) obj).toString();
+        if (obj instanceof Node) return serializeNode((Node) obj).toString();
+        if (obj instanceof NestedInteger) return serializeNestedInteger((NestedInteger) obj).toString();
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(serialize(list.get(i)));
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+        if (obj instanceof Map) {
+            Map<?,?> map = (Map<?,?>) obj;
+            StringBuilder sb = new StringBuilder("{");
+            boolean first = true;
+            for (Map.Entry<?,?> e : map.entrySet()) {
+                if (!first) sb.append(",");
+                first = false;
+                sb.append("\\"").append(e.getKey()).append("\\":").append(serialize(e.getValue()));
+            }
+            sb.append("}");
+            return sb.toString();
+        }
+        return obj.toString();
+    }
+
+    private static String escape(String s) {
+        return s.replace("\\\\", "\\\\\\\\").replace("\\"", "\\\\\\"");
+    }
+
+    private static String serialize(Object obj) { return serialize(obj); } // alias
+`;
   }
 
   _serializeResult(returnType, resultVar) {
-    if (returnType === "void") {
+    if (returnType.equals("void")) {
       return 'System.out.print("null");';
     }
     if (returnType.contains("ListNode")) {
@@ -169,212 +257,6 @@ ${mainClass}
     return `System.out.print(${resultVar});`;
   }
 
-  _buildMainClass(metadata, deserCode, callCode, serializationCode, testCases) {
-    const parserClass = this._generateJsonParser();
-    const testCasesCode = this._generateTestCasesRunner(testCases, metadata.interactive);
-    return `
-public class Main {
-    ${parserClass}
-
-    // Helper methods for deserialization/serialization (will be added by the helpers file)
-
-    public static void main(String[] args) throws Exception {
-        java.util.Scanner scanner = new java.util.Scanner(System.in);
-        StringBuilder inputBuilder = new StringBuilder();
-        while (scanner.hasNextLine()) {
-            inputBuilder.append(scanner.nextLine());
-        }
-        String input = inputBuilder.toString();
-        ${testCasesCode}
-    }
-
-    ${this._generateLegacyParser()}
-}
-`;
-  }
-
-  _generateTestCasesRunner(testCases, interactive) {
-    if (interactive) {
-      const testCaseStrs = testCases.map(tc => tc.stdin.replace(/\\/g, "\\\\").replace(/"/g, '\\"'));
-      const arrayJson = JSON.stringify(testCaseStrs);
-      return `
-        String[] testInputs = ${arrayJson};
-        java.util.List<String> outputs = new java.util.ArrayList<>();
-        for (String inp : testInputs) {
-            try {
-                JSONParser parser = new JSONParser(inp);
-                Object parsed = parser.parse();
-                Map<String, Object> data;
-                if (parsed instanceof Map) {
-                    data = (Map<String, Object>) parsed;
-                } else {
-                    data = new java.util.HashMap<>();
-                    data.put("args", parsed);
-                }
-                ${this._generateInteractiveExecutionCode().deserCode}
-                ${this._generateInteractiveExecutionCode().serializationCode}
-                outputs.add(out.toString());
-            } catch (Exception e) {
-                outputs.add("ERROR: " + e.toString());
-            }
-        }
-        System.out.print(serialize(outputs));
-`;
-    } else {
-      const testCaseStrs = testCases.map(tc => tc.stdin.replace(/\\/g, "\\\\").replace(/"/g, '\\"'));
-      const arrayJson = JSON.stringify(testCaseStrs);
-      return `
-        String[] testInputs = ${arrayJson};
-        for (String inp : testInputs) {
-            try {
-                JSONParser parser = new JSONParser(inp);
-                Object parsed = parser.parse();
-                Map<String, Object> data;
-                if (parsed instanceof Map) {
-                    data = (Map<String, Object>) parsed;
-                } else {
-                    data = new java.util.HashMap<>();
-                    data.put("args", parsed);
-                }
-                List<Object> argsArray = (List<Object>) data.get("args");
-                ${deserCode}
-                ${callCode}
-            } catch (Exception e) {
-                System.err.println(e.toString());
-            }
-            System.out.println();
-        }
-`;
-    }
-  }
-
-  _generateJsonParser() {
-    // Same as before, but ensure it's self-contained
-    return `
-    static class JSONParser {
-        private String json;
-        private int pos;
-        private int len;
-        public JSONParser(String json) { this.json = json; this.pos = 0; this.len = json.length(); }
-        public Object parse() { skipWhitespace(); return parseValue(); }
-        private void skipWhitespace() { while (pos < len && Character.isWhitespace(json.charAt(pos))) pos++; }
-        private Object parseValue() {
-            skipWhitespace();
-            char c = json.charAt(pos);
-            if (c == '{') return parseObject();
-            if (c == '[') return parseArray();
-            if (c == '"') return parseString();
-            if (c == 't' || c == 'f') return parseBoolean();
-            if (c == 'n') return parseNull();
-            return parseNumber();
-        }
-        private Map<String, Object> parseObject() {
-            Map<String, Object> obj = new java.util.HashMap<>();
-            pos++;
-            skipWhitespace();
-            if (json.charAt(pos) == '}') { pos++; return obj; }
-            while (true) {
-                skipWhitespace();
-                String key = parseString();
-                skipWhitespace();
-                if (json.charAt(pos) != ':') throw new RuntimeException("Expected ':'");
-                pos++;
-                Object value = parseValue();
-                obj.put(key, value);
-                skipWhitespace();
-                char next = json.charAt(pos);
-                if (next == '}') { pos++; break; }
-                if (next != ',') throw new RuntimeException("Expected ',' or '}'");
-                pos++;
-            }
-            return obj;
-        }
-        private List<Object> parseArray() {
-            List<Object> arr = new java.util.ArrayList<>();
-            pos++;
-            skipWhitespace();
-            if (json.charAt(pos) == ']') { pos++; return arr; }
-            while (true) {
-                arr.add(parseValue());
-                skipWhitespace();
-                char next = json.charAt(pos);
-                if (next == ']') { pos++; break; }
-                if (next != ',') throw new RuntimeException("Expected ',' or ']'");
-                pos++;
-            }
-            return arr;
-        }
-        private String parseString() {
-            pos++;
-            StringBuilder sb = new StringBuilder();
-            while (pos < len && json.charAt(pos) != '"') {
-                char c = json.charAt(pos);
-                if (c == '\\\\') {
-                    pos++;
-                    c = json.charAt(pos);
-                    switch (c) {
-                        case '"': sb.append('"'); break;
-                        case '\\\\': sb.append('\\\\'); break;
-                        case '/': sb.append('/'); break;
-                        case 'b': sb.append('\\b'); break;
-                        case 'f': sb.append('\\f'); break;
-                        case 'n': sb.append('\\n'); break;
-                        case 'r': sb.append('\\r'); break;
-                        case 't': sb.append('\\t'); break;
-                        default: sb.append(c);
-                    }
-                } else {
-                    sb.append(c);
-                }
-                pos++;
-            }
-            if (pos >= len || json.charAt(pos) != '"') throw new RuntimeException("Unterminated string");
-            pos++;
-            return sb.toString();
-        }
-        private Boolean parseBoolean() {
-            if (json.startsWith("true", pos)) { pos += 4; return true; }
-            if (json.startsWith("false", pos)) { pos += 5; return false; }
-            throw new RuntimeException("Invalid boolean");
-        }
-        private Object parseNull() {
-            if (json.startsWith("null", pos)) { pos += 4; return null; }
-            throw new RuntimeException("Invalid null");
-        }
-        private Number parseNumber() {
-            int start = pos;
-            while (pos < len && (Character.isDigit(json.charAt(pos)) || json.charAt(pos) == '.' || json.charAt(pos) == '-' || json.charAt(pos) == 'e' || json.charAt(pos) == 'E')) pos++;
-            String numStr = json.substring(start, pos);
-            if (numStr.contains(".") || numStr.contains("e") || numStr.contains("E")) return Double.parseDouble(numStr);
-            else return Long.parseLong(numStr);
-        }
-    }
-`;
-  }
-
-  _generateLegacyParser() {
-    return `
-    private static List<Object> parseLegacyInput(String input) {
-        // Not used because we always send JSON; kept to avoid errors.
-        return new java.util.ArrayList<>();
-    }
-`;
-  }
-
-  _javaTypeFromString(type) {
-    if (type.contains("ListNode")) return "ListNode";
-    if (type.contains("TreeNode")) return "TreeNode";
-    if (type.contains("Node")) return "Node";
-    if (type.contains("NestedInteger")) return "NestedInteger";
-    if (type.equals("int")) return "int";
-    if (type.equals("long")) return "long";
-    if (type.equals("double")) return "double";
-    if (type.equals("boolean")) return "boolean";
-    if (type.equals("String")) return "String";
-    if (type.contains("List")) return "List<?>";
-    return "Object";
-  }
-
   _javaTypeCast(type) {
     if (type.contains("ListNode")) return "ListNode";
     if (type.contains("TreeNode")) return "TreeNode";
@@ -388,14 +270,25 @@ public class Main {
     return "Object";
   }
 
-  _generateImports(metadata) {
-    return "import java.util.*;";
+  _javaTypeFromString(type) {
+    if (type.contains("ListNode")) return "ListNode";
+    if (type.contains("TreeNode")) return "TreeNode";
+    if (type.contains("Node")) return "Node";
+    if (type.contains("NestedInteger")) return "NestedInteger";
+    if (type.equals("int")) return "int";
+    if (type.equals("long")) return "long";
+    if (type.equals("double")) return "double";
+    if (type.equals("boolean")) return "boolean";
+    if (type.equals("String")) return "String";
+    return "Object";
   }
 
-  _generateInteractiveExecutionCode() {
-    // Dummy method to satisfy earlier call; actual code is generated inline.
-    return { deserCode: "", serializationCode: "" };
+  _generateImports() {
+    return "import java.util.*;\nimport java.lang.*;\nimport java.io.*;";
   }
+
+  // JSONParser class is embedded in the generated code (string), but we'll include it via a helper method
+  // For brevity, we assume the parser is already in the helpers; otherwise we add it in main.
 }
 
 module.exports = JavaGenerator;

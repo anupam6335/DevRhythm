@@ -3,31 +3,15 @@ const path = require('path');
 const fs = require('fs');
 
 /**
- * PythonMetadataExtractor - Extracts execution metadata from Python starter code.
- * Uses AST parsing via a temporary Python script for accuracy, with regex fallback.
+ * PythonMetadataExtractor – Extracts execution metadata from Python starter code.
+ * Uses Python's ast module (via a temporary script) for accuracy, with a regex fallback.
  */
 class PythonMetadataExtractor {
-  /**
-   * Extract metadata from Python starter code.
-   * @param {string} starterCode - The Python starter code provided by the platform.
-   * @returns {Object} Metadata object with the following shape:
-   * {
-   *   className: string|null,
-   *   methodName: string,
-   *   returnType: string,
-   *   parameters: [{ name: string, type: string }],
-   *   dataStructures: string[],
-   *   interactive: boolean,
-   *   methods: [{ name: string, returnType: string, parameters: string[] }],
-   *   constructorParams: string[]
-   * }
-   */
   extract(starterCode) {
     if (!starterCode || typeof starterCode !== 'string' || starterCode.trim() === '') {
       throw new Error('Invalid starter code: empty or not a string');
     }
 
-    // Try AST parsing first (most accurate)
     try {
       return this._extractWithAST(starterCode);
     } catch (astError) {
@@ -37,8 +21,7 @@ class PythonMetadataExtractor {
   }
 
   /**
-   * Use Python's ast module to parse the code and extract metadata.
-   * Creates a temporary Python script that analyzes the starter code.
+   * Use Python's ast module to analyse the starter code.
    */
   _extractWithAST(starterCode) {
     const tempScriptPath = path.join(__dirname, '_temp_ast_parser.py');
@@ -65,17 +48,17 @@ def analyze(code):
         if isinstance(annotation, ast.Name):
             return annotation.id
         if isinstance(annotation, ast.Subscript):
-            # e.g., List[int], Optional[TreeNode]
             base = get_type_from_annotation(annotation.value)
+            # Handle Optional, List, Dict, Set, Tuple
             if base in ("List", "Dict", "Set", "Tuple", "Optional"):
                 return base
-            # Handle nested generics like List[List[int]]
+            # For nested generics we keep the base name
             return base
         if isinstance(annotation, ast.Attribute):
             return annotation.attr
         return "Any"
 
-    # First, find a class named Solution or any class with methods (for interactive detection)
+    # First, find a class named Solution or any class with methods
     classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
     target_class = None
     for cls in classes:
@@ -83,14 +66,15 @@ def analyze(code):
             target_class = cls
             break
     if not target_class and len(classes) == 1:
-        target_class = classes[0]  # single class, assume it's the solution class
-        interactive = True          # single class with multiple methods -> interactive
+        target_class = classes[0]   # single class, assume it's the solution class
+        interactive = True          # single class with multiple methods -> likely interactive
     if target_class:
         class_name = target_class.name
         methods_in_class = [node for node in target_class.body if isinstance(node, ast.FunctionDef)]
         if len(methods_in_class) > 1:
             interactive = True
-        # Look for __init__ method to capture constructor parameters
+
+        # Look for __init__ to capture constructor parameters
         for func in methods_in_class:
             if func.name == "__init__":
                 # parameters: first is self, skip it
@@ -99,30 +83,33 @@ def analyze(code):
                     arg_type = get_type_from_annotation(arg.annotation) if arg.annotation else "Any"
                     constructor_params.append(arg_type)
                 break
-        # Find the first public method that is not __init__ (assume it's the main method)
+
+        # Find the first non-__init__ method as the main method
         main_method = None
         for func in methods_in_class:
             if func.name != "__init__":
                 main_method = func
                 break
         if not main_method and methods_in_class:
-            main_method = methods_in_class[0]  # fallback
+            main_method = methods_in_class[0]   # fallback
+
         if main_method:
             method_name = main_method.name
-            # Return type
             if main_method.returns:
                 return_type = get_type_from_annotation(main_method.returns)
-            # Parameters: skip self
+
+            # Parse parameters (skip self)
             for arg in main_method.args.args[1:]:
                 arg_name = arg.arg
                 arg_type = get_type_from_annotation(arg.annotation) if arg.annotation else "Any"
                 parameters.append({"name": arg_name, "type": arg_type})
-                # Check for known data structures
-                if any(ds in arg_type for ds in ["ListNode", "TreeNode", "Node", "NestedInteger"]):
+                # Detect known data structures
+                if any(ds in arg_type for ds in ("ListNode", "TreeNode", "Node", "NestedInteger")):
                     data_structures.add(arg_type)
-            # Also check return type for data structures
-            if any(ds in return_type for ds in ["ListNode", "TreeNode", "Node", "NestedInteger"]):
+
+            if any(ds in return_type for ds in ("ListNode", "TreeNode", "Node", "NestedInteger")):
                 data_structures.add(return_type)
+
         # Collect all methods for interactive problems
         for func in methods_in_class:
             if func.name == "__init__":
@@ -138,7 +125,7 @@ def analyze(code):
                 "parameters": param_types
             })
     else:
-        # No class found, look for top-level function
+        # No class: look for top-level function
         top_functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
         if top_functions:
             func = top_functions[0]
@@ -149,14 +136,14 @@ def analyze(code):
                 arg_name = arg.arg
                 arg_type = get_type_from_annotation(arg.annotation) if arg.annotation else "Any"
                 parameters.append({"name": arg_name, "type": arg_type})
-                if any(ds in arg_type for ds in ["ListNode", "TreeNode", "Node", "NestedInteger"]):
+                if any(ds in arg_type for ds in ("ListNode", "TreeNode", "Node", "NestedInteger")):
                     data_structures.add(arg_type)
-            if any(ds in return_type for ds in ["ListNode", "TreeNode", "Node", "NestedInteger"]):
+            if any(ds in return_type for ds in ("ListNode", "TreeNode", "Node", "NestedInteger")):
                 data_structures.add(return_type)
         else:
             raise ValueError("No class or function found in starter code")
 
-    # If interactive and no explicit methods captured, use the main method as fallback
+    # If interactive but no methods were captured, use the main method
     if interactive and len(methods) == 0 and method_name:
         methods.append({
             "name": method_name,
@@ -197,7 +184,6 @@ if __name__ == "__main__":
       }
       return result;
     } finally {
-      // Clean up temporary file
       if (fs.existsSync(tempScriptPath)) {
         fs.unlinkSync(tempScriptPath);
       }
@@ -205,8 +191,8 @@ if __name__ == "__main__":
   }
 
   /**
-   * Fallback regex-based extraction when AST is unavailable.
-   * Less accurate but works for well-formed LeetCode starter code.
+   * Fallback regex‑based extraction when AST is unavailable or fails.
+   * Handles common LeetCode Python patterns.
    */
   _extractWithRegex(starterCode) {
     let className = null;
@@ -222,7 +208,7 @@ if __name__ == "__main__":
     const classMatch = starterCode.match(/class\s+(\w+)\s*:/);
     if (classMatch) {
       className = classMatch[1];
-      // Extract class body (simplistic: from class line to end or next class)
+      // Extract class body (simplistic but works for well‑formed code)
       const classStart = classMatch.index;
       let braceCount = 0;
       let classBody = '';
@@ -251,7 +237,6 @@ if __name__ == "__main__":
       // Separate __init__ from others
       const initMethod = methodsList.find(m => m.name === '__init__');
       if (initMethod) {
-        // Parse constructor parameters
         const params = initMethod.paramStr.split(',').map(p => p.trim()).filter(p => p && p !== 'self');
         for (const param of params) {
           const typeMatch = param.match(/:?\s*(\w+)$/);
@@ -263,7 +248,6 @@ if __name__ == "__main__":
       if (otherMethods.length > 1) {
         interactive = true;
       }
-      // Assume the first non-__init__ method is the main method
       const mainMethod = otherMethods[0];
       if (!mainMethod) {
         throw new Error('No public method found');
@@ -272,7 +256,6 @@ if __name__ == "__main__":
       returnType = mainMethod.retType;
       // Parse parameters
       let paramParts = mainMethod.paramStr.split(',').map(p => p.trim()).filter(p => p);
-      // Remove 'self' if present
       if (paramParts.length && paramParts[0] === 'self') {
         paramParts = paramParts.slice(1);
       }
@@ -306,7 +289,7 @@ if __name__ == "__main__":
         });
       }
     } else {
-      // No class: look for top-level function
+      // No class: look for top‑level function
       const funcMatch = starterCode.match(/def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^:]+))?\s*:/);
       if (!funcMatch) {
         throw new Error('No function or class found in starter code');
@@ -327,7 +310,6 @@ if __name__ == "__main__":
       if (/ListNode|TreeNode|Node|NestedInteger/.test(returnType)) {
         dataStructuresSet.add(returnType);
       }
-      // Not interactive
       interactive = false;
     }
 

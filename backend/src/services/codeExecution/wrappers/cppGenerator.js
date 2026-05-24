@@ -10,18 +10,52 @@ class CppGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
-    const jsonParserCode = this._getJsonParser();
-    const helpersCode = this._getEmbeddedHelpers();
-    const { deserCode, callCode } = this._generateExecutionCode(metadata);
-    const mainCode = this._buildMain(metadata, deserCode, callCode);
+    const helpersCode = this._embeddedHelpers();
+    const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
     const includes = this._generateIncludes();
 
-    const finalCode = `${includes}\n\n${jsonParserCode}\n\n${helpersCode}\n\n${userCode}\n\n${mainCode}`;
+    // Wrap user code with pragmas to suppress common warnings
+    const wrappedUserCode = `
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+${userCode}
+#pragma GCC diagnostic pop
+`;
+
+    const finalCode = `${includes}\n\n${helpersCode}\n\n${wrappedUserCode}\n\n${interactiveMain || this._buildNonInteractiveMain(deserCode, callCode)}\n`;
+
     return finalCode;
   }
 
-  _getJsonParser() {
+  _embeddedHelpers() {
     return `
+#ifndef EMBEDDED_STRUCTURES_H
+#define EMBEDDED_STRUCTURES_H
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <map>
+#include <queue>
+#include <memory>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstring>
+#include <functional>
+#include <unordered_set>
+#include <stack>
+
+// ----------------------------------------------------------------------
+// JSON Parser
+// ----------------------------------------------------------------------
 class JsonValue {
 public:
     enum Type { JSON_NULL, JSON_BOOL, JSON_NUMBER, JSON_STRING, JSON_ARRAY, JSON_OBJECT };
@@ -53,6 +87,60 @@ public:
     std::string asString() const { return *string_val; }
     std::vector<JsonValue> asArray() const { return *array_val; }
     std::map<std::string, JsonValue> asObject() const { return *object_val; }
+
+    std::string toString() const {
+        std::ostringstream oss;
+        print(oss);
+        return oss.str();
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const JsonValue& val) {
+        val.print(os);
+        return os;
+    }
+
+private:
+    void print(std::ostream& os) const {
+        switch (type) {
+            case JSON_NULL: os << "null"; break;
+            case JSON_BOOL: os << (bool_val ? "true" : "false"); break;
+            case JSON_NUMBER: os << number_val; break;
+            case JSON_STRING: {
+                os << '"';
+                for (char c : *string_val) {
+                    if (c == '"') os << "\\\\\\"";
+                    else if (c == '\\\\') os << "\\\\\\\\";
+                    else if (c == '\\n') os << "\\\\n";
+                    else if (c == '\\r') os << "\\\\r";
+                    else if (c == '\\t') os << "\\\\t";
+                    else os << c;
+                }
+                os << '"';
+                break;
+            }
+            case JSON_ARRAY: {
+                os << '[';
+                for (size_t i = 0; i < array_val->size(); ++i) {
+                    if (i > 0) os << ',';
+                    (*array_val)[i].print(os);
+                }
+                os << ']';
+                break;
+            }
+            case JSON_OBJECT: {
+                os << '{';
+                bool first = true;
+                for (const auto& pair : *object_val) {
+                    if (!first) os << ',';
+                    first = false;
+                    os << '"' << pair.first << '"' << ':';
+                    pair.second.print(os);
+                }
+                os << '}';
+                break;
+            }
+        }
+    }
 };
 
 class JsonParser {
@@ -151,19 +239,56 @@ private:
         return JsonValue(num);
     }
 };
-`;
-  }
-
-  _getEmbeddedHelpers() {
-    return `
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
 
 // ----------------------------------------------------------------------
-// Helper functions for deserialization and serialization
+// Data Structures
 // ----------------------------------------------------------------------
+struct ListNode {
+    int val;
+    ListNode *next;
+    ListNode() : val(0), next(nullptr) {}
+    ListNode(int x) : val(x), next(nullptr) {}
+    ListNode(int x, ListNode *next) : val(x), next(next) {}
+};
 
-// ---------- vector<int> ----------
+struct TreeNode {
+    int val;
+    TreeNode *left;
+    TreeNode *right;
+    TreeNode() : val(0), left(nullptr), right(nullptr) {}
+    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
+    TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
+};
+
+struct Node {
+    int val;
+    std::vector<Node*> neighbors;
+    Node* next;
+    Node* random;
+    Node() : val(0), next(nullptr), random(nullptr) {}
+    Node(int _val) : val(_val), next(nullptr), random(nullptr) {}
+    Node(int _val, std::vector<Node*> _neighbors) : val(_val), neighbors(_neighbors), next(nullptr), random(nullptr) {}
+    Node(int _val, Node* _next, Node* _random) : val(_val), next(_next), random(_random) {}
+};
+
+class NestedInteger {
+private:
+    int value;
+    std::vector<NestedInteger> list;
+    bool isInt;
+public:
+    NestedInteger() : isInt(false) {}
+    NestedInteger(int val) : value(val), isInt(true) {}
+    bool isInteger() const { return isInt; }
+    int getInteger() const { return value; }
+    void setInteger(int val) { value = val; isInt = true; list.clear(); }
+    void add(const NestedInteger& ni) { list.push_back(ni); }
+    const std::vector<NestedInteger>& getList() const { return list; }
+};
+
+// ----------------------------------------------------------------------
+// Serialization / Deserialization Helpers
+// ----------------------------------------------------------------------
 static std::vector<int> deserializeIntVector(const JsonValue& val) {
     std::vector<int> res;
     if (!val.isArray()) return res;
@@ -179,7 +304,6 @@ static JsonValue serializeIntVector(const std::vector<int>& vec) {
     return JsonValue(res);
 }
 
-// ---------- vector<vector<int>> ----------
 static std::vector<std::vector<int>> deserializeIntVectorVector(const JsonValue& val) {
     std::vector<std::vector<int>> res;
     if (!val.isArray()) return res;
@@ -197,7 +321,6 @@ static JsonValue serializeIntVectorVector(const std::vector<std::vector<int>>& v
     return JsonValue(res);
 }
 
-// ---------- vector<string> ----------
 static std::vector<std::string> deserializeStringVector(const JsonValue& val) {
     std::vector<std::string> res;
     if (!val.isArray()) return res;
@@ -214,14 +337,47 @@ static JsonValue serializeStringVector(const std::vector<std::string>& vec) {
     return JsonValue(res);
 }
 
-// ---------- ListNode ----------
-struct ListNode {
-    int val;
-    ListNode *next;
-    ListNode() : val(0), next(nullptr) {}
-    ListNode(int x) : val(x), next(nullptr) {}
-    ListNode(int x, ListNode *next) : val(x), next(next) {}
-};
+// ---------- Helpers for char vectors ----------
+static std::vector<char> deserializeCharVector(const JsonValue& val) {
+    std::vector<char> res;
+    if (!val.isArray()) return res;
+    for (const auto& elem : val.asArray()) {
+        if (elem.isString()) {
+            std::string s = elem.asString();
+            if (!s.empty()) res.push_back(s[0]);
+        } else if (elem.isNumber()) {
+            res.push_back((char)elem.asNumber());
+        }
+    }
+    return res;
+}
+
+static JsonValue serializeCharVector(const std::vector<char>& vec) {
+    std::vector<JsonValue> res;
+    for (char c : vec) {
+        std::string s(1, c);
+        res.push_back(JsonValue(s));
+    }
+    return JsonValue(res);
+}
+
+static std::vector<std::vector<char>> deserializeCharVectorVector(const JsonValue& val) {
+    std::vector<std::vector<char>> res;
+    if (!val.isArray()) return res;
+    for (const auto& row : val.asArray()) {
+        res.push_back(deserializeCharVector(row));
+    }
+    return res;
+}
+
+static JsonValue serializeCharVectorVector(const std::vector<std::vector<char>>& vec) {
+    std::vector<JsonValue> res;
+    for (const auto& row : vec) {
+        res.push_back(serializeCharVector(row));
+    }
+    return JsonValue(res);
+}
+// ---------------------------------------------
 
 static ListNode* deserializeListNode(const JsonValue& val) {
     if (!val.isArray()) return nullptr;
@@ -244,16 +400,6 @@ static JsonValue serializeListNode(ListNode* head) {
     }
     return JsonValue(res);
 }
-
-// ---------- TreeNode ----------
-struct TreeNode {
-    int val;
-    TreeNode *left;
-    TreeNode *right;
-    TreeNode() : val(0), left(nullptr), right(nullptr) {}
-    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
-    TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
-};
 
 static TreeNode* deserializeTreeNode(const JsonValue& val) {
     if (!val.isArray()) return nullptr;
@@ -286,24 +432,12 @@ static JsonValue serializeTreeNode(TreeNode* root) {
             q.push(node->left);
             q.push(node->right);
         } else {
-            res.push_back(JsonValue()); // null
+            res.push_back(JsonValue());
         }
     }
     while (!res.empty() && res.back().isNull()) res.pop_back();
     return JsonValue(res);
 }
-
-// ---------- Node (graph & random list) ----------
-struct Node {
-    int val;
-    std::vector<Node*> neighbors;
-    Node* next;
-    Node* random;
-    Node() : val(0), next(nullptr), random(nullptr) {}
-    Node(int _val) : val(_val), next(nullptr), random(nullptr) {}
-    Node(int _val, std::vector<Node*> _neighbors) : val(_val), neighbors(_neighbors), next(nullptr), random(nullptr) {}
-    Node(int _val, Node* _next, Node* _random) : val(_val), next(_next), random(_random) {}
-};
 
 static Node* deserializeGraphNode(const JsonValue& val) {
     if (!val.isArray()) return nullptr;
@@ -415,22 +549,6 @@ static JsonValue serializeNode(Node* node) {
     }
 }
 
-// ---------- NestedInteger ----------
-class NestedInteger {
-private:
-    int value;
-    std::vector<NestedInteger> list;
-    bool isInt;
-public:
-    NestedInteger() : isInt(false) {}
-    NestedInteger(int val) : value(val), isInt(true) {}
-    bool isInteger() const { return isInt; }
-    int getInteger() const { return value; }
-    void setInteger(int val) { value = val; isInt = true; list.clear(); }
-    void add(const NestedInteger& ni) { list.push_back(ni); }
-    const std::vector<NestedInteger>& getList() const { return list; }
-};
-
 static NestedInteger deserializeNestedInteger(const JsonValue& val) {
     if (val.isNumber()) {
         return NestedInteger((int)val.asNumber());
@@ -457,135 +575,207 @@ static JsonValue serializeNestedInteger(const NestedInteger& ni) {
 }
 
 #pragma GCC diagnostic pop
+
+#endif // EMBEDDED_STRUCTURES_H
 `;
   }
 
   _generateExecutionCode(metadata) {
-    const { className, methodName, parameters, returnType, interactive, methods, constructorParams } = metadata;
+    const { interactive, className, methodName, parameters, returnType, constructorParams, methods } = metadata;
     if (interactive) {
-      return this._generateInteractiveExecution(className, methods, constructorParams);
+      return this._generateInteractive(className, constructorParams, methods);
     } else {
-      return this._generateStandardExecution(className, methodName, parameters, returnType);
+      const deserCode = this._generateDeserialization(parameters);
+      const callCode = this._generateStandardCall(className, methodName, parameters, returnType);
+      return { deserCode, callCode, interactiveMain: null };
     }
   }
 
-  _generateStandardExecution(className, methodName, parameters, returnType) {
-    const deserLines = [];
+  _generateDeserialization(parameters) {
+    const lines = [];
     for (let i = 0; i < parameters.length; i++) {
       const param = parameters[i];
-      const type = param.type;
-      let deserExpr = '';
-      if (type == "int") {
-        deserExpr = `(int)argsArray[${i}].asNumber()`;
-      } else if (type == "double") {
-        deserExpr = `argsArray[${i}].asNumber()`;
-      } else if (type == "bool") {
-        deserExpr = `argsArray[${i}].asBool()`;
-      } else if (type == "string" || type == "std::string") {
-        deserExpr = `argsArray[${i}].asString()`;
-      } else if (type == "vector<int>" || type == "vector<int>&") {
-        deserExpr = `deserializeIntVector(argsArray[${i}])`;
-      } else if (type == "vector<vector<int>>" || type == "vector<vector<int>>&") {
-        deserExpr = `deserializeIntVectorVector(argsArray[${i}])`;
-      } else if (type == "vector<string>" || type == "vector<string>&") {
-        deserExpr = `deserializeStringVector(argsArray[${i}])`;
-      } else if (type.includes("ListNode")) {
-        deserExpr = `deserializeListNode(argsArray[${i}])`;
-      } else if (type.includes("TreeNode")) {
-        deserExpr = `deserializeTreeNode(argsArray[${i}])`;
-      } else if (type.includes("Node")) {
-        deserExpr = `deserializeNode(argsArray[${i}])`;
-      } else if (type.includes("NestedInteger")) {
-        deserExpr = `deserializeNestedInteger(argsArray[${i}])`;
-      } else {
-        deserExpr = `argsArray[${i}]`;
-      }
-      deserLines.push(`    auto arg${i} = ${deserExpr};`);
-    }
-    const deserCode = deserLines.join('\n');
+      let type = param.type;
+      let normalized = type.replace(/[&*]/g, '').replace(/const/g, '').trim();
+      normalized = normalized.replace(/\s+/g, ' ');
+      let expr = `argsArray[${i}]`;
 
-    let callLine;
-    if (className) {
-      callLine = `    ${className} obj;
-    ${returnType === "void" ? "" : "auto result = "}obj.${methodName}(${parameters.map((_, i) => `arg${i}`).join(", ")});
-    ${this._serializeResult(returnType, "result")}`;
-    } else {
-      callLine = `    ${returnType === "void" ? "" : "auto result = "}${methodName}(${parameters.map((_, i) => `arg${i}`).join(", ")});
-    ${this._serializeResult(returnType, "result")}`;
+      if (normalized.includes("vector<vector<char>>")) {
+        expr = `deserializeCharVectorVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<char>")) {
+        expr = `deserializeCharVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<vector<int>>")) {
+        expr = `deserializeIntVectorVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<int>")) {
+        expr = `deserializeIntVector(argsArray[${i}])`;
+      } else if (normalized.includes("vector<string>")) {
+        expr = `deserializeStringVector(argsArray[${i}])`;
+      } else if (normalized.includes("ListNode")) {
+        expr = `deserializeListNode(argsArray[${i}])`;
+      } else if (normalized.includes("TreeNode")) {
+        expr = `deserializeTreeNode(argsArray[${i}])`;
+      } else if (normalized.includes("Node")) {
+        expr = `deserializeNode(argsArray[${i}])`;
+      } else if (normalized.includes("NestedInteger")) {
+        expr = `deserializeNestedInteger(argsArray[${i}])`;
+      } else if (normalized === "int") {
+        expr = `(int)argsArray[${i}].asNumber()`;
+      } else if (normalized === "double") {
+        expr = `argsArray[${i}].asNumber()`;
+      } else if (normalized === "bool") {
+        expr = `argsArray[${i}].asBool()`;
+      } else if (normalized === "string" || normalized === "std::string") {
+        expr = `argsArray[${i}].asString()`;
+      } else if (normalized === "char") {
+        expr = `(argsArray[${i}].asString().empty() ? '\\0' : argsArray[${i}].asString()[0])`;
+      }
+      lines.push(`    auto arg${i} = ${expr};`);
     }
-    return { deserCode, callCode: callLine };
+    return lines.join('\n');
   }
 
-  _generateInteractiveExecution(className, methods, constructorParams) {
-    const instantiation = `    ${className} obj;
+  _generateStandardCall(className, methodName, parameters, returnType) {
+    const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
+    if (className) {
+      return `    ${className} obj;
     try {
-        obj = ${className}(${constructorParams.map((_, i) => `constrArgs[${i}]`).join(", ")});
+        ${returnType === "void" ? "" : "auto result = "}obj.${methodName}(${argNames});
+        ${this._serializeResult(returnType, "result")}
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
-        return;
+        std::cout << "null";
     }`;
-    const dispatch = methods.map(m => {
-      const paramTypes = m.parameters.map(p => this._cppTypeFromString(p));
-      return `        if (methodName == "${m.name}") {
-            try {
-                ${m.returnType === "void" ? "" : "auto res = "}obj.${m.name}(${paramTypes.map((_, i) => `methodArgs[${i}]`).join(", ")});
-                results.push_back(${m.returnType === "void" ? "nullptr" : "res"});
-            } catch (const std::exception& e) {
-                std::cerr << e.what() << std::endl;
-                results.push_back(nullptr);
-            }
-        } else`;
-    }).join(' ') + ` {
-            results.push_back(nullptr);
-        }`;
-    const serialization = `    std::cout << serialize(results);`;
-
-    const deserCode = `
-    JsonParser parser(inputStr);
-    JsonValue parsed = parser.parse();
-    auto objMap = parsed.asObject();
-    std::vector<JsonValue> constrArgs = objMap["constructor"].asArray();
-    std::vector<std::vector<JsonValue>> methodsList;
-    for (auto& call : objMap["methods"].asArray()) {
-        methodsList.push_back(call.asArray());
+    } else {
+      return `    try {
+        ${returnType === "void" ? "" : "auto result = "}${methodName}(${argNames});
+        ${this._serializeResult(returnType, "result")}
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cout << "null";
+    }`;
     }
-    std::vector<JsonValue> results;
-    results.push_back(JsonValue());
-    ${instantiation}
-    for (auto& call : methodsList) {
-        if (call.size() < 1) { results.push_back(JsonValue()); continue; }
-        std::string methodName = call[0].asString();
-        std::vector<JsonValue> methodArgs;
-        for (size_t i = 1; i < call.size(); i++) methodArgs.push_back(call[i]);
-        ${dispatch}
-    }`;
-    return { deserCode, callCode: serialization };
   }
 
   _serializeResult(returnType, resultVar) {
-    if (returnType === "void") return 'std::cout << "null";';
-    if (returnType.includes("ListNode")) return `std::cout << serializeListNode(${resultVar});`;
-    if (returnType.includes("TreeNode")) return `std::cout << serializeTreeNode(${resultVar});`;
-    if (returnType.includes("Node")) return `std::cout << serializeNode(${resultVar});`;
-    if (returnType.includes("NestedInteger")) return `std::cout << serializeNestedInteger(${resultVar});`;
-    if (returnType == "std::string") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
-    if (returnType == "bool") return `std::cout << std::boolalpha << ${resultVar};`;
-    if (returnType == "vector<int>") return `std::cout << serializeIntVector(${resultVar});`;
-    if (returnType == "vector<vector<int>>") return `std::cout << serializeIntVectorVector(${resultVar});`;
-    if (returnType == "vector<string>") return `std::cout << serializeStringVector(${resultVar});`;
+    const typeStr = (typeof returnType === 'string') ? returnType : String(returnType);
+    let normalized = typeStr.replace(/[&*]/g, '').replace(/const/g, '').trim();
+    normalized = normalized.replace(/\s+/g, ' ');
+    if (normalized === "void") return 'std::cout << "null";';
+    if (normalized.includes("vector<vector<char>>")) return `std::cout << serializeCharVectorVector(${resultVar});`;
+    if (normalized.includes("vector<char>")) return `std::cout << serializeCharVector(${resultVar});`;
+    if (normalized.includes("ListNode")) return `std::cout << serializeListNode(${resultVar});`;
+    if (normalized.includes("TreeNode")) return `std::cout << serializeTreeNode(${resultVar});`;
+    if (normalized.includes("Node")) return `std::cout << serializeNode(${resultVar});`;
+    if (normalized.includes("NestedInteger")) return `std::cout << serializeNestedInteger(${resultVar});`;
+    if (normalized.includes("vector<vector<int>>")) return `std::cout << serializeIntVectorVector(${resultVar});`;
+    if (normalized.includes("vector<int>")) return `std::cout << serializeIntVector(${resultVar});`;
+    if (normalized.includes("vector<string>")) return `std::cout << serializeStringVector(${resultVar});`;
+    if (normalized === "std::string") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
+    if (normalized === "bool") return `std::cout << std::boolalpha << ${resultVar};`;
+    if (normalized === "int" || normalized === "double") return `std::cout << ${resultVar};`;
+    if (normalized === "char") return `std::cout << "\\"" << ${resultVar} << "\\"";`;
     return `std::cout << ${resultVar};`;
   }
 
-  _buildMain(metadata, deserCode, callCode) {
-    const interactive = metadata.interactive;
-    if (interactive) {
-      return `
+  _generateInteractive(className, constructorParams, methods) {
+    const instantiation = (!constructorParams || constructorParams.length === 0)
+      ? `    ${className} obj;`
+      : `    ${className} obj(${constructorParams.map((_, i) => `deserializeArg<${this._cppTypeFromString(constructorParams[i])}>(constrArgs[${i}])`).join(', ')});`;
+
+    const deserializeHelper = `
+    template<typename T>
+    T deserializeArg(const JsonValue& val) {
+        if constexpr (std::is_same_v<T, int>) return (int)val.asNumber();
+        else if constexpr (std::is_same_v<T, double>) return val.asNumber();
+        else if constexpr (std::is_same_v<T, bool>) return val.asBool();
+        else if constexpr (std::is_same_v<T, std::string>) return val.asString();
+        else if constexpr (std::is_same_v<T, char>) return (val.asString().empty() ? '\\0' : val.asString()[0]);
+        else if constexpr (std::is_same_v<T, ListNode*>) return deserializeListNode(val);
+        else if constexpr (std::is_same_v<T, TreeNode*>) return deserializeTreeNode(val);
+        else if constexpr (std::is_same_v<T, Node*>) return deserializeNode(val);
+        else if constexpr (std::is_same_v<T, NestedInteger>) return deserializeNestedInteger(val);
+        else if constexpr (std::is_same_v<T, std::vector<int>>) return deserializeIntVector(val);
+        else if constexpr (std::is_same_v<T, std::vector<std::vector<int>>>) return deserializeIntVectorVector(val);
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) return deserializeStringVector(val);
+        else if constexpr (std::is_same_v<T, std::vector<char>>) return deserializeCharVector(val);
+        else if constexpr (std::is_same_v<T, std::vector<std::vector<char>>>) return deserializeCharVectorVector(val);
+        else return val;
+    }
+`;
+
+    const methodBodies = [];
+    for (const m of methods) {
+      const methodName = m.name;
+      const paramTypes = m.parameters;
+      const lines = [];
+      for (let i = 0; i < paramTypes.length; i++) {
+        const cppType = this._cppTypeFromString(paramTypes[i]);
+        lines.push(`                auto arg${i} = deserializeArg<${cppType}>(methodArgs[${i}]);`);
+      }
+      const argNames = paramTypes.map((_, i) => `arg${i}`).join(', ');
+      lines.push(`                try {`);
+      if (m.returnType !== "void") {
+        lines.push(`                    auto res = obj.${methodName}(${argNames});`);
+        lines.push(`                    results.push_back(serialize(res).toString());`);
+      } else {
+        lines.push(`                    obj.${methodName}(${argNames});`);
+        lines.push(`                    results.push_back("null");`);
+      }
+      lines.push(`                } catch (const std::exception& e) {`);
+      lines.push(`                    std::cerr << e.what() << std::endl;`);
+      lines.push(`                    results.push_back("null");`);
+      lines.push(`                }`);
+
+      methodBodies.push(`            if (methodName == "${methodName}") {
+${lines.join('\n')}
+            } else`);
+    }
+    const dispatch = methodBodies.join(' ') + ` {
+                results.push_back("null");
+            }`;
+
+    const unwrapLogic = `
+        JsonParser parser(line);
+        JsonValue parsed = parser.parse();
+        if (parsed.isObject()) {
+            auto objMap = parsed.asObject();
+            if (objMap.count("args") && objMap["args"].isString()) {
+                std::string inner = objMap["args"].asString();
+                JsonParser innerParser(inner);
+                parsed = innerParser.parse();
+            }
+        }
+        auto objMap = parsed.asObject();
+`;
+
+    const interactiveCode = `
+${deserializeHelper}
 int main() {
     std::string line;
     std::getline(std::cin, line);
     try {
-        ${deserCode}
-        ${callCode}
+        ${unwrapLogic}
+        std::vector<JsonValue> constrArgs = objMap["constructor"].asArray();
+        std::vector<std::vector<JsonValue>> methodsList;
+        for (auto& call : objMap["methods"].asArray()) {
+            methodsList.push_back(call.asArray());
+        }
+        std::vector<std::string> results;
+        results.push_back("null");
+        ${instantiation}
+        for (auto& call : methodsList) {
+            if (call.size() < 1) { results.push_back("null"); continue; }
+            std::string methodName = call[0].asString();
+            std::vector<JsonValue> methodArgs;
+            for (size_t i = 1; i < call.size(); i++) methodArgs.push_back(call[i]);
+            ${dispatch}
+        }
+        std::cout << '[';
+        for (size_t i = 0; i < results.size(); i++) {
+            if (i > 0) std::cout << ',';
+            std::cout << results[i];
+        }
+        std::cout << ']';
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     } catch (...) {
@@ -594,8 +784,11 @@ int main() {
     return 0;
 }
 `;
-    } else {
-      return `
+    return { deserCode: '', callCode: '', interactiveMain: interactiveCode };
+  }
+
+  _buildNonInteractiveMain(deserCode, callCode) {
+    return `
 int main() {
     std::string line;
     std::getline(std::cin, line);
@@ -609,44 +802,60 @@ int main() {
         std::cout << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "ERROR: " << e.what() << std::endl;
+        std::cout << "null";
     } catch (...) {
         std::cerr << "Unknown error" << std::endl;
+        std::cout << "null";
     }
     return 0;
 }
 `;
-    }
   }
 
   _generateIncludes() {
     return `#include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <list>
+#include <deque>
+#include <queue>
+#include <stack>
+#include <algorithm>
+#include <numeric>
+#include <iterator>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <cctype>
-#include <algorithm>
-#include <queue>
-#include <stack>
 #include <cmath>
 #include <cstring>
-#include <functional>
-#include <unordered_set>
+#include <tuple>
 using namespace std;`;
   }
 
   _cppTypeFromString(type) {
-    if (type.includes("ListNode")) return "ListNode*";
-    if (type.includes("TreeNode")) return "TreeNode*";
-    if (type.includes("Node")) return "Node*";
-    if (type.includes("NestedInteger")) return "NestedInteger";
-    if (type == "int") return "int";
-    if (type == "long") return "long";
-    if (type == "double") return "double";
-    if (type == "bool") return "bool";
-    if (type == "string") return "string";
-    if (type.contains("vector")) return type;
+    let normalized = type.replace(/[&*]/g, '').replace(/const/g, '').trim();
+    normalized = normalized.replace(/\s+/g, ' ');
+    if (normalized.includes("vector<vector<char>>")) return "std::vector<std::vector<char>>";
+    if (normalized.includes("vector<char>")) return "std::vector<char>";
+    if (normalized.includes("vector<vector<int>>")) return "std::vector<std::vector<int>>";
+    if (normalized.includes("vector<int>")) return "std::vector<int>";
+    if (normalized.includes("vector<string>")) return "std::vector<std::string>";
+    if (normalized.includes("ListNode")) return "ListNode*";
+    if (normalized.includes("TreeNode")) return "TreeNode*";
+    if (normalized.includes("Node")) return "Node*";
+    if (normalized.includes("NestedInteger")) return "NestedInteger";
+    if (normalized === "int") return "int";
+    if (normalized === "long") return "long";
+    if (normalized === "double") return "double";
+    if (normalized === "bool") return "bool";
+    if (normalized === "char") return "char";
+    if (normalized === "string" || normalized === "std::string") return "std::string";
     return "auto";
   }
 }

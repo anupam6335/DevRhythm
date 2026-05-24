@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * JsGenerator - Produces a runnable JavaScript/Node.js program from user code and metadata.
+ * JsGenerator – Produces a runnable JavaScript/Node.js program from user code and metadata.
  * Injects required helper functions and a main() entry point with error handling.
  */
 class JsGenerator {
@@ -14,22 +14,9 @@ class JsGenerator {
       throw new Error('Invalid metadata: missing methodName');
     }
 
-    // 1. Load required data structure helpers
     const helpersCode = this._getRequiredHelpers(metadata.dataStructures || []);
-
-    // 2. Generate argument deserialization and method call code
-    const { deserCode, callCode, serializationCode } = this._generateExecutionCode(metadata);
-
-    // 3. Build the main() function that reads stdin, processes test cases
-    const mainCode = this._buildMain(metadata, deserCode, callCode, serializationCode, testCases);
-
-    // 4. Combine: helpers, user code, main()
-    const finalScript = `${helpersCode}
-
-${userCode}
-
-${mainCode}
-`;
+    const { deserCode, callCode, interactiveMain } = this._generateExecutionCode(metadata);
+    const finalScript = `${helpersCode}\n\n${userCode}\n\n${interactiveMain || this._buildNonInteractiveMain(deserCode, callCode)}\n`;
 
     return finalScript;
   }
@@ -41,14 +28,13 @@ ${mainCode}
       return fs.readFileSync(helpersPath, 'utf-8');
     } catch (err) {
       console.warn(`Could not read structures.js: ${err.message}`);
-      return this._generateFallbackHelpers();
+      return this._fallbackHelpers();
     }
   }
 
-  _generateFallbackHelpers() {
-    // Minimal data structure helpers (used if structures.js not found)
+  _fallbackHelpers() {
     return `
-// Minimal data structure helpers
+// Minimal data structure helpers (production version should use structures.js)
 class ListNode { constructor(val, next) { this.val = val === undefined ? 0 : val; this.next = next === undefined ? null : next; } }
 class TreeNode { constructor(val, left, right) { this.val = val === undefined ? 0 : val; this.left = left === undefined ? null : left; this.right = right === undefined ? null : right; } }
 class Node { constructor(val, neighbors, next, random) { this.val = val === undefined ? 0 : val; this.neighbors = neighbors === undefined ? [] : neighbors; this.next = next === undefined ? null : next; this.random = random === undefined ? null : random; } }
@@ -69,100 +55,81 @@ function serializeNestedInteger(ni){ if(ni.isInteger()) return ni.getInteger(); 
   }
 
   _generateExecutionCode(metadata) {
-    const { className, methodName, parameters, interactive, methods, constructorParams } = metadata;
+    const { interactive, className, constructorParams, methods, parameters } = metadata;
     if (interactive) {
-      return this._generateInteractiveExecution(className, methods, constructorParams);
+      return this._generateInteractive(className, constructorParams, methods);
     } else {
-      return this._generateStandardExecution(className, methodName, parameters);
+      const deserCode = this._generateDeserialization(parameters);
+      const callCode = this._generateStandardCall(className, metadata.methodName, parameters);
+      return { deserCode, callCode, interactiveMain: null };
     }
   }
 
-  _generateStandardExecution(className, methodName, parameters) {
-    // Deserialize each argument
-    const deserLines = [];
+  _generateDeserialization(parameters) {
+    if (!parameters.length) return '';
+    const lines = [];
     for (let i = 0; i < parameters.length; i++) {
       const param = parameters[i];
       const paramName = param.name;
-      let deserExpr = `args[${i}]`;
+      let expr = `args[${i}]`;
       if (paramName.toLowerCase().includes('head') || paramName.toLowerCase().includes('list')) {
-        deserExpr = `deserializeLinkedList(args[${i}])`;
+        expr = `deserializeLinkedList(args[${i}])`;
       } else if (paramName.toLowerCase().includes('root') || paramName.toLowerCase().includes('tree')) {
-        deserExpr = `deserializeTree(args[${i}])`;
+        expr = `deserializeTree(args[${i}])`;
       } else if (paramName.toLowerCase().includes('graph') || paramName.toLowerCase().includes('adj')) {
-        deserExpr = `deserializeGraph(args[${i}])`;
-      } else if (paramName.toLowerCase().includes('node') && param.type !== 'ListNode') {
-        deserExpr = `deserializeNode(args[${i}])`;
+        expr = `deserializeGraph(args[${i}])`;
+      } else if (paramName.toLowerCase().includes('node') && !param.type.includes('ListNode')) {
+        expr = `deserializeNode(args[${i}])`;
       }
-      deserLines.push(`    const arg${i} = ${deserExpr};`);
+      lines.push(`    const arg${i} = ${expr};`);
     }
-    const deserCode = deserLines.join('\n');
+    return lines.join('\n');
+  }
 
-    // Method call with error handling
-    let callLine;
+  _generateStandardCall(className, methodName, parameters) {
+    const argNames = parameters.map((_, i) => `arg${i}`).join(', ');
     if (className) {
-      callLine = `    let result;
+      return `    let result;
     try {
         const obj = new ${className}();
-        result = obj.${methodName}(${parameters.map((_, i) => `arg${i}`).join(', ')});
+        result = obj.${methodName}(${argNames});
     } catch (err) {
         process.stderr.write(err.toString());
         result = null;
     }`;
     } else {
-      callLine = `    let result;
+      return `    let result;
     try {
-        result = ${methodName}(${parameters.map((_, i) => `arg${i}`).join(', ')});
+        result = ${methodName}(${argNames});
     } catch (err) {
         process.stderr.write(err.toString());
         result = null;
     }`;
     }
-
-    // Serialization
-    const serializationCode = `    try {
-        const serialized = JSON.stringify(result, (key, value) => {
-            if (value && typeof value === 'object') {
-                if (value.val !== undefined && value.next !== undefined) return serializeLinkedList(value);
-                if (value.val !== undefined && (value.left !== undefined || value.right !== undefined)) return serializeTree(value);
-                if (value.val !== undefined && value.neighbors !== undefined) return serializeGraph(value);
-                if (value.val !== undefined && (value.next !== undefined || value.random !== undefined)) return serializeRandomList(value);
-                if (value.isInteger && value.getList) return serializeNestedInteger(value);
-            }
-            return value;
-        });
-        return serialized;
-    } catch (err) {
-        process.stderr.write(err.toString());
-        return "null";
-    }`;
-    return { deserCode, callCode: callLine, serializationCode };
   }
 
-  _generateInteractiveExecution(className, methods, constructorParams) {
-    // Build code that reads JSON input, instantiates class, executes methods sequentially with error handling.
-    const instantiation = `    let obj = null;
-    try {
-        obj = new ${className}(${constructorParams.map((_, i) => `constrArgs[${i}]`).join(', ')});
-    } catch (err) {
-        process.stderr.write(err.toString());
-        return JSON.stringify([]);
-    }`;
-    const dispatch = methods.map(m => {
-      return `        if (methodName === "${m.name}") {
-            try {
-                const res = obj.${m.name}(${m.parameters.map((_, i) => `methodArgs[${i}]`).join(', ')});
-                results.push(res);
-            } catch (err) {
-                process.stderr.write(err.toString());
-                results.push(null);
-            }
-        } else`;
-    }).join(' ') + ` {
-            results.push(null);
-        }`;
-    const serialization = `    return JSON.stringify(results);`;
+  _generateInteractive(className, constructorParams, methods) {
+    const constrArgs = constructorParams.map((_, i) => `constrArgs[${i}]`).join(', ');
+    const dispatchLines = [];
+    for (const m of methods) {
+      const paramCount = m.parameters.length;
+      const argsPlaceholder = paramCount > 0 ? `...methodArgs` : '';
+      dispatchLines.push(`        if (methodName === "${m.name}") {`);
+      dispatchLines.push(`            try {`);
+      dispatchLines.push(`                const res = obj.${m.name}(${argsPlaceholder});`);
+      dispatchLines.push(`                results.push(res);`);
+      dispatchLines.push(`            } catch (err) {`);
+      dispatchLines.push(`                process.stderr.write(err.toString());`);
+      dispatchLines.push(`                results.push(null);`);
+      dispatchLines.push(`            }`);
+      dispatchLines.push(`        } else`);
+    }
+    dispatchLines.push(`        {`);
+    dispatchLines.push(`            results.push(null);`);
+    dispatchLines.push(`        }`);
 
-    const deserCode = `
+    const interactiveCode = `
+function solve(inputStr) {
     let data;
     try {
         data = JSON.parse(inputStr);
@@ -173,7 +140,13 @@ function serializeNestedInteger(ni){ if(ni.isInteger()) return ni.getInteger(); 
     const constrArgs = data.constructor || [];
     const methodsList = data.methods || [];
     const results = [null];
-    ${instantiation}
+    let obj;
+    try {
+        obj = new ${className}(${constrArgs});
+    } catch (err) {
+        process.stderr.write(err.toString());
+        return JSON.stringify([]);
+    }
     for (const call of methodsList) {
         if (!Array.isArray(call) || call.length === 0) {
             results.push(null);
@@ -181,62 +154,16 @@ function serializeNestedInteger(ni){ if(ni.isInteger()) return ni.getInteger(); 
         }
         const methodName = call[0];
         const methodArgs = call.slice(1);
-        ${dispatch}
+        ${dispatchLines.join('\n        ')}
     }
-    ${serialization}
+    return JSON.stringify(results);
+}
 `;
-    return { deserCode, callCode: '', serializationCode: '' };
+    return { deserCode: '', callCode: '', interactiveMain: interactiveCode };
   }
 
-  _buildMain(metadata, deserCode, callCode, serializationCode, testCases) {
-    const interactive = metadata.interactive;
-    const testCaseStrs = testCases.map(tc => tc.stdin.replace(/\\/g, '\\\\').replace(/"/g, '\\"'));
-    const testArrayJson = JSON.stringify(testCaseStrs);
-
-    if (interactive) {
-      return `
-const fs = require('fs');
-
-function main() {
-    const testInputs = ${testArrayJson};
-    const outputs = [];
-    for (const inp of testInputs) {
-        try {
-            const out = solve(inp);
-            outputs.push(out);
-        } catch (e) {
-            outputs.push(JSON.stringify({ error: e.toString() }));
-        }
-    }
-    process.stdout.write(JSON.stringify(outputs));
-}
-
-function solve(inputStr) {
-    ${deserCode}
-    ${callCode}
-    ${serializationCode}
-}
-
-if (require.main === module) {
-    main();
-}
-`;
-    } else {
-      return `
-const fs = require('fs');
-
-function main() {
-    const testInputs = ${testArrayJson};
-    for (const inp of testInputs) {
-        try {
-            const out = solve(inp);
-            process.stdout.write(out + "\\n");
-        } catch (e) {
-            process.stderr.write(e.toString() + "\\n");
-        }
-    }
-}
-
+  _buildNonInteractiveMain(deserCode, callCode) {
+    return `
 function solve(inputStr) {
     let parsed;
     try {
@@ -248,14 +175,36 @@ function solve(inputStr) {
     const args = parsed.args || [];
     ${deserCode}
     ${callCode}
-    ${serializationCode}
+    // Serialise result using appropriate helper
+    if (result && typeof result === 'object') {
+        if (result.val !== undefined && result.next !== undefined) {
+            return JSON.stringify(serializeLinkedList(result));
+        }
+        if (result.val !== undefined && (result.left !== undefined || result.right !== undefined)) {
+            return JSON.stringify(serializeTree(result));
+        }
+        if (result.val !== undefined && result.neighbors !== undefined) {
+            return JSON.stringify(serializeGraph(result));
+        }
+        if (result.val !== undefined && (result.next !== undefined || result.random !== undefined)) {
+            return JSON.stringify(serializeRandomList(result));
+        }
+        if (result.isInteger && result.getList) {
+            return JSON.stringify(serializeNestedInteger(result));
+        }
+    }
+    return JSON.stringify(result);
 }
 
 if (require.main === module) {
-    main();
+    let input = '';
+    process.stdin.on('data', chunk => input += chunk);
+    process.stdin.on('end', () => {
+        const output = solve(input);
+        process.stdout.write(output);
+    });
 }
 `;
-    }
   }
 }
 

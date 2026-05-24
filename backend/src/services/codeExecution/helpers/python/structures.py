@@ -1,15 +1,16 @@
 import json
 from collections import deque
+from typing import List, Optional, Any, Dict, Set, Tuple
 
 # ----------------------------------------------------------------------
 # ListNode Helpers
 # ----------------------------------------------------------------------
 class ListNode:
-    def __init__(self, val=0, next=None):
+    def __init__(self, val: int = 0, next: 'ListNode' = None):
         self.val = val
         self.next = next
 
-def deserialize_linked_list(arr):
+def deserialize_linked_list(arr: List[int]) -> Optional[ListNode]:
     """Convert a JSON array into a linked list."""
     if not arr:
         return None
@@ -20,7 +21,7 @@ def deserialize_linked_list(arr):
         curr = curr.next
     return head
 
-def serialize_linked_list(head):
+def serialize_linked_list(head: Optional[ListNode]) -> List[int]:
     """Convert a linked list into a JSON array."""
     res = []
     curr = head
@@ -33,12 +34,12 @@ def serialize_linked_list(head):
 # TreeNode Helpers (level‑order with nulls)
 # ----------------------------------------------------------------------
 class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
+    def __init__(self, val: int = 0, left: 'TreeNode' = None, right: 'TreeNode' = None):
         self.val = val
         self.left = left
         self.right = right
 
-def deserialize_tree(arr):
+def deserialize_tree(arr: List[Optional[int]]) -> Optional[TreeNode]:
     """Convert a level‑order JSON array (with nulls) into a binary tree."""
     if not arr:
         return None
@@ -53,7 +54,7 @@ def deserialize_tree(arr):
                 node.right = kids.pop()
     return root
 
-def serialize_tree(root):
+def serialize_tree(root: Optional[TreeNode]) -> List[Optional[int]]:
     """Convert a binary tree into a level‑order JSON array (with nulls)."""
     if not root:
         return []
@@ -74,17 +75,15 @@ def serialize_tree(root):
 
 # ----------------------------------------------------------------------
 # Generic Node – supports both graph and random list
-# The type of Node is determined by the presence of 'neighbors' vs 'random'.
-# We provide both deserializers; the generator will call the appropriate one.
 # ----------------------------------------------------------------------
 class Node:
-    def __init__(self, val=0, neighbors=None, next=None, random=None):
+    def __init__(self, val: int = 0, neighbors: List['Node'] = None, next: 'Node' = None, random: 'Node' = None):
         self.val = val
         self.neighbors = neighbors if neighbors is not None else []
         self.next = next
         self.random = random
 
-def deserialize_graph(adj_list):
+def deserialize_graph(adj_list: List[List[int]]) -> Optional[Node]:
     """Convert adjacency list JSON into a graph Node (1‑based indexing)."""
     if not adj_list:
         return None
@@ -99,7 +98,7 @@ def deserialize_graph(adj_list):
             nodes[node_val].neighbors.append(nodes[nb_val])
     return nodes[1] if nodes else None
 
-def serialize_graph(node):
+def serialize_graph(node: Optional[Node]) -> List[List[int]]:
     """Convert a graph Node into adjacency list JSON."""
     if not node:
         return []
@@ -123,19 +122,19 @@ def serialize_graph(node):
         res.append(neighbor_vals)
     return res
 
-def deserialize_random_list(arr):
+def deserialize_random_list(arr: List[List[Optional[int]]]) -> Optional[Node]:
     """Convert a JSON array of [val, random_index] pairs into a random‑list Node."""
     if not arr:
         return None
     nodes = [Node(pair[0]) for pair in arr]
-    for i in range(len(nodes)-1):
+    for i in range(len(nodes) - 1):
         nodes[i].next = nodes[i+1]
     for i, pair in enumerate(arr):
         if pair[1] is not None:
             nodes[i].random = nodes[pair[1]]
     return nodes[0] if nodes else None
 
-def serialize_random_list(head):
+def serialize_random_list(head: Optional[Node]) -> List[List[Optional[int]]]:
     """Convert a random‑list Node into a JSON array of [val, random_index] pairs."""
     if not head:
         return []
@@ -154,31 +153,50 @@ def serialize_random_list(head):
         cur = cur.next
     return res
 
+def deserialize_node(obj: Any) -> Optional[Node]:
+    """Auto‑detect Node type: graph (adjacency list) or random list."""
+    if not obj:
+        return None
+    if (isinstance(obj, list) and len(obj) > 0 and
+        isinstance(obj[0], list) and len(obj[0]) == 2 and
+        (isinstance(obj[0][1], int) or obj[0][1] is None)):
+        return deserialize_random_list(obj)
+    return deserialize_graph(obj)
+
+def serialize_node(node: Optional[Node]) -> Any:
+    """Auto‑detect Node type: graph or random list, and serialize accordingly."""
+    if not node:
+        return []
+    if node.next is not None:
+        return serialize_random_list(node)
+    else:
+        return serialize_graph(node)
+
 # ----------------------------------------------------------------------
 # NestedInteger Helpers
 # ----------------------------------------------------------------------
 class NestedInteger:
-    def __init__(self, value=None):
+    def __init__(self, value: Any = None):
         self.value = value
         self.list = []
 
-    def isInteger(self):
+    def isInteger(self) -> bool:
         return self.value is not None
 
-    def getInteger(self):
+    def getInteger(self) -> Any:
         return self.value
 
-    def setInteger(self, value):
+    def setInteger(self, value: int) -> None:
         self.value = value
         self.list = []
 
-    def add(self, ni):
+    def add(self, ni: 'NestedInteger') -> None:
         self.list.append(ni)
 
-    def getList(self):
+    def getList(self) -> List['NestedInteger']:
         return self.list
 
-def deserialize_nested_integer(data):
+def deserialize_nested_integer(data: Any) -> NestedInteger:
     """Convert a JSON value (int or list) into a NestedInteger."""
     if isinstance(data, int):
         return NestedInteger(data)
@@ -190,7 +208,7 @@ def deserialize_nested_integer(data):
     else:
         return NestedInteger()
 
-def serialize_nested_integer(ni):
+def serialize_nested_integer(ni: NestedInteger) -> Any:
     """Convert a NestedInteger into a JSON value (int or list)."""
     if ni.isInteger():
         return ni.getInteger()
@@ -198,43 +216,22 @@ def serialize_nested_integer(ni):
         return [serialize_nested_integer(child) for child in ni.getList()]
 
 # ----------------------------------------------------------------------
-# General collection helpers (List, Dict, Tuple, Set) – they mostly pass through
-# but are kept for consistency.
+# Additional helpers for common collection types
 # ----------------------------------------------------------------------
-def deserialize_list(obj):
-    return obj
+def deserialize_int_vector(arr: List[int]) -> List[int]:
+    return arr
 
-def deserialize_dict(obj):
-    return obj
+def serialize_int_vector(vec: List[int]) -> List[int]:
+    return vec
 
-def deserialize_tuple(obj):
-    return obj
+def deserialize_int_vector_vector(arr: List[List[int]]) -> List[List[int]]:
+    return arr
 
-def deserialize_set(obj):
-    return obj
+def serialize_int_vector_vector(vec: List[List[int]]) -> List[List[int]]:
+    return vec
 
-# ----------------------------------------------------------------------
-# The following function is a generic dispatcher for Node deserialization.
-# It tries to detect whether the input is a graph adjacency list or a random list.
-# ----------------------------------------------------------------------
-def deserialize_node(obj):
-    """Auto‑detect Node type: graph (adjacency list) or random list."""
-    if not obj:
-        return None
-    # If it's a list of lists and the inner lists have length 2 and second element is an int or None -> random list
-    if (isinstance(obj, list) and len(obj) > 0 and
-        isinstance(obj[0], list) and len(obj[0]) == 2 and
-        (isinstance(obj[0][1], int) or obj[0][1] is None)):
-        return deserialize_random_list(obj)
-    # Otherwise treat as graph adjacency list
-    return deserialize_graph(obj)
+def deserialize_string_vector(arr: List[str]) -> List[str]:
+    return arr
 
-def serialize_node(node):
-    """Auto‑detect Node type: graph or random list, and serialize accordingly."""
-    if not node:
-        return []
-    # Check if node has 'random' attribute (distinct from None) that indicates random list
-    if hasattr(node, 'random') and (node.random is not None or getattr(node, 'next', None) is not None):
-        return serialize_random_list(node)
-    else:
-        return serialize_graph(node)
+def serialize_string_vector(vec: List[str]) -> List[str]:
+    return vec

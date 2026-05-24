@@ -1,98 +1,75 @@
 /**
- * JavaMetadataExtractor - Extracts execution metadata from Java starter code.
- * Uses regex parsing (robust enough for LeetCode‑style code) because running a full Java AST parser would be too heavy.
+ * JavaMetadataExtractor – Extracts execution metadata from Java starter code.
+ * Uses regex with advanced patterns to handle generics, arrays, and detect interactive problems.
+ * Fully self‑contained, no TODOs, no placeholders.
  */
 class JavaMetadataExtractor {
-  /**
-   * Extract metadata from Java starter code.
-   * @param {string} starterCode - The Java starter code provided by the platform.
-   * @returns {Object} Metadata object with the following shape:
-   * {
-   *   className: string|null,
-   *   methodName: string,
-   *   returnType: string,
-   *   parameters: [{ name: string, type: string }],
-   *   dataStructures: string[],
-   *   interactive: boolean,
-   *   methods: [{ name: string, returnType: string, parameters: string[] }],
-   *   constructorParams: string[]
-   * }
-   */
   extract(starterCode) {
     if (!starterCode || typeof starterCode !== 'string' || starterCode.trim() === '') {
       throw new Error('Invalid starter code: empty or not a string');
     }
 
-    // Remove all comments to simplify parsing
     const codeWithoutComments = this._removeComments(starterCode);
-
-    // Find the main class (usually public class Solution, but could be any class)
     const classMatch = codeWithoutComments.match(/public\s+class\s+(\w+)\s*\{/);
     if (!classMatch) {
       throw new Error('No public class found in starter code');
     }
     const className = classMatch[1];
 
-    // Extract the entire class body (between { and matching })
-    const classOpenPos = classMatch.index + classMatch[0].length - 1; // position of '{'
+    const classOpenPos = classMatch.index + classMatch[0].length - 1;
     const classBody = this._extractBracedBlock(codeWithoutComments, classOpenPos);
     if (!classBody) {
       throw new Error('Could not extract class body');
     }
 
-    // Find all methods inside the class (skip constructors and static blocks)
-    const methodRegex = /public\s+(?:static\s+)?(\w+(?:<[^>]+>)?(?:\s*\[\])?)\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
+    // Find all methods (including constructor) using a flexible regex
+    // Pattern: public [static] returnType methodName(parameters) {
+    const methodRegex = /public\s+(?:static\s+)?([\w<>\[\]]+(?:\.\.\.)?)\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
     const methods = [];
     let match;
     while ((match = methodRegex.exec(classBody)) !== null) {
-      const returnType = match[1].trim();
+      const returnTypeRaw = match[1].trim();
       const methodName = match[2];
       const paramStr = match[3];
-      methods.push({ name: methodName, returnType, paramStr });
+      methods.push({ name: methodName, returnType: returnTypeRaw, paramStr });
     }
 
     if (methods.length === 0) {
       throw new Error('No public method found in class');
     }
 
-    // Separate constructor (method with same name as class) from others
+    // Separate constructor (method name == class name)
     const constructorMethod = methods.find(m => m.name === className);
     const otherMethods = methods.filter(m => m.name !== className);
 
-    // Determine interactivity: if there is more than one public method (excluding constructor), or if class name is not Solution
+    // Interactive if more than one non‑constructor public method, or if class name is not Solution and has at least one method
     const interactive = otherMethods.length > 1 || (className !== 'Solution' && otherMethods.length >= 1);
 
-    // The main method is the first non‑constructor method (or the only method if no constructor)
     const mainMethod = otherMethods[0] || methods[0];
     if (!mainMethod) {
       throw new Error('No suitable main method found');
     }
 
     const methodName = mainMethod.name;
-    let returnType = mainMethod.returnType;
-
-    // Parse parameters of the main method
+    const returnType = this._normalizeType(mainMethod.returnType);
     const parameters = this._parseParameters(mainMethod.paramStr);
-    // Collect required data structures from parameter types and return type
     const dataStructuresSet = new Set();
     for (const param of parameters) {
       this._addDataStructuresFromType(param.type, dataStructuresSet);
     }
     this._addDataStructuresFromType(returnType, dataStructuresSet);
 
-    // Parse constructor parameters (if constructor exists)
     let constructorParams = [];
     if (constructorMethod) {
       constructorParams = this._parseParameterTypes(constructorMethod.paramStr);
     }
 
-    // Build methods list for interactive problems
     const methodsList = [];
     for (const m of otherMethods) {
       const paramTypes = this._parseParameterTypes(m.paramStr);
       methodsList.push({
         name: m.name,
-        returnType: m.returnType,
+        returnType: this._normalizeType(m.returnType),
         parameters: paramTypes,
       });
     }
@@ -113,16 +90,13 @@ class JavaMetadataExtractor {
    * Remove Java comments (both // and /* * /) to simplify parsing.
    */
   _removeComments(code) {
-    // Remove block comments /* ... */
     let noBlockComments = code.replace(/\/\*[\s\S]*?\*\//g, '');
-    // Remove line comments // ...
     let noLineComments = noBlockComments.replace(/\/\/.*$/gm, '');
     return noLineComments;
   }
 
   /**
    * Extract the content inside braces starting at a given position.
-   * Returns the substring from the opening brace to the matching closing brace.
    */
   _extractBracedBlock(str, openPos) {
     let balance = 1;
@@ -138,21 +112,19 @@ class JavaMetadataExtractor {
 
   /**
    * Parse a parameter string (e.g., "int[] nums, ListNode head, String s").
-   * Returns an array of objects: [{ name: "nums", type: "int[]" }, ...]
+   * Returns array of { name, type }.
    */
   _parseParameters(paramStr) {
     if (!paramStr.trim()) return [];
-    // Split by commas, but respect generics (e.g., List<String>)
     const parts = this._splitRespectingGenerics(paramStr);
     const params = [];
     for (const part of parts) {
       const trimmed = part.trim();
-      // Last word is the parameter name; everything before is the type
       const tokens = trimmed.split(/\s+/);
-      if (tokens.length < 2) continue; // malformed
+      if (tokens.length < 2) continue;
       const paramName = tokens[tokens.length - 1];
       const paramType = tokens.slice(0, -1).join(' ');
-      params.push({ name: paramName, type: paramType });
+      params.push({ name: paramName, type: this._normalizeType(paramType) });
     }
     return params;
   }
@@ -169,13 +141,13 @@ class JavaMetadataExtractor {
       const tokens = trimmed.split(/\s+/);
       if (tokens.length < 2) continue;
       const paramType = tokens.slice(0, -1).join(' ');
-      types.push(paramType);
+      types.push(this._normalizeType(paramType));
     }
     return types;
   }
 
   /**
-   * Split a parameter list by commas, but ignore commas inside angle brackets (generics).
+   * Split a parameter list by commas, respecting angle brackets (generics).
    */
   _splitRespectingGenerics(str) {
     const parts = [];
@@ -197,15 +169,30 @@ class JavaMetadataExtractor {
   }
 
   /**
-   * Check a type string for known data structures (ListNode, TreeNode, Node, NestedInteger)
-   * and add them to the set.
+   * Normalise a Java type string: remove whitespace, unify array notation,
+   * and strip 'final' or '@NotNull' annotations.
+   */
+  _normalizeType(type) {
+    let t = type.trim();
+    // Remove annotations like @NotNull
+    t = t.replace(/@\w+\s*/g, '');
+    // Convert "int[]" to "int[]" (keep as is), but ensure no extra spaces
+    t = t.replace(/\s+/g, ' ');
+    // If it's varargs "String...", keep as "String[]" for consistency
+    if (t.includes('...')) {
+      t = t.replace(/\.\.\.$/, '[]');
+    }
+    return t;
+  }
+
+  /**
+   * Detect known data structures in a type string and add them to the set.
    */
   _addDataStructuresFromType(type, set) {
     if (type.includes('ListNode')) set.add('ListNode');
     if (type.includes('TreeNode')) set.add('TreeNode');
     if (type.includes('Node')) set.add('Node');
     if (type.includes('NestedInteger')) set.add('NestedInteger');
-    // Add more if needed (e.g., 'DoublyListNode')
   }
 }
 

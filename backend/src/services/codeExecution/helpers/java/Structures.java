@@ -323,4 +323,47 @@ public class Structures {
             return list;
         }
     }
+
+    // ---------- Collection helpers ----------
+    public static List<Integer> deserializeIntVector(Object obj) {
+        if (obj == null) return new ArrayList<>();
+        List<?> list = (List<?>) obj;
+        List<Integer> result = new ArrayList<>();
+        for (Object item : list) {
+            result.add(((Number) item).intValue());
+        }
+        return result;
+    }
+
+    public static Object serializeIntVector(List<Integer> vec) {
+        return vec;
+    }
+
+    public static List<List<Integer>> deserializeIntVectorVector(Object obj) {
+        if (obj == null) return new ArrayList<>();
+        List<?> outer = (List<?>) obj;
+        List<List<Integer>> result = new ArrayList<>();
+        for (Object inner : outer) {
+            result.add(deserializeIntVector(inner));
+        }
+        return result;
+    }
+
+    public static Object serializeIntVectorVector(List<List<Integer>> vec) {
+        return vec;
+    }
+
+    public static List<String> deserializeStringVector(Object obj) {
+        if (obj == null) return new ArrayList<>();
+        List<?> list = (List<?>) obj;
+        List<String> result = new ArrayList<>();
+        for (Object item : list) {
+            result.add(item.toString());
+        }
+        return result;
+    }
+
+    public static Object serializeStringVector(List<String> vec) {
+        return vec;
+    }
 }

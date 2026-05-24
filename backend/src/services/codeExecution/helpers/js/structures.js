@@ -1,6 +1,6 @@
 /**
- * structures.js - Helper functions for data structure serialization/deserialization.
- * These are injected into the generated JavaScript wrapper.
+ * structures.js – Helper functions for data structure serialization/deserialization.
+ * Injected into generated JavaScript wrappers.
  */
 
 // ----------------------------------------------------------------------
@@ -253,20 +253,28 @@ function serializeNestedInteger(ni) {
 // ----------------------------------------------------------------------
 // Collection helpers (optional, for completeness)
 // ----------------------------------------------------------------------
-function deserializeList(obj) {
-    return obj;
+function deserializeIntVector(arr) {
+    return arr;
 }
 
-function deserializeDict(obj) {
-    return obj;
+function serializeIntVector(vec) {
+    return vec;
 }
 
-function deserializeTuple(obj) {
-    return obj;
+function deserializeIntVectorVector(arr) {
+    return arr;
 }
 
-function deserializeSet(obj) {
-    return obj;
+function serializeIntVectorVector(vec) {
+    return vec;
+}
+
+function deserializeStringVector(arr) {
+    return arr;
+}
+
+function serializeStringVector(vec) {
+    return vec;
 }
 
 // Export for Node.js (if needed, but the wrapper will embed this whole file)
@@ -288,5 +296,11 @@ if (typeof module !== 'undefined' && module.exports) {
         NestedInteger,
         deserializeNestedInteger,
         serializeNestedInteger,
+        deserializeIntVector,
+        serializeIntVector,
+        deserializeIntVectorVector,
+        serializeIntVectorVector,
+        deserializeStringVector,
+        serializeStringVector,
     };
 }
