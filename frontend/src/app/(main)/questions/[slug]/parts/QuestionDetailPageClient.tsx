@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/features/auth/hooks/useSession';
@@ -10,6 +10,7 @@ import { useRunCode } from '@/features/codeExecution/hooks/useRunCode';
 import { useDeleteQuestion } from '@/features/question/hooks/useDeleteQuestion';
 import { useQuestionDetails } from '@/features/question/hooks/useQuestionDetails';
 import { useUpdateStatus } from '@/features/progress/hooks/useUpdateStatus';
+import { useSimilarQuestions } from '@/features/question/hooks/useSimilarQuestions';
 import { useTimeTracker } from '@/features/revision/hooks/useTimeTracker';
 import { questionsKeys, slugify } from '@/shared/lib';
 import Button from '@/shared/components/Button';
@@ -26,15 +27,13 @@ import { LazyRightColumn } from './LazyRightColumn';
 import { LazyRevisionTimeline } from './LazyRevisionTimeline';
 import styles from './QuestionDetailPage.module.css';
 import Link from 'next/link';
+import SkeletonLoader from '@/shared/components/SkeletonLoader';
 
 interface QuestionDetailPageClientProps {
   initialQuestion: Question;
   initialSimilarQuestions: Question[];
 }
 
-/**
- * Decode common escape sequences (e.g., \\n → \n) and HTML entities.
- */
 function decodeEscapedString(str: string): string {
   if (!str) return '';
 
@@ -53,9 +52,6 @@ function decodeEscapedString(str: string): string {
     .replace(/&#39;/g, "'");
 }
 
-/**
- * Convert a raw content string into safe HTML for rendering.
- */
 function prepareHtmlContent(raw: string): string {
   if (!raw) return '';
 
@@ -74,9 +70,6 @@ function prepareHtmlContent(raw: string): string {
   return `<div style="white-space: pre-wrap;">${escaped.replace(/\n/g, '<br>')}</div>`;
 }
 
-/**
- * Format the <pre> blocks inside the problem statement.
- */
 function formatExamplePreBlocks(html: string): string {
   if (!html) return html;
 
@@ -108,6 +101,27 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const [rightActiveTab, setRightActiveTab] = useState('code');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [persistedResults, setPersistedResults] = useState<any[] | undefined>(undefined);
+
+  // Client-side fallback for similar questions
+  const [similarQuestions, setSimilarQuestions] = useState(initialSimilarQuestions);
+  const [shouldFetchSimilar, setShouldFetchSimilar] = useState(initialSimilarQuestions.length === 0);
+
+  const {
+    data: clientSimilarQuestions,
+    isLoading: clientSimilarLoading,
+    error: clientSimilarError,
+  } = useSimilarQuestions(initialQuestion._id, shouldFetchSimilar);
+
+  useEffect(() => {
+    if (clientSimilarQuestions && clientSimilarQuestions.length > 0) {
+      setSimilarQuestions(clientSimilarQuestions);
+      setShouldFetchSimilar(false);
+    } else if (clientSimilarError && !clientSimilarLoading) {
+      // If fetch fails, keep empty and stop retrying
+      setShouldFetchSimilar(false);
+    }
+  }, [clientSimilarQuestions, clientSimilarLoading, clientSimilarError]);
+
   const updateStatusMutation = useUpdateStatus(initialQuestion._id);
 
   useEffect(() => {
@@ -329,7 +343,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             #{p}
           </Link>
         ))}
-
         <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.linkIcon}>
           🔗 Problem Link
         </a>
@@ -410,13 +423,19 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         </div>
       </div>
 
-      {/* Similar Questions */}
+      {/* Similar Questions - with client-side fallback */}
       <div className={styles.similarSection}>
-        {initialSimilarQuestions.length > 0 ? (
+        {similarQuestions.length > 0 ? (
           <SimilarQuestionsGrid
-            questions={initialSimilarQuestions}
+            questions={similarQuestions}
             onViewAll={() => router.push('/questions')}
           />
+        ) : clientSimilarLoading ? (
+          <div className={styles.similarLoadingGrid}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonLoader key={i} variant="custom" className={styles.skeletonSimilarCard} />
+            ))}
+          </div>
         ) : (
           <div className={styles.noSimilarMessage}>
             <p>No similar questions found.</p>

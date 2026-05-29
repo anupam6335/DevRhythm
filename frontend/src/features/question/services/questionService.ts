@@ -70,8 +70,8 @@ export const questionService = {
     return response.data.question;
   },
 
-  async getSimilarQuestions(id: string) {
-    const response = await apiClient.get<{ similarQuestions: Question[] }>(`/questions/similar/${id}`);
+  async getSimilarQuestions(id: string, limit: number = 9): Promise<Question[]> {
+    const response = await apiClient.get<{ similarQuestions: Question[] }>(`/questions/similar/${id}?limit=${limit}`);
     return response.data.similarQuestions;
   },
 
