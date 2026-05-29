@@ -332,7 +332,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
       return (
         <div className={styles.listHeader}>
           <h2 className={styles.listTitle}>
-            Your Pattern Master · {totalFilteredMasterCount}
+            Attempted Pattern · {totalFilteredMasterCount}
           </h2>
           <span className={styles.trendHeaderLabel}>Improvement Rate</span>
         </div>
@@ -489,7 +489,7 @@ export default function PatternsDashboardClient({ initialData }: PatternsDashboa
           className={`${styles.tabButton} ${activeTab === 'master' ? styles.activeTab : ''}`}
           onClick={() => handleTabChange('master')}
         >
-          Your Pattern Master
+          Attempted Pattern
         </button>
         <button
           className={`${styles.tabButton} ${activeTab === 'all' ? styles.activeTab : ''}`}
