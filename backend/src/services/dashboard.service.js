@@ -140,7 +140,6 @@ const getRevisionsData = async (userId, timeZone) => {
     }
   ]);
 
-  // Convert scheduledDate to local timezone
   const convertedPendingList = pendingList.map(item => ({
     ...item,
     scheduledDate: toLocalISOString(item.scheduledDate, timeZone)
@@ -246,14 +245,20 @@ const getRecentActivity = async (userId, timeZone) => {
 
 const getHeatmapSummary = async (userId) => {
   const year = new Date().getFullYear();
-  const heatmap = await HeatmapData.findOne({ userId, year }).select('statsPanel').lean();
+  const heatmap = await HeatmapData.findOne({ userId, year }).lean();
   if (!heatmap?.statsPanel) {
     return { yearlyProblems: 0, activeDaysPercentage: 0, consistencyScore: 0 };
   }
+
+  // Compute consistency score on‑the‑fly (active days / total days in year * 100)
+  const totalDaysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
+  const activeDays = heatmap.dailyData?.filter(day => day.totalActivities > 0).length || 0;
+  const consistencyScore = totalDaysInYear > 0 ? Math.round((activeDays / totalDaysInYear) * 1000) / 10 : 0;
+
   return {
     yearlyProblems: heatmap.statsPanel.yearlyProblems || 0,
     activeDaysPercentage: heatmap.statsPanel.activeDays?.percentage || 0,
-    consistencyScore: heatmap.statsPanel.consistencyScore || 0
+    consistencyScore: consistencyScore
   };
 };
 
@@ -264,7 +269,6 @@ const getDailyProblem = async (userId, refresh = false) => {
     const todayUTC = new Date().toISOString().split('T')[0];
     const isActive = daily.date === todayUTC;
 
-    // Fetch the corresponding question from the database
     const question = await Question.findOne({
       platform: 'LeetCode',
       platformQuestionId: daily.titleSlug,
@@ -416,7 +420,6 @@ const getRecentRevisions = async (userId, timeZone) => {
     }
   }
 
-  // Convert date to local timezone for all items
   return result.slice(0, 5).map(item => ({
     ...item,
     date: toLocalISOString(item.date, timeZone)
@@ -610,7 +613,6 @@ const getUpcomingRevisionsList = async (userId, timeZone, limit = 5) => {
     }
   ]);
 
-  // Convert scheduledDate to local timezone
   return upcoming.map(item => ({
     ...item,
     scheduledDate: toLocalISOString(item.scheduledDate, timeZone)
@@ -624,9 +626,7 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
     .limit(limit)
     .lean();
 
-  // Collect all target question IDs
   const allQuestionIds = goals.flatMap(goal => goal.targetQuestions.map(q => q._id));
-  // Fetch progress for all these questions in one query
   const progressMap = new Map();
   if (allQuestionIds.length) {
     const progresses = await UserQuestionProgress.find({
@@ -638,7 +638,6 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
     }
   }
 
-  // Helper to format date range
   const formatDateRange = (start, end) => {
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -650,7 +649,7 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
 
   return goals.map(goal => ({
     id: goal._id,
-    title: formatDateRange(goal.startDate, goal.endDate),   // changed: date range
+    title: formatDateRange(goal.startDate, goal.endDate),
     description: goal.targetQuestions.length === 1
       ? `Solve ${goal.targetQuestions[0].title}`
       : `Solve ${goal.targetQuestions.length} problems`,
@@ -692,12 +691,12 @@ const getTopWeakestPattern = async (userId) => {
   };
 };
 
+// ========== FIXED: currentMonthHeatmap with local‑date grouping ==========
 const getCurrentMonthHeatmap = async (userId, timeZone) => {
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth(); // 0-indexed
 
-  // Use UTC-based dates to avoid timezone rollover
   const startOfMonth = getStartOfDay(new Date(Date.UTC(year, month, 1)), timeZone);
   const endOfMonth = getEndOfDay(new Date(Date.UTC(year, month + 1, 0)), timeZone);
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
@@ -709,9 +708,10 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
   if (!heatmap?.dailyData) {
     const result = [];
     for (let d = 1; d <= daysInMonth; d++) {
-      const date = getStartOfDay(new Date(Date.UTC(year, month, d)), timeZone);
+      const localDate = new Date(Date.UTC(year, month, d));
+      const dateStr = localDate.toISOString().split('T')[0];
       result.push({
-        date: date.toISOString(),
+        date: dateStr,
         activityCount: 0,
         intensityLevel: 0
       });
@@ -719,37 +719,35 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
     return result;
   }
 
-  // Filter dailyData to current month
-  const monthData = heatmap.dailyData.filter(day => {
-    const dayDate = new Date(day.date);
-    return dayDate >= startOfMonth && dayDate <= endOfMonth;
-  });
+  // Build map: local date string → activity count
+  const activityMap = new Map();
 
-  const resultMap = new Map();
-  for (const day of monthData) {
-    const dateStr = day.date.toISOString().split('T')[0];
-    const activityCount = day.totalActivities || 0;
-    const intensity = calculateIntensityLevel(activityCount);
-    resultMap.set(dateStr, {
-      date: day.date,
-      activityCount: activityCount,
-      intensityLevel: intensity
-    });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const localDate = new Date(Date.UTC(year, month, d));
+    const localDateStr = localDate.toISOString().split('T')[0];
+    const dayStartUTC = getStartOfDay(localDate, timeZone);
+    const dayEndUTC = getEndOfDay(localDate, timeZone);
+
+    let total = 0;
+    for (const day of heatmap.dailyData) {
+      const dayDate = new Date(day.date);
+      if (dayDate >= dayStartUTC && dayDate <= dayEndUTC) {
+        total += day.totalActivities || 0;
+      }
+    }
+    activityMap.set(localDateStr, total);
   }
 
   const result = [];
   for (let d = 1; d <= daysInMonth; d++) {
-    const date = getStartOfDay(new Date(Date.UTC(year, month, d)), timeZone);
-    const dateStr = date.toISOString().split('T')[0];
-    if (resultMap.has(dateStr)) {
-      result.push(resultMap.get(dateStr));
-    } else {
-      result.push({
-        date: date.toISOString(),
-        activityCount: 0,
-        intensityLevel: 0
-      });
-    }
+    const localDate = new Date(Date.UTC(year, month, d));
+    const localDateStr = localDate.toISOString().split('T')[0];
+    const activityCount = activityMap.get(localDateStr) || 0;
+    result.push({
+      date: localDateStr,
+      activityCount,
+      intensityLevel: calculateIntensityLevel(activityCount)
+    });
   }
   return result;
 };
@@ -757,11 +755,6 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
 /**
  * Get daily trend data for the last N days (default 30).
  * Returns arrays suitable for Chart.js line charts.
- *
- * @param {string} userId - User ObjectId
- * @param {number} days - Number of days (default 30)
- * @param {string} timeZone - IANA timezone
- * @returns {Promise<Object>} - { labels, problemsSolved, revisionsCompleted, studyTimeMinutes, goalCompletionRate }
  */
 const getDailyTrend = async (userId, days = 30, timeZone = 'UTC') => {
   const now = new Date();
@@ -770,20 +763,16 @@ const getDailyTrend = async (userId, days = 30, timeZone = 'UTC') => {
   startDate.setDate(startDate.getDate() - days + 1);
   startDate.setHours(0, 0, 0, 0);
 
-  // Get heatmap for the current year (or previous year if range spans years)
   const year = endDate.getUTCFullYear();
   let heatmap = await HeatmapData.findOne({ userId, year }).lean();
   if (!heatmap) {
     heatmap = await require('./heatmap.service').generateHeatmapData(userId, year, timeZone);
   }
 
-  // Filter dailyData to the date range
   const filteredDays = heatmap.dailyData.filter(day => {
     const dayDate = new Date(day.date);
     return dayDate >= startDate && dayDate <= endDate;
   });
-
-  // Sort by date ascending
   filteredDays.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   const labels = filteredDays.map(day => formatDate(day.date));
@@ -799,15 +788,8 @@ const getDailyTrend = async (userId, days = 30, timeZone = 'UTC') => {
  * Get monthly trend data for the last M months (default 12).
  * Returns monthly aggregates for problems solved, goals completed, revision completion rate,
  * and optional comparison with global average.
- *
- * @param {string} userId - User ObjectId
- * @param {number} months - Number of months (default 12)
- * @param {string} timeZone - IANA timezone
- * @param {boolean} includeComparison - Whether to include global average (default true)
- * @returns {Promise<Object>} - { labels, problemsSolved, goalsCompleted, revisionCompletionRate, comparison }
  */
 const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeComparison = true) => {
-  // Get monthly goals data from GoalSnapshot
   const goalChartData = await GoalSnapshotService.getChartData(userId, 'monthly', {
     months,
     includeComparison,
@@ -817,7 +799,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
   const goalsCompleted = goalChartData.user.goalsCompleted;
   const comparison = goalChartData.comparison;
 
-  // Get monthly problems solved from HeatmapData
   const now = new Date();
   const endDate = getEndOfDay(now, timeZone);
   const startDate = new Date(endDate);
@@ -825,7 +806,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
   startDate.setDate(1);
   startDate.setHours(0, 0, 0, 0);
 
-  // Collect years involved
   const years = new Set();
   let current = new Date(startDate);
   while (current <= endDate) {
@@ -833,7 +813,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
     current.setMonth(current.getMonth() + 1);
   }
 
-  // Fetch heatmap data for each year
   const heatmaps = await Promise.all(
     Array.from(years).map(async (year) => {
       let heatmap = await HeatmapData.findOne({ userId, year }).lean();
@@ -844,7 +823,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
     })
   );
 
-  // Aggregate problems solved per month
   const monthlyProblems = new Array(months).fill(0);
   for (let i = 0; i < labels.length; i++) {
     const labelDate = new Date(labels[i]);
@@ -862,7 +840,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
     monthlyProblems[i] = total;
   }
 
-  // Get monthly revision completion rate from revisionService
   const revisionCompletionRate = await revisionService.getMonthlyRevisionCompletionRate(userId, months, timeZone);
 
   return {
@@ -892,6 +869,6 @@ module.exports = {
   getActivePlannedGoals,
   getTopWeakestPattern,
   getCurrentMonthHeatmap,
-  getDailyTrend,      
-  getMonthlyTrend,    
+  getDailyTrend,
+  getMonthlyTrend,
 };
