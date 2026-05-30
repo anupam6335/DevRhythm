@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const HeatmapData = require('../models/HeatmapData');
 const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
@@ -15,12 +16,38 @@ const { client: redisClient } = require('../config/redis');
 const { calculateIntensityLevel } = heatmapService;
 
 /**
- * Helper to generate fresh tooltip data from dailyData
+ * Convert a UTC date to user's local ISO string with offset.
+ * Example output: "2026-05-30T00:00:00+05:30"
  */
+const toLocalISOString = (utcDate, timeZone) => {
+  if (!utcDate) return null;
+  if (!timeZone) timeZone = 'UTC';
+  const dt = DateTime.fromJSDate(new Date(utcDate), { zone: 'UTC' });
+  return dt.setZone(timeZone).toISO({ includeOffset: true });
+};
+
+/**
+ * Helper to convert dailyData array to local dates and recompute dayOfWeek.
+ */
+const convertDailyDataToLocal = (dailyData, timeZone) => {
+  if (!dailyData) return [];
+  return dailyData.map(day => {
+    const localDateStr = toLocalISOString(day.date, timeZone);
+    // Extract the date part for possible further use (optional)
+    const localDateObj = DateTime.fromISO(localDateStr);
+    return {
+      ...day,
+      date: localDateStr,
+      // Recompute dayOfWeek based on local date (0 = Sunday, 6 = Saturday)
+      dayOfWeek: localDateObj.weekday % 7, // luxon weekday: Monday=1 → Sunday=7, we want Sunday=0
+    };
+  });
+};
+
 const generateTooltipData = (dailyData) => {
   return dailyData.map(day => ({
-    date: day.date,
-    summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${formatDate(day.date)}`,
+    date: day.date, // already local ISO string
+    summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${formatDate(new Date(day.date))}`,
     details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Submissions: ${day.totalSubmissions}, Study: ${day.studyGroupActivity}, Time: ${day.totalTimeSpent}min`
   }));
 };
@@ -47,7 +74,11 @@ const getHeatmap = async (req, res, next) => {
       });
     }
 
-    // Recalculate intensity levels to ensure they match totalActivities
+    // Convert dailyData dates to user's local timezone
+    const localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
+    heatmap.dailyData = localDailyData;
+
+    // Recalculate intensity levels based on totalActivities (still correct)
     if (heatmap.dailyData) {
       heatmap.dailyData = heatmap.dailyData.map(day => ({
         ...day,
@@ -118,6 +149,10 @@ const getHeatmapByYear = async (req, res, next) => {
         suggestedAction: 'Refresh heatmap data'
       });
     }
+
+    // Convert dailyData dates to user's local timezone
+    const localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
+    heatmap.dailyData = localDailyData;
 
     // Recalculate intensity levels
     if (heatmap.dailyData) {
