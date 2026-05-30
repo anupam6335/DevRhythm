@@ -755,7 +755,8 @@ module.exports = {
   getOrCreateHeatmap,
   extractMinimalHeatmap,
   incrementDailyActivity,
-  incrementDailyActivityDirect,   // NEW: direct MongoDB increment
+  incrementDailyActivityDirect,
   flushDailyActivitiesToMongoDB,
   getDayData,
+  generateCachedRenderData,
 };
