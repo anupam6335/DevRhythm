@@ -145,7 +145,7 @@ export default function AboutPage() {
           <div className={styles.feature}>
             <FiTrendingUp className={styles.featureIcon} />
             <h3>Heatmaps & Streaks</h3>
-            <p>Your daily garden. Watch your consistency grow, not just your solve count.</p>
+            <p>Track your daily productivity and consistency over time. Every activity contributes to building long-term progress.</p>
           </div>
           <div className={styles.feature}>
             <FiTarget className={styles.featureIcon} />

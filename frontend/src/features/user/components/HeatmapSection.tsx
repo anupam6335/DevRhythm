@@ -158,7 +158,7 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
             {/* Optionally show legend skeleton or nothing */}
           </div>
           <div className={styles.right}>
-            <span className={styles.title}>Daily Garden</span>
+            <span className={styles.title}>Consistency Map</span>
             <div className={styles.yearSelectWrapper}>
               <select
                 value={selectedYear}
@@ -209,7 +209,7 @@ const HeatmapSection: React.FC<HeatmapSectionProps> = ({
         </div>
 
         <div className={styles.right}>
-          <span className={styles.title}>Daily Garden</span>
+          <span className={styles.title}>Consistency Map</span>
           <div className={styles.yearSelectWrapper}>
             <select
               value={selectedYear}
