@@ -121,11 +121,14 @@ const leaveSheet = async (req, res, next) => {
 const getMyProgress = async (req, res, next) => {
   try {
     const { slug } = req.params;
+    // First, fetch sheet data with current user to check membership
     const sheetData = await SheetService.getSheetBySlug(slug, req.user._id);
     if (!sheetData.hasJoined) {
       throw new AppError('You have not joined this sheet', 403);
     }
-    res.json(formatResponse('Your progress retrieved', { progress: sheetData.currentUserProgress }));
+    const username = req.user.username;
+    const progressData = await SheetService.getUserProgress(slug, req.user._id, username);
+    res.json(formatResponse('Your progress retrieved', progressData));
   } catch (error) {
     next(error);
   }
