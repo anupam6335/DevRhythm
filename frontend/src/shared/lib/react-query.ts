@@ -144,3 +144,13 @@ export const codeExecutionKeys = {
   all: ['codeExecution'] as const,
   history: (questionId: string, params?: any) => [...codeExecutionKeys.all, 'history', questionId, params] as const,
 };
+
+export const sheetsKeys = {
+  all: ['sheets'] as const,
+  lists: () => [...sheetsKeys.all, 'list'] as const,
+  list: (params?: Record<string, any>) => [...sheetsKeys.lists(), params] as const,
+  details: () => [...sheetsKeys.all, 'detail'] as const,
+  detail: (slug: string) => [...sheetsKeys.details(), slug] as const,
+  progress: (slug: string, username?: string) => [...sheetsKeys.detail(slug), 'progress', username ?? 'me'] as const,
+  chart: (slug: string, username?: string) => [...sheetsKeys.detail(slug), 'chart', username ?? 'me'] as const,
+};

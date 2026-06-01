@@ -1,16 +1,15 @@
 const mongoose = require('mongoose');
 const { slugify } = require('../utils/helpers/string');
-const User = require('../models/User');
+const config = require('../config');
 const Sheet = require('../models/Sheet');
 const SheetMembership = require('../models/SheetMembership');
 const SheetProgress = require('../models/SheetProgress');
 const Question = require('../models/Question');
+const User = require('../models/User');
 const UserQuestionProgress = require('../models/UserQuestionProgress');
 const RevisionSchedule = require('../models/RevisionSchedule');
 const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
-const config = require('../config');
-
 
 class SheetService {
   /**
@@ -40,6 +39,7 @@ class SheetService {
       }
     }
 
+    // 1. Direct ObjectId lookup
     if (objectIdStrings.length) {
       const directQuestions = await Question.find({
         _id: { $in: objectIdStrings },
@@ -56,6 +56,7 @@ class SheetService {
       }
     }
 
+    // 2. Search by platformQuestionId or title (case‑insensitive)
     if (searchStrings.length) {
       const searchedQuestions = await Question.find({
         $or: [
@@ -85,7 +86,7 @@ class SheetService {
 
     if (unresolved.length) {
       const error = new AppError(
-        `Some questions could not be found: ${unresolved.join(', ')}. Please check the spelling or ensure these problems exist in the questions page.`,
+        `Some questions could not be found: ${unresolved.join(', ')}. Please check the spelling or ensure these problems exist in the database.`,
         400
       );
       error.data = { unresolved };
@@ -96,17 +97,20 @@ class SheetService {
   }
 
   /**
-   * Create a sheet manually (owner provides question identifiers and target date).
+   * Create a sheet manually (owner provides question identifiers, target date, and optional metadata).
    * Automatically creates membership for the owner with the given target date.
    * @param {string} ownerId
    * @param {string} name
    * @param {string} description
    * @param {Array<string>} questionIdentifiers
    * @param {Date|string} targetDate
+   * @param {string|null} specialTag
+   * @param {string|null} originalSourceName
+   * @param {string|null} originalSourceUrl
    * @returns {Promise<Object>} Created sheet
    * @throws {AppError} 409 if sheet with same name already exists for this owner
    */
-  static async createSheet(ownerId, name, description, questionIdentifiers, targetDate) {
+  static async createSheet(ownerId, name, description, questionIdentifiers, targetDate, specialTag = null, originalSourceName = null, originalSourceUrl = null) {
     // Check for existing sheet with same owner and name (case‑insensitive)
     const existingSheet = await Sheet.findOne({
       ownerId,
@@ -137,12 +141,15 @@ class SheetService {
       description: description || '',
       questions: questionIds,
       isActive: true,
+      specialTag: specialTag || null,
+      originalSourceName: originalSourceName || null,
+      originalSourceUrl: originalSourceUrl || null,
     });
 
     // Automatically create owner membership and progress
     await this._initializeOwnerMembership(sheet._id, ownerId, questionIds, targetDate);
 
-    // Invalidate caches so the sheet appears in lists with participant count
+    // Invalidate caches
     await this._invalidateSheetCaches(sheet._id, sheet.slug, ownerId);
 
     return sheet;
@@ -209,8 +216,11 @@ class SheetService {
   }
 
   /**
-   * Join a sheet: create membership and initialize SheetProgress for all questions
-   * based on user's existing solved/revision status.
+   * Join a sheet (non‑owner participants).
+   * @param {string} userId
+   * @param {string} sheetSlug
+   * @param {Date|string} targetDate
+   * @returns {Promise<Object>}
    */
   static async joinSheet(userId, sheetSlug, targetDate) {
     const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
@@ -252,6 +262,10 @@ class SheetService {
   /**
    * Initialize SheetProgress rows for a user in a sheet.
    * (Used for non‑owner participants)
+   * @param {ObjectId} sheetId
+   * @param {ObjectId} userId
+   * @param {Array<ObjectId>} questionIds
+   * @returns {Promise<void>}
    */
   static async _initializeUserProgress(sheetId, userId, questionIds) {
     const progressDocs = [];
@@ -296,6 +310,9 @@ class SheetService {
   /**
    * Update progress when a question is solved.
    * Called from questionSolved queue handler.
+   * @param {string} userId
+   * @param {string} questionId
+   * @returns {Promise<void>}
    */
   static async updateSheetProgressOnSolve(userId, questionId) {
     const sheets = await Sheet.find({ questions: questionId, isActive: true }).lean();
@@ -334,6 +351,9 @@ class SheetService {
   /**
    * Update progress when a question's revision schedule is fully completed.
    * Called from revisionCompleted queue handler.
+   * @param {string} userId
+   * @param {string} questionId
+   * @returns {Promise<void>}
    */
   static async updateSheetProgressOnRevisionComplete(userId, questionId) {
     const sheets = await Sheet.find({ questions: questionId, isActive: true }).lean();
@@ -372,6 +392,9 @@ class SheetService {
   /**
    * Check if a user has fully completed a sheet (solved and revisionCompleted true for all questions).
    * If yes, update membership.completedAt.
+   * @param {ObjectId} sheetId
+   * @param {ObjectId} userId
+   * @returns {Promise<void>}
    */
   static async _checkAndUpdateSheetCompletion(sheetId, userId) {
     const sheet = await Sheet.findById(sheetId).lean();
@@ -394,8 +417,55 @@ class SheetService {
   }
 
   /**
-   * Get sheet details by slug, including questions grouped by tags,
-   * participant counts, per-question solver counts, and current user's progress.
+   * Update current user's target date for a sheet.
+   * @param {string} userId
+   * @param {string} sheetSlug
+   * @param {Date|string} newTargetDate
+   * @returns {Promise<Object>}
+   */
+  static async updateTargetDate(userId, sheetSlug, newTargetDate) {
+    const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
+    if (!sheet) {
+      throw new AppError('Sheet not found', 404);
+    }
+
+    const membership = await SheetMembership.findOne({ sheetId: sheet._id, userId });
+    if (!membership) {
+      throw new AppError('You are not a member of this sheet', 403);
+    }
+
+    const newDate = new Date(newTargetDate);
+    const currentDate = membership.targetDate;
+
+    if (currentDate.getTime() === newDate.getTime()) {
+      throw new AppError('Target date is already set to this value', 400);
+    }
+
+    const joinDate = membership.joinedAt;
+    if (newDate < joinDate) {
+      throw new AppError('Target date cannot be earlier than your join date', 400);
+    }
+
+    membership.targetDate = newDate;
+    await membership.save();
+
+    await this._invalidateSheetCaches(sheet._id, sheet.slug, userId);
+
+    return {
+      sheetId: sheet._id,
+      sheetSlug: sheet.slug,
+      sheetName: sheet.name,
+      targetDate: membership.targetDate,
+      joinedAt: membership.joinedAt,
+      completedAt: membership.completedAt,
+    };
+  }
+
+  /**
+   * Get sheet details by slug.
+   * @param {string} slug
+   * @param {string|null} currentUserId
+   * @returns {Promise<Object>}
    */
   static async getSheetBySlug(slug, currentUserId = null) {
     const sheet = await Sheet.findOne({ slug, isActive: true }).lean();
@@ -407,14 +477,14 @@ class SheetService {
       _id: { $in: sheet.questions },
       isActive: true,
     })
-      .select('_id title problemLink platform platformQuestionId difficulty tags')
+      .select('_id title problemLink platform platformQuestionId difficulty tags pattern')
       .lean();
 
     const orderedQuestions = sheet.questions
       .map(qid => questions.find(q => q._id.toString() === qid.toString()))
       .filter(Boolean);
 
-    // Tag grouping with deduplication (unchanged)
+    // Tag grouping with deduplication
     const tagToQuestions = new Map();
     for (const q of orderedQuestions) {
       const tags = q.tags && q.tags.length ? q.tags : ['Uncategorized'];
@@ -444,24 +514,21 @@ class SheetService {
       questions: group.questions,
     }));
 
-    // Participant list (new)
+    // Participants list
     const memberships = await SheetMembership.find({ sheetId: sheet._id })
-      .populate('userId', 'username displayName avatarUrl')
+      .populate('userId', 'username avatarUrl displayName')
       .lean();
 
     const participants = memberships.map(m => ({
       userId: m.userId._id,
       username: m.userId.username,
-      // displayName: m.userId.displayName,
+      displayName: m.userId.displayName,
       avatarUrl: m.userId.avatarUrl,
-      // joinedAt: m.joinedAt,
-      // targetDate: m.targetDate,
-      // completedAt: m.completedAt,
     }));
 
     const totalParticipants = participants.length;
 
-    // Per‑question participant counts and solved counts (unchanged)
+    // Per‑question stats
     const perQuestionParticipantCounts = {};
     const perQuestionSolvedCounts = {};
 
@@ -474,7 +541,7 @@ class SheetService {
       perQuestionSolvedCounts[q._id.toString()] = solvedCount;
     }
 
-    // Current user progress (unchanged)
+    // Current user progress
     let currentUserProgress = null;
     if (currentUserId) {
       const membership = memberships.find(m => m.userId._id.toString() === currentUserId.toString());
@@ -503,6 +570,14 @@ class SheetService {
 
     const hasJoined = !!currentUserProgress;
 
+    // Compute owner display name
+    let ownerDisplayName = 'Anonymous User';
+    if (sheet.ownerId) {
+      const owner = await User.findById(sheet.ownerId).select('displayName username').lean();
+      ownerDisplayName = owner?.displayName || owner?.username || 'Anonymous User';
+    }
+    
+
     return {
       sheet: {
         _id: sheet._id,
@@ -510,6 +585,11 @@ class SheetService {
         slug: sheet.slug,
         description: sheet.description,
         ownerId: sheet.ownerId,
+        ownerDisplayName,
+        shareLink: `${config.frontendUrl}/sheets/${sheet.slug}`,
+        specialTag: sheet.specialTag,
+        originalSourceName: sheet.originalSourceName,
+        originalSourceUrl: sheet.originalSourceUrl,
         createdAt: sheet.createdAt,
         updatedAt: sheet.updatedAt,
       },
@@ -527,10 +607,13 @@ class SheetService {
   }
 
   /**
-   * Get detailed progress of a specific user within a sheet.
+   * Get detailed progress of a specific user by username.
+   * @param {string} sheetSlug
+   * @param {string} currentUserId (for access control)
+   * @param {string} username
+   * @returns {Promise<Object>}
    */
   static async getUserProgress(sheetSlug, currentUserId, username) {
-    // Find user by username
     const targetUser = await User.findOne({ username }).select('_id').lean();
     if (!targetUser) {
       throw new AppError('User not found', 404);
@@ -548,7 +631,6 @@ class SheetService {
       throw new AppError('User has not joined this sheet', 404);
     }
 
-    // Rest of the method unchanged ...
     const progress = await SheetProgress.find({
       sheetId: sheet._id,
       userId: targetUserId,
@@ -558,7 +640,7 @@ class SheetService {
       _id: { $in: sheet.questions },
       isActive: true,
     })
-      .select('_id title problemLink platform platformQuestionId difficulty tags')
+      .select('_id title problemLink platform platformQuestionId difficulty tags pattern')
       .lean();
 
     const orderedProgress = sheet.questions.map(qid => {
@@ -576,6 +658,7 @@ class SheetService {
     const revisionCompletedCount = orderedProgress.filter(p => p.revisionCompleted).length;
     const totalQuestions = sheet.questions.length;
     const isFullyCompleted = solvedCount === totalQuestions && revisionCompletedCount === totalQuestions;
+
     const shareLink = `${config.frontendUrl}/sheets/${sheetSlug}/progress/${username}`;
 
     return {
@@ -598,9 +681,9 @@ class SheetService {
   }
 
   /**
-   * Get user progress in a chart‑ready format.
+   * Get chart‑ready progress data for a user.
    * @param {string} sheetSlug
-   * @param {string} currentUserId (for visibility)
+   * @param {string} currentUserId
    * @param {string} username
    * @returns {Promise<Object>}
    */
@@ -628,6 +711,9 @@ class SheetService {
 
   /**
    * List sheets with pagination, search, and filtering.
+   * @param {Object} filters
+   * @param {Object} pagination
+   * @returns {Promise<Object>}
    */
   static async getSheetsList(filters = {}, pagination = {}) {
     const { search, ownerId, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
@@ -653,19 +739,49 @@ class SheetService {
     ]);
 
     const sheetIds = sheets.map(s => s._id);
-    const memberCounts = await SheetMembership.aggregate([
-      { $match: { sheetId: { $in: sheetIds } } },
-      { $group: { _id: '$sheetId', count: { $sum: 1 } } },
-    ]);
-    const countMap = new Map(memberCounts.map(m => [m._id.toString(), m.count]));
 
-    const sheetsWithCount = sheets.map(s => ({
-      ...s,
-      participantCount: countMap.get(s._id.toString()) || 0,
-    }));
+    // Fetch memberships for all sheets in this page
+    const memberships = await SheetMembership.find({ sheetId: { $in: sheetIds } })
+      .populate('userId', 'username avatarUrl displayName')
+      .lean();
+
+    // Group memberships by sheetId
+    const membersBySheet = new Map();
+    for (const m of memberships) {
+      const sheetIdStr = m.sheetId.toString();
+      if (!membersBySheet.has(sheetIdStr)) membersBySheet.set(sheetIdStr, []);
+      membersBySheet.get(sheetIdStr).push({
+        userId: m.userId._id,
+        username: m.userId.username,
+        displayName: m.userId.displayName,
+        avatarUrl: m.userId.avatarUrl,
+      });
+    }
+
+    // Fetch owner display names for all sheets (bulk)
+    const ownerIds = sheets.map(s => s.ownerId).filter(id => id);
+    const owners = await User.find({ _id: { $in: ownerIds } }).select('displayName username').lean();
+    const ownerMap = new Map();
+    for (const owner of owners) {
+      ownerMap.set(owner._id.toString(), owner.displayName || owner.username);
+    }
+
+    const sheetsWithDetails = sheets.map(s => {
+      let ownerDisplayName = 'Anonymous User';
+      if (s.ownerId) {
+        const name = ownerMap.get(s.ownerId.toString());
+        if (name) ownerDisplayName = name;
+      }
+      return {
+        ...s,
+        ownerDisplayName,
+        participantCount: membersBySheet.get(s._id.toString())?.length || 0,
+        participants: membersBySheet.get(s._id.toString()) || [],
+      };
+    });
 
     return {
-      sheets: sheetsWithCount,
+      sheets: sheetsWithDetails,
       pagination: {
         page,
         limit,
@@ -677,6 +793,9 @@ class SheetService {
 
   /**
    * Leave a sheet: remove membership and all progress records.
+   * @param {string} userId
+   * @param {string} sheetSlug
+   * @returns {Promise<boolean>}
    */
   static async leaveSheet(userId, sheetSlug) {
     const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
@@ -697,12 +816,14 @@ class SheetService {
    * Update sheet metadata (owner only).
    * @param {string} userId
    * @param {string} sheetSlug
-   * @param {Object} updates - may contain name, description, questions (array of identifiers)
+   * @param {Object} updates
+   * @returns {Promise<Object>}
    */
   static async updateSheet(userId, sheetSlug, updates) {
     const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
     if (!sheet) throw new AppError('Sheet not found', 404);
-    if (sheet.ownerId.toString() !== userId.toString()) {
+    // Allow update only if owner exists and matches the requesting user
+    if (!sheet.ownerId || sheet.ownerId.toString() !== userId.toString()) {
       throw new AppError('Only the sheet owner can update it', 403);
     }
 
@@ -723,6 +844,10 @@ class SheetService {
       const resolvedIds = await this._resolveQuestionIdentifiers(updates.questions);
       allowedUpdates.questions = resolvedIds;
     }
+    // Optional metadata fields
+    if (updates.specialTag !== undefined) allowedUpdates.specialTag = updates.specialTag || null;
+    if (updates.originalSourceName !== undefined) allowedUpdates.originalSourceName = updates.originalSourceName || null;
+    if (updates.originalSourceUrl !== undefined) allowedUpdates.originalSourceUrl = updates.originalSourceUrl || null;
 
     if (Object.keys(allowedUpdates).length === 0) {
       throw new AppError('No valid fields to update', 400);
@@ -734,79 +859,60 @@ class SheetService {
   }
 
   /**
-   * Delete sheet (soft delete) – owner only.
+   * Delete sheet (owner removal, soft delete for participants).
+   * Owner is removed from membership and progress, ownership is revoked.
+   * Sheet remains active for other participants.
+   * Returns a warning message for UX.
+   * @param {string} userId - Must be the current owner.
+   * @param {string} sheetSlug
+   * @returns {Promise<Object>} { success: true, warning: string }
    */
   static async deleteSheet(userId, sheetSlug) {
-    const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
-    if (!sheet) throw new AppError('Sheet not found', 404);
-    if (sheet.ownerId.toString() !== userId.toString()) {
-      throw new AppError('Only the sheet owner can delete it', 403);
-    }
-
-    sheet.isActive = false;
-    await sheet.save();
-    await this._invalidateSheetCaches(sheet._id, sheet.slug);
-    return true;
-  }
-
-  /**
-   * Update the current user's target date for a sheet.
-   * @param {string} userId
-   * @param {string} sheetSlug
-   * @param {Date|string} newTargetDate
-   * @returns {Promise<Object>} Updated membership
-   * @throws {AppError} if sheet not found, user not a member, or validation fails
-   */
-  static async updateTargetDate(userId, sheetSlug, newTargetDate) {
     const sheet = await Sheet.findOne({ slug: sheetSlug, isActive: true });
     if (!sheet) {
       throw new AppError('Sheet not found', 404);
     }
-
-    const membership = await SheetMembership.findOne({ sheetId: sheet._id, userId });
-    if (!membership) {
-      throw new AppError('You are not a member of this sheet', 403);
+    if (!sheet.ownerId || sheet.ownerId.toString() !== userId.toString()) {
+      throw new AppError('Only the sheet owner can delete (remove themselves from) the sheet', 403);
     }
 
-    const newDate = new Date(newTargetDate);
-    const currentDate = membership.targetDate;
+    // Remove owner's membership
+    await SheetMembership.deleteOne({ sheetId: sheet._id, userId });
 
-    // Check if same date
-    if (currentDate.getTime() === newDate.getTime()) {
-      throw new AppError('Target date is already set to this value', 400);
-    }
+    // Remove owner's progress records
+    await SheetProgress.deleteMany({ sheetId: sheet._id, userId });
 
-    // Check if new date is before join date
-    const joinDate = membership.joinedAt;
-    if (newDate < joinDate) {
-      throw new AppError('Target date cannot be earlier than your join date', 400);
-    }
+    // Revoke ownership: set to null
+    sheet.ownerId = null;
+    await sheet.save();
 
-    membership.targetDate = newDate;
-    await membership.save();
-
-    // Invalidate caches
+    // Invalidate caches (force immediate expiry)
     await this._invalidateSheetCaches(sheet._id, sheet.slug, userId);
 
-    // Return membership with user info (optional, but return minimal)
-    return {
-      sheetId: sheet._id,
-      sheetSlug: sheet.slug,
-      sheetName: sheet.name,
-      targetDate: membership.targetDate,
-      joinedAt: membership.joinedAt,
-      completedAt: membership.completedAt,
-    };
+    const warning = 'You have been removed as the sheet owner. Your progress has been deleted. The sheet remains accessible to other participants. You can rejoin later as a normal participant, but your previous progress will not be restored.';
+
+    return { success: true, warning };
   }
 
   /**
-   * Invalidate all caches related to a sheet.
+   * Invalidate all caches related to a sheet, including exact URL patterns.
+   * @param {ObjectId} sheetId
+   * @param {string} slug
+   * @param {string|null} userId - optional, for user-specific caches
+   * @returns {Promise<void>}
    */
   static async _invalidateSheetCaches(sheetId, slug, userId = null) {
+    // Wildcard patterns for general sheet data
     await invalidateCache(`sheet:${slug}:*`);
     await invalidateCache(`sheet:${sheetId}:*`);
     await invalidateCache('sheets:list:*');
+
+    // Invalidate exact URL-based caches for the single sheet endpoint
+    // Public (unauthenticated) cache
+    await invalidateCache(`sheet:/api/v1/sheets/${slug}*`);
+    // Authenticated user cache
     if (userId) {
+      await invalidateCache(`sheet:user:${userId}:/api/v1/sheets/${slug}*`);
       await invalidateCache(`user:${userId}:sheets:*`);
     }
   }

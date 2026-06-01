@@ -96,4 +96,11 @@ export const ROUTES = {
     CREATE: '/groups/create',
     DETAIL: (groupId: string) => `/groups/${groupId}`,
   },
+
+  SHEETS: {
+    ROOT: '/sheets',
+    CREATE: '/sheets/create',
+    DETAIL: (slug: string) => `/sheets/${slug}`,
+    PROGRESS: (slug: string, username: string) => `/sheets/${slug}/progress/${username}`,
+  },
 } as const;

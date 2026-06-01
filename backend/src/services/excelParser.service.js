@@ -18,21 +18,27 @@ async function parseExcelFile(buffer, filename) {
         '  { "title": "3Sum" },\n' +
         '  { "platformQuestionId": "four-sum" }\n' +
         ']\n' +
-        'Each object must contain at least "title" or "platformQuestionId".'
+        'Or a single object: { "title": "Two Sum" }'
       );
     }
+    
+    // Normalize to an array: if it's a single object, wrap it
     let rows = [];
     if (Array.isArray(data)) {
       rows = data;
     } else if (data.data && Array.isArray(data.data)) {
       rows = data.data;
+    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+      // Single object → wrap in array
+      rows = [data];
     } else {
       throw new Error(
-        'JSON must contain an array of questions. Example:\n' +
+        'JSON must contain an array of questions or a single question object. Example:\n' +
         '[\n' +
         '  { "title": "Two Sum" },\n' +
         '  { "platformQuestionId": "three-sum" }\n' +
-        ']'
+        ']\n' +
+        'Or a single object: { "title": "Two Sum" }'
       );
     }
     
@@ -62,10 +68,7 @@ async function parseExcelFile(buffer, filename) {
       }
     }
     if (normalized.length === 0) {
-      throw new Error(
-        'No valid question data found in JSON. Each object must contain "title" or "platformQuestionId".\n' +
-        'Example: { "title": "Two Sum" } or { "platformQuestionId": "two-sum" }'
-      );
+      throw new Error('No valid question data found in JSON. Each object must contain "title" or "platformQuestionId".');
     }
     return normalized;
   }

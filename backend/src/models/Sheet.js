@@ -5,7 +5,7 @@ const SheetSchema = new mongoose.Schema(
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
     },
     name: {
@@ -35,6 +35,24 @@ const SheetSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    specialTag: {
+      type: String,
+      trim: true,
+      maxlength: 50,
+      default: null,
+    },
+    originalSourceName: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: null,
+    },
+    originalSourceUrl: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -46,12 +64,14 @@ const SheetSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for common queries
+// Indexes
+SheetSchema.index({ slug: 1 }, { unique: true });
 SheetSchema.index({ ownerId: 1, createdAt: -1 });
 SheetSchema.index({ isActive: 1, createdAt: -1 });
-SheetSchema.index({ slug: 1 }, { unique: true });
+SheetSchema.index({ specialTag: 1 });
+SheetSchema.index({ originalSourceName: 1 });
 
-// Pre‑save hook to ensure questions array is not empty
+// Pre‑save hook unchanged
 SheetSchema.pre('save', function (next) {
   if (this.questions && this.questions.length === 0) {
     const err = new Error('Sheet must contain at least one question');

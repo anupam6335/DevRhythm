@@ -1,0 +1,101 @@
+.header {
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.username {
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.sheetInfo {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0 0;
+}
+
+.copyBtn {
+  white-space: nowrap;
+}
+
+.statsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: center;
+  margin: 1rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid var(--divider);
+  border-bottom: 1px solid var(--divider);
+}
+
+.statItem {
+  text-align: center;
+}
+
+.statValue {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-code);
+}
+
+.statLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.metaIcon {
+  font-size: 0.9rem;
+  color: var(--accent-moss);
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .header {
+    padding: 1rem;
+  }
+  .username {
+    font-size: 1.3rem;
+  }
+  .statsGrid {
+    gap: 1rem;
+  }
+  .statValue {
+    font-size: 1.2rem;
+  }
+  .metadata {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

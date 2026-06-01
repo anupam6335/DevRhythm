@@ -1,5 +1,23 @@
 const Joi = require('joi');
 
+// Custom validator for a future date – handles quoted strings and trims whitespace
+const futureDate = Joi.string().required().custom((value, helpers) => {
+  let clean = value.trim();
+  // Remove surrounding double or single quotes if present
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1);
+  }
+  const date = new Date(clean);
+  if (isNaN(date.getTime())) {
+    return helpers.message('targetDate must be a valid date string (e.g., 2026-06-15T23:59:59.999Z).');
+  }
+  const now = new Date();
+  if (date <= now) {
+    return helpers.message('targetDate must be a future date.');
+  }
+  return date.toISOString();
+});
+
 const sheetIdParam = Joi.object({
   slug: Joi.string().trim().lowercase().required(),
 }).unknown(true);
@@ -12,25 +30,28 @@ const paginationQuery = {
 const createSheetManual = Joi.object({
   name: Joi.string().trim().min(3).max(200).required(),
   description: Joi.string().trim().max(1000).allow('').default(''),
-  questions: Joi.array()
-    .items(Joi.string().trim().min(1).max(200))
-    .min(1)
-    .required(),
-  targetDate: Joi.date().iso().greater('now').required().messages({
-    'any.required': 'targetDate is required to create a sheet. Please provide a future date as your completion deadline.',
-    'date.greater': 'targetDate must be a future date.',
-    // 'date.base': 'targetDate must be a valid ISO date (e.g., 2026-06-15T23:59:59.999Z).',
-  }),
+  questions: Joi.array().items(Joi.string().trim().min(1).max(200)).min(1).required(),
+  targetDate: futureDate,
+  specialTag: Joi.string().trim().max(50).optional(),
+  originalSourceName: Joi.string().trim().max(200).optional(),
+  originalSourceUrl: Joi.string().trim().uri().max(500).optional(),
 });
 
 const joinSheet = Joi.object({
-  targetDate: Joi.date().iso().greater('now').required(),
+  targetDate: futureDate,
+});
+
+const updateTargetDate = Joi.object({
+  targetDate: futureDate,
 });
 
 const updateSheet = Joi.object({
   name: Joi.string().trim().min(3).max(200),
   description: Joi.string().trim().max(1000).allow(''),
   questions: Joi.array().items(Joi.string().trim().min(1).max(200)).min(1),
+  specialTag: Joi.string().trim().max(50).optional(),
+  originalSourceName: Joi.string().trim().max(200).optional(),
+  originalSourceUrl: Joi.string().trim().uri().max(500).optional(),
 }).min(1);
 
 const getSheets = Joi.object({
@@ -48,28 +69,19 @@ const getUserProgress = Joi.object({
 const importExcelPreview = Joi.object({
   sheetName: Joi.string().trim().min(3).max(200).required(),
   description: Joi.string().trim().max(1000).allow('').default(''),
-  targetDate: Joi.date().iso().greater('now').required().messages({
-    'any.required': 'targetDate is required to create a sheet. Please provide a future date as your completion deadline.',
-    'date.greater': 'targetDate must be a future date.',
-    // 'date.base': 'targetDate must be a valid ISO date (e.g., 2026-06-15T23:59:59.999Z).',
-  }),
+  targetDate: futureDate,
+  specialTag: Joi.string().trim().max(50).optional(),
+  originalSourceName: Joi.string().trim().max(200).optional(),
+  originalSourceUrl: Joi.string().trim().uri().max(500).optional(),
 }).unknown(true);
-
-const updateTargetDate = Joi.object({
-  targetDate: Joi.date().iso().greater('now').required().messages({
-    'any.required': 'targetDate is required.',
-    'date.greater': 'targetDate must be a future date.',
-    'date.base': 'targetDate must be a valid ISO date (e.g., 2026-06-15T23:59:59.999Z).',
-  }),
-});
 
 module.exports = {
   sheetIdParam,
   createSheetManual,
   joinSheet,
+  updateTargetDate,
   updateSheet,
   getSheets,
   getUserProgress,
   importExcelPreview,
-  updateTargetDate,
 };

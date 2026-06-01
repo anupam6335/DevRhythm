@@ -9,13 +9,16 @@ const Question = require('../models/Question');
  */
 const createSheet = async (req, res, next) => {
   try {
-    const { name, description, questions, targetDate } = req.body;
+    const { name, description, questions, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
     const sheet = await SheetService.createSheet(
       req.user._id,
       name,
       description,
       questions,
-      targetDate
+      targetDate,
+      specialTag,
+      originalSourceName,
+      originalSourceUrl
     );
     res.status(201).json(formatResponse('Sheet created successfully', { sheet }));
   } catch (error) {
@@ -199,8 +202,8 @@ const updateSheet = async (req, res, next) => {
 const deleteSheet = async (req, res, next) => {
   try {
     const { slug } = req.params;
-    await SheetService.deleteSheet(req.user._id, slug);
-    res.json(formatResponse('Sheet deleted successfully'));
+    const result = await SheetService.deleteSheet(req.user._id, slug);
+    res.json(formatResponse('Sheet deleted successfully (owner removed)', result));
   } catch (error) {
     next(error);
   }
@@ -211,17 +214,34 @@ const deleteSheet = async (req, res, next) => {
  * POST /api/v1/sheets/import
  */
 const importSheet = async (req, res, next) => {
+  // Set a timeout to prevent hanging indefinitely (e.g., 30 seconds)
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      return res.status(504).json({
+        success: false,
+        statusCode: 504,
+        message: 'Request timeout. The file may be too large or malformed.',
+        data: null,
+        meta: { timestamp: new Date().toISOString() },
+        error: null,
+      });
+    }
+  }, 30000);
+
   try {
     if (!req.file) {
+      clearTimeout(timeout);
       throw new AppError('No file uploaded', 400);
     }
-    const { sheetName, description, targetDate } = req.body;
+
+    const { sheetName, description, targetDate, specialTag, originalSourceName, originalSourceUrl } = req.body;
     const { parseExcelFile } = require('../services/excelParser.service');
     const parsedRows = await parseExcelFile(req.file.buffer, req.file.originalname);
     
     const identifiers = parsedRows.map(row => row.platformQuestionId || row.title).filter(Boolean);
     
     if (identifiers.length === 0) {
+      clearTimeout(timeout);
       throw new AppError('No valid question titles or slugs found in the file', 400);
     }
     
@@ -230,15 +250,20 @@ const importSheet = async (req, res, next) => {
       sheetName,
       description || '',
       identifiers,
-      targetDate
+      targetDate,
+      specialTag,
+      originalSourceName,
+      originalSourceUrl
     );
     
+    clearTimeout(timeout);
     res.status(201).json(formatResponse('Sheet imported successfully', {
       sheet,
       totalRows: parsedRows.length,
       matchedCount: identifiers.length,
     }));
   } catch (error) {
+    clearTimeout(timeout);
     if (error.statusCode === 409 && error.data) {
       return res.status(409).json({
         success: false,
@@ -259,6 +284,8 @@ const importSheet = async (req, res, next) => {
         error: null,
       });
     }
+    // Generic error fallback
+    console.error('[ImportSheet] Error:', error);
     next(error);
   }
 };

@@ -1,0 +1,51 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.skeletonCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.skeletonHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.skeletonMetadata {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.75rem 0;
+}
+
+.skeletonParticipants {
+  border-top: 1px solid var(--divider);
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.skeletonAvatars {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Tablet and mobile adjustments */
+@media (max-width: 939px) {
+  .skeletonCard {
+    padding: 1rem;
+  }
+}
