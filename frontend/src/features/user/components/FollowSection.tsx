@@ -77,7 +77,7 @@ const FollowSection: React.FC<FollowSectionProps> = ({
       <div className={clsx(styles.container, styles.empty, className)}>
         <div className={styles.header}>
           <h2 className={styles.title}>Connections</h2>
-          <Link href={`/users/${user.username}/connections`} className={styles.viewall}>
+          <Link href={`/users`} className={styles.viewall}>
             View Connections →
           </Link>
         </div>
@@ -85,7 +85,7 @@ const FollowSection: React.FC<FollowSectionProps> = ({
           <FiUserPlus className={styles.emptyIcon} />
           <p>no connections yet</p>
           {isOwnProfile && (
-            <Link href={ROUTES.SEARCH.USERS} className={styles.findPeopleLink}>
+            <Link href={`/users`} className={styles.findPeopleLink}>
               find people
             </Link>
           )}
@@ -99,7 +99,7 @@ const FollowSection: React.FC<FollowSectionProps> = ({
       {/* Header */}
       <div className={styles.header}>
         <h2 className={styles.title}>Connections</h2>
-        <Link href={`/users/${user.username}/connections`} className={styles.viewall}>
+        <Link href={`/users`} className={styles.viewall}>
           View Connections →
         </Link>
       </div>

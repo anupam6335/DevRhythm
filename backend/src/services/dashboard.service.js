@@ -26,10 +26,8 @@ const toLocalISOString = (utcDate, timeZone) => {
 const getUserStats = async (user) => {
   const userId = user._id;
   const timeZone = user.preferences?.timezone || 'UTC';
-
   const computedStats = await computeUserStats(userId, timeZone);
   const computedStreak = await computeUserStreak(userId, timeZone);
-
   return {
     totalSolved: computedStats.totalSolved,
     masteryRate: computedStats.masteryRate,
@@ -42,7 +40,6 @@ const getCurrentGoals = async (userId, timeZone) => {
   const now = new Date();
   const todayStart = getStartOfDay(now, timeZone);
   const todayEnd = getEndOfDay(now, timeZone);
-
   const [dailyGoal, weeklyGoal] = await Promise.all([
     Goal.findOne({
       userId,
@@ -59,7 +56,6 @@ const getCurrentGoals = async (userId, timeZone) => {
       status: 'active'
     }).lean()
   ]);
-
   return {
     daily: dailyGoal ? {
       target: dailyGoal.targetCount,
@@ -115,7 +111,8 @@ const getRevisionsData = async (userId, timeZone) => {
     { $sort: { nextDue: 1 } },
     { $limit: 5 },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
-    { $unwind: '$question' },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    { $match: { 'question._id': { $exists: true } } },
     {
       $lookup: {
         from: 'userquestionprogresses',
@@ -128,7 +125,8 @@ const getRevisionsData = async (userId, timeZone) => {
       }
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
-    { $project: {
+    {
+      $project: {
         _id: '$_id',
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
@@ -178,20 +176,22 @@ const getRecentActivity = async (userId, timeZone) => {
     .populate('questionId', '_id platformQuestionId title platform difficulty')
     .lean();
 
-  const solvedItems = solved.map(s => ({
-    type: 'solved',
-    questionId: s.questionId._id,
-    platformQuestionId: s.questionId.platformQuestionId,
-    title: s.questionId.title,
-    platform: s.questionId.platform,
-    difficulty: s.questionId.difficulty,
-    timestamp: s.attempts.solvedAt,
-    totalTimeSpent: s.totalTimeSpent || 0,
-    revisionCount: s.revisionCount || 0,
-    attemptsCount: s.attempts?.count || 0,
-    lastPracticed: s.lastRevisedAt || s.updatedAt || s.attempts?.lastAttemptAt || null,
-    status: s.status
-  }));
+  const solvedItems = solved
+    .filter(s => s.questionId !== null)
+    .map(s => ({
+      type: 'solved',
+      questionId: s.questionId._id,
+      platformQuestionId: s.questionId.platformQuestionId,
+      title: s.questionId.title,
+      platform: s.questionId.platform,
+      difficulty: s.questionId.difficulty,
+      timestamp: s.attempts.solvedAt,
+      totalTimeSpent: s.totalTimeSpent || 0,
+      revisionCount: s.revisionCount || 0,
+      attemptsCount: s.attempts?.count || 0,
+      lastPracticed: s.lastRevisedAt || s.updatedAt || s.attempts?.lastAttemptAt || null,
+      status: s.status
+    }));
 
   const revisions = await RevisionSchedule.aggregate([
     { $match: { userId } },
@@ -200,7 +200,8 @@ const getRecentActivity = async (userId, timeZone) => {
     { $sort: { 'completedRevisions.completedAt': -1 } },
     { $limit: 10 },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
-    { $unwind: '$question' },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    { $match: { 'question._id': { $exists: true } } },
     {
       $lookup: {
         from: 'userquestionprogresses',
@@ -213,7 +214,8 @@ const getRecentActivity = async (userId, timeZone) => {
       }
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
-    { $project: {
+    {
+      $project: {
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
         title: '$question.title',
@@ -260,12 +262,9 @@ const getHeatmapSummary = async (userId) => {
   if (!heatmap?.statsPanel) {
     return { yearlyProblems: 0, activeDaysPercentage: 0, consistencyScore: 0 };
   }
-
-  // Compute consistency score on‑the‑fly (active days / total days in year * 100)
   const totalDaysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
   const activeDays = heatmap.dailyData?.filter(day => day.totalActivities > 0).length || 0;
   const consistencyScore = totalDaysInYear > 0 ? Math.round((activeDays / totalDaysInYear) * 1000) / 10 : 0;
-
   return {
     yearlyProblems: heatmap.statsPanel.yearlyProblems || 0,
     activeDaysPercentage: heatmap.statsPanel.activeDays?.percentage || 0,
@@ -279,20 +278,17 @@ const getDailyProblem = async (userId, refresh = false) => {
     if (!daily) return null;
     const todayUTC = new Date().toISOString().split('T')[0];
     const isActive = daily.date === todayUTC;
-
     const question = await Question.findOne({
       platform: 'LeetCode',
       platformQuestionId: daily.titleSlug,
       isActive: true
     }).lean();
-
     let progress = null;
     let questionId = null;
     if (question) {
       questionId = question._id;
       progress = await UserQuestionProgress.findOne({ userId, questionId }).lean();
     }
-
     return {
       title: daily.title,
       link: daily.link,
@@ -341,7 +337,8 @@ const getRecentRevisions = async (userId, timeZone) => {
     { $addFields: { nextDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] } } },
     { $match: { nextDue: { $gte: todayStart, $lte: todayEnd } } },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
-    { $unwind: '$question' },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    { $match: { 'question._id': { $exists: true } } },
     {
       $lookup: {
         from: 'userquestionprogresses',
@@ -354,7 +351,8 @@ const getRecentRevisions = async (userId, timeZone) => {
       }
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
-    { $project: {
+    {
+      $project: {
         _id: 0,
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
@@ -386,7 +384,8 @@ const getRecentRevisions = async (userId, timeZone) => {
     { $sort: { 'completedRevisions.completedAt': -1 } },
     { $limit: 10 },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
-    { $unwind: '$question' },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    { $match: { 'question._id': { $exists: true } } },
     {
       $lookup: {
         from: 'userquestionprogresses',
@@ -399,7 +398,8 @@ const getRecentRevisions = async (userId, timeZone) => {
       }
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
-    { $project: {
+    {
+      $project: {
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
         title: '$question.title',
@@ -448,25 +448,26 @@ const getRecentlySolved = async (userId) => {
     .populate('questionId', '_id platformQuestionId title platform difficulty')
     .lean();
 
-  return solved.map(s => ({
-    questionId: s.questionId._id,
-    platformQuestionId: s.questionId.platformQuestionId,
-    title: s.questionId.title,
-    platform: s.questionId.platform,
-    difficulty: s.questionId.difficulty,
-    solvedAt: s.attempts.solvedAt,
-    totalTimeSpent: s.totalTimeSpent || 0,
-    revisionCount: s.revisionCount || 0,
-    attemptsCount: s.attempts?.count || 0,
-    lastPracticed: s.lastRevisedAt || s.updatedAt || s.attempts?.lastAttemptAt || null,
-    status: s.status
-  }));
+  return solved
+    .filter(s => s.questionId !== null)
+    .map(s => ({
+      questionId: s.questionId._id,
+      platformQuestionId: s.questionId.platformQuestionId,
+      title: s.questionId.title,
+      platform: s.questionId.platform,
+      difficulty: s.questionId.difficulty,
+      solvedAt: s.attempts.solvedAt,
+      totalTimeSpent: s.totalTimeSpent || 0,
+      revisionCount: s.revisionCount || 0,
+      attemptsCount: s.attempts?.count || 0,
+      lastPracticed: s.lastRevisedAt || s.updatedAt || s.attempts?.lastAttemptAt || null,
+      status: s.status
+    }));
 };
 
 const getWeeklyStudyTime = async (userId, timeZone) => {
   const now = new Date();
   const year = now.getUTCFullYear();
-
   const heatmap = await HeatmapData.findOne({ userId, year }).select('dailyData').lean();
   if (!heatmap?.dailyData) return {
     currentWeekMinutes: 0,
@@ -483,7 +484,6 @@ const getWeeklyStudyTime = async (userId, timeZone) => {
   const weekEndPrevious = new Date(weekStartCurrent);
   weekEndPrevious.setDate(weekEndPrevious.getDate() - 1);
   weekEndPrevious.setHours(23, 59, 59, 999);
-
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   thirtyDaysAgo.setHours(0, 0, 0, 0);
@@ -512,7 +512,6 @@ const getWeeklyStudyTime = async (userId, timeZone) => {
   } else if (currentWeek > 0 && previousWeek === 0) {
     weekOverWeekChange = 100;
   }
-
   let changeFromMonthlyAvg = null;
   if (monthlyAverageWeekly > 0) {
     changeFromMonthlyAvg = ((currentWeek - monthlyAverageWeekly) / monthlyAverageWeekly) * 100;
@@ -589,7 +588,8 @@ const getUpcomingRevisionsList = async (userId, timeZone, limit = 5) => {
     { $sort: { nextDue: 1 } },
     { $limit: limit },
     { $lookup: { from: 'questions', localField: 'questionId', foreignField: '_id', as: 'question' } },
-    { $unwind: '$question' },
+    { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+    { $match: { 'question._id': { $exists: true } } },
     {
       $lookup: {
         from: 'userquestionprogresses',
@@ -602,7 +602,8 @@ const getUpcomingRevisionsList = async (userId, timeZone, limit = 5) => {
       }
     },
     { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
-    { $project: {
+    {
+      $project: {
         _id: '$_id',
         questionId: '$question._id',
         platformQuestionId: '$question.platformQuestionId',
@@ -637,7 +638,10 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
     .limit(limit)
     .lean();
 
-  const allQuestionIds = goals.flatMap(goal => goal.targetQuestions.map(q => q._id));
+  // Filter out goals that have null targetQuestions (e.g., deleted questions)
+  const validGoals = goals.filter(goal => goal.targetQuestions && goal.targetQuestions.length > 0 && goal.targetQuestions.every(q => q !== null));
+
+  const allQuestionIds = validGoals.flatMap(goal => goal.targetQuestions.map(q => q._id).filter(id => id));
   const progressMap = new Map();
   if (allQuestionIds.length) {
     const progresses = await UserQuestionProgress.find({
@@ -658,11 +662,11 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
     return `${startStr} – ${endStr}`;
   };
 
-  return goals.map(goal => ({
+  return validGoals.map(goal => ({
     id: goal._id,
     title: formatDateRange(goal.startDate, goal.endDate),
     description: goal.targetQuestions.length === 1
-      ? `Solve ${goal.targetQuestions[0].title}`
+      ? `Solve ${goal.targetQuestions[0]?.title || 'a problem'}`
       : `Solve ${goal.targetQuestions.length} problems`,
     deadline: goal.endDate,
     progress: {
@@ -671,6 +675,7 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
       percentage: Math.round((goal.completedQuestions.length / goal.targetQuestions.length) * 100)
     },
     questions: goal.targetQuestions.map(q => {
+      if (!q) return null;
       const prog = progressMap.get(q._id.toString());
       return {
         id: q._id,
@@ -682,26 +687,20 @@ const getActivePlannedGoals = async (userId, limit = 2) => {
         lastPracticed: prog?.lastRevisedAt || prog?.updatedAt || prog?.attempts?.lastAttemptAt || null,
         status: prog?.status || 'Not Started'
       };
-    })
+    }).filter(q => q !== null)
   }));
 };
 
 const getTopWeakestPattern = async (userId) => {
-  // Remove solvedCount filter to include patterns with 0 solves
   const patterns = await PatternMastery.find({ userId })
     .select('patternName confidenceLevel masteryRate solvedCount')
     .lean();
   if (!patterns.length) return null;
-  
-  // Recompute confidence from solvedCount
   patterns.forEach(p => p.confidenceLevel = computeConfidence(p.solvedCount));
-  
-  // Sort by confidence ascending, then solvedCount ascending
   patterns.sort((a, b) => {
     if (a.confidenceLevel !== b.confidenceLevel) return a.confidenceLevel - b.confidenceLevel;
     return a.solvedCount - b.solvedCount;
   });
-  
   const weakest = patterns[0];
   return {
     patternName: weakest.patternName,
@@ -712,43 +711,31 @@ const getTopWeakestPattern = async (userId) => {
   };
 };
 
-// ========== FIXED: currentMonthHeatmap with local‑date grouping ==========
 const getCurrentMonthHeatmap = async (userId, timeZone) => {
   const now = new Date();
   const year = now.getUTCFullYear();
-  const month = now.getUTCMonth(); // 0-indexed
-
+  const month = now.getUTCMonth();
   const startOfMonth = getStartOfDay(new Date(Date.UTC(year, month, 1)), timeZone);
   const endOfMonth = getEndOfDay(new Date(Date.UTC(year, month + 1, 0)), timeZone);
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
-  const heatmap = await HeatmapData.findOne({ userId, year })
-    .select('dailyData')
-    .lean();
-
+  const heatmap = await HeatmapData.findOne({ userId, year }).select('dailyData').lean();
   if (!heatmap?.dailyData) {
     const result = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const localDate = new Date(Date.UTC(year, month, d));
       const dateStr = localDate.toISOString().split('T')[0];
-      result.push({
-        date: dateStr,
-        activityCount: 0,
-        intensityLevel: 0
-      });
+      result.push({ date: dateStr, activityCount: 0, intensityLevel: 0 });
     }
     return result;
   }
 
-  // Build map: local date string → activity count
   const activityMap = new Map();
-
   for (let d = 1; d <= daysInMonth; d++) {
     const localDate = new Date(Date.UTC(year, month, d));
     const localDateStr = localDate.toISOString().split('T')[0];
     const dayStartUTC = getStartOfDay(localDate, timeZone);
     const dayEndUTC = getEndOfDay(localDate, timeZone);
-
     let total = 0;
     for (const day of heatmap.dailyData) {
       const dayDate = new Date(day.date);
@@ -773,43 +760,30 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
   return result;
 };
 
-/**
- * Get daily trend data for the last N days (default 30).
- * Returns arrays suitable for Chart.js line charts.
- */
 const getDailyTrend = async (userId, days = 30, timeZone = 'UTC') => {
   const now = new Date();
   const endDate = getEndOfDay(now, timeZone);
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - days + 1);
   startDate.setHours(0, 0, 0, 0);
-
   const year = endDate.getUTCFullYear();
   let heatmap = await HeatmapData.findOne({ userId, year }).lean();
   if (!heatmap) {
     heatmap = await require('./heatmap.service').generateHeatmapData(userId, year, timeZone);
   }
-
   const filteredDays = heatmap.dailyData.filter(day => {
     const dayDate = new Date(day.date);
     return dayDate >= startDate && dayDate <= endDate;
   });
   filteredDays.sort((a, b) => new Date(a.date) - new Date(b.date));
-
   const labels = filteredDays.map(day => formatDate(day.date));
   const problemsSolved = filteredDays.map(day => day.newProblemsSolved || 0);
   const revisionsCompleted = filteredDays.map(day => day.revisionProblems || 0);
   const studyTimeMinutes = filteredDays.map(day => day.totalTimeSpent || 0);
   const goalCompletionRate = filteredDays.map(day => day.goalCompletion || 0);
-
   return { labels, problemsSolved, revisionsCompleted, studyTimeMinutes, goalCompletionRate };
 };
 
-/**
- * Get monthly trend data for the last M months (default 12).
- * Returns monthly aggregates for problems solved, goals completed, revision completion rate,
- * and optional comparison with global average.
- */
 const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeComparison = true) => {
   const goalChartData = await GoalSnapshotService.getChartData(userId, 'monthly', {
     months,
@@ -819,21 +793,18 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
   const labels = goalChartData.labels;
   const goalsCompleted = goalChartData.user.goalsCompleted;
   const comparison = goalChartData.comparison;
-
   const now = new Date();
   const endDate = getEndOfDay(now, timeZone);
   const startDate = new Date(endDate);
   startDate.setMonth(startDate.getMonth() - months + 1);
   startDate.setDate(1);
   startDate.setHours(0, 0, 0, 0);
-
   const years = new Set();
   let current = new Date(startDate);
   while (current <= endDate) {
     years.add(current.getUTCFullYear());
     current.setMonth(current.getMonth() + 1);
   }
-
   const heatmaps = await Promise.all(
     Array.from(years).map(async (year) => {
       let heatmap = await HeatmapData.findOne({ userId, year }).lean();
@@ -843,7 +814,6 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
       return heatmap;
     })
   );
-
   const monthlyProblems = new Array(months).fill(0);
   for (let i = 0; i < labels.length; i++) {
     const labelDate = new Date(labels[i]);
@@ -860,9 +830,7 @@ const getMonthlyTrend = async (userId, months = 12, timeZone = 'UTC', includeCom
     }
     monthlyProblems[i] = total;
   }
-
   const revisionCompletionRate = await revisionService.getMonthlyRevisionCompletionRate(userId, months, timeZone);
-
   return {
     labels,
     problemsSolved: monthlyProblems,
