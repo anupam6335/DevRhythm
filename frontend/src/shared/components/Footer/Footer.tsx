@@ -186,6 +186,8 @@ export const Footer: React.FC<FooterProps> = ({ version = '1.0.0', className }) 
             links={[
               { label: 'My Groups', href: ROUTES.GROUPS.MY },
               { label: 'Create Group', href: ROUTES.GROUPS.CREATE },
+              { label: 'All Sheets', href: ROUTES.SHEETS.ROOT },
+              { label: 'Create Sheet', href: ROUTES.SHEETS.CREATE },
             ]}
           />
 

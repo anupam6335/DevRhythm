@@ -1,0 +1,135 @@
+.header {
+  border-bottom: 1px solid var(--divider);
+  padding: 0.5rem 0 0.75rem 0;
+  margin-bottom: 1.5rem;
+}
+
+/* Top row: sheet name + share button */
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sheetName {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.shareButton {
+  flex-shrink: 0;
+}
+
+/* User row: avatar + username */
+.userRow {
+  margin-bottom: 0.75rem;
+}
+
+.userLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.2s ease;
+}
+
+.userLink:hover {
+  opacity: 0.8;
+}
+
+.userAvatar {
+  border-radius: 50% !important;
+  border: 1px solid var(--border);
+}
+
+.username {
+  font-family: var(--font-code);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Stats row */
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.stat {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-code);
+}
+
+.separator {
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+/* Metadata row */
+.metadataRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metaIcon {
+  font-size: 0.8rem;
+  color: var(--accent-moss);
+}
+
+.overdueBadge {
+  background-color: var(--error);
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-left: 0.4rem;
+}
+
+.daysLeft {
+  margin-left: 0.25rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .header {
+    padding: 0.4rem 0 0.6rem 0;
+  }
+  .sheetName {
+    font-size: 1.2rem;
+  }
+  .statsRow {
+    font-size: 0.8rem;
+  }
+  .metadataRow {
+    font-size: 0.7rem;
+  }
+  .username {
+    font-size: 0.85rem;
+  }
+}

@@ -18,6 +18,9 @@ import {
   FiMenu,
   FiX,
   FiClock,
+  FiGrid,
+  FiChevronRight,
+  FiBell,
 } from 'react-icons/fi';
 import { FaFire } from 'react-icons/fa';
 import clsx from 'clsx';
@@ -29,6 +32,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import ThemeToggle from '@/shared/components/ThemeToggle';
 import Button from '@/shared/components/Button';
 import { useSession } from '@/features/auth/hooks/useSession';
+import { useUnreadCount } from '@/features/notification/hooks/useNotifications';
 
 import styles from './Navbar.module.css';
 
@@ -39,7 +43,7 @@ export interface NavbarProps {
   className?: string;
 }
 
-type DropdownId = 'questions' | 'progress' | 'groups' | 'profile' | null;
+type DropdownId = 'sheets' | 'questions' | 'progress' | 'groups' | 'profile' | null;
 
 export const Navbar: React.FC<NavbarProps> = ({
   pendingRevisionsCount = 0,
@@ -50,11 +54,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useSession();
   const pathname = usePathname();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const { data: unreadCountData } = useUnreadCount();
+  const unreadCount = unreadCountData?.unreadCount ?? 0;
 
   const [openDropdown, setOpenDropdown] = useState<DropdownId>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  const sheetsRef = useRef<HTMLDivElement>(null);
   const questionsRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const groupsRef = useRef<HTMLDivElement>(null);
@@ -64,6 +71,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     setOpenDropdown((prev) => (prev === id ? null : id));
   }, []);
 
+  useClickOutside(sheetsRef, () => {
+    if (openDropdown === 'sheets') setOpenDropdown(null);
+  });
   useClickOutside(questionsRef, () => {
     if (openDropdown === 'questions') setOpenDropdown(null);
   });
@@ -98,6 +108,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Logo size="sm" layout="horizontal" />
 
           <div className={styles.navLinks}>
+            {/* Sheets dropdown (first) */}
+            <div className={styles.dropdownWrapper} ref={sheetsRef}>
+              <Button
+                variant="ghost"
+                className={clsx(styles.navLink, openDropdown === 'sheets' && styles.active)}
+                onClick={() => toggleDropdown('sheets')}
+                aria-expanded={openDropdown === 'sheets'}
+                aria-haspopup="true"
+                leftIcon={<FiGrid />}
+                rightIcon={<FiChevronDown />}
+              >
+                Sheets
+              </Button>
+              {openDropdown === 'sheets' && (
+                <div className={styles.dropdownMenu}>
+                  <Link href={ROUTES.SHEETS.ROOT} className={styles.dropdownItem}>
+                    All Sheets
+                  </Link>
+                  <Link href={ROUTES.SHEETS.CREATE} className={styles.dropdownItem}>
+                    Create Sheet
+                  </Link>
+                </div>
+              )}
+            </div>
+
             {/* Questions dropdown */}
             <div className={styles.dropdownWrapper} ref={questionsRef}>
               <Button
@@ -119,12 +154,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Link href={ROUTES.PATTERNS.ROOT} className={styles.dropdownItem}>
                     Patterns
                   </Link>
-                  {/* Tags link can be uncommented if needed */}
                 </div>
               )}
             </div>
 
-            {/* Progress dropdown – "My progress" removed */}
+            {/* Progress dropdown */}
             <div className={styles.dropdownWrapper} ref={progressRef}>
               <Button
                 variant="ghost"
@@ -176,21 +210,37 @@ export const Navbar: React.FC<NavbarProps> = ({
               {openDropdown === 'groups' && (
                 <div className={styles.dropdownMenu}>
                   <Link href={ROUTES.GROUPS.MY} className={styles.dropdownItem}>
-                    My groups
+                    My Groups
                   </Link>
                   <Link href={ROUTES.GROUPS.CREATE} className={styles.dropdownItem}>
-                    Create group
+                    Create Group
                   </Link>
                 </div>
               )}
             </div>
 
-            {/* Streak pill with animated fire – only when user is logged in */}
+            {/* Streak pill */}
             {user && streakCount > 0 && (
               <div className={styles.streakPill} title={`${streakCount} day streak`}>
                 <FaFire className={styles.streakFireIcon} />
                 <span>{streakCount}</span>
               </div>
+            )}
+
+            {/* Notification icon (only for logged in users) */}
+            {user && (
+              <Link
+                href={ROUTES.NOTIFICATIONS.ROOT}
+                className={styles.notificationLink}
+                aria-label="Notifications"
+              >
+                <FiBell className={styles.notificationIcon} />
+                {unreadCount > 0 && (
+                  <span className={styles.notificationBadge}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
             )}
 
             <ThemeToggle variant="icon" className={styles.themeToggle} />
@@ -271,25 +321,44 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ThemeToggle variant="both" />
               </div>
 
-              {user ? (
-                <div className={styles.drawerUser}>
-                  <Avatar
-                    src={user.avatarUrl}
-                    name={user.displayName || user.username}
-                    size="md"
-                  />
-                  <div className={styles.drawerUserInfo}>
-                    <span className={styles.drawerUserName}>
-                      {user.displayName || user.username}
-                    </span>
-                    {streakCount > 0 && (
-                      <div className={styles.drawerStreak}>
-                        <FaFire />
-                        <span>{streakCount} day streak</span>
-                      </div>
-                    )}
+                {/* Notifications section (only for logged in users) */}
+                {user && (
+                  <div className={styles.drawerSection}>
+                    <h3>Notifications</h3>
+                    <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                      View Notifications
+                      {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                    </Link>
                   </div>
-                </div>
+                )}
+
+
+              {user ? (
+                <Link
+                  href={ROUTES.USER_PROFILE.OWN(user.username)}
+                  onClick={() => setIsDrawerOpen(false)}
+                  className={styles.drawerUserLink}
+                >
+                  <div className={styles.drawerUser}>
+                    <Avatar
+                      src={user.avatarUrl}
+                      name={user.displayName || user.username}
+                      size="md"
+                    />
+                    <div className={styles.drawerUserInfo}>
+                      <span className={styles.drawerUserName}>
+                        {user.displayName || user.username}
+                      </span>
+                      {streakCount > 0 && (
+                        <div className={styles.drawerStreak}>
+                          <FaFire />
+                          <span>{streakCount} day streak</span>
+                        </div>
+                      )}
+                    </div>
+                    <FiChevronRight className={styles.drawerUserChevron} />
+                  </div>
+                </Link>
               ) : (
                 <Link
                   href={loginHref}
@@ -300,6 +369,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </Link>
               )}
 
+              {/* Sheets section (first) */}
+              <div className={styles.drawerSection}>
+                <h3>Sheets</h3>
+                <Link href={ROUTES.SHEETS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                  All Sheets
+                </Link>
+                <Link href={ROUTES.SHEETS.CREATE} onClick={() => setIsDrawerOpen(false)}>
+                  Create Sheet
+                </Link>
+              </div>
+
               {/* Questions section */}
               <div className={styles.drawerSection}>
                 <h3>Questions</h3>
@@ -309,12 +389,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link href={ROUTES.PATTERNS.ROOT} onClick={() => setIsDrawerOpen(false)}>
                   Patterns
                 </Link>
-                <Link href={ROUTES.QUESTIONS.TAGS} onClick={() => setIsDrawerOpen(false)}>
-                  Tags
-                </Link>
               </div>
 
-              {/* Progress section – "My progress" removed */}
+              {/* Progress section */}
               <div className={styles.drawerSection}>
                 <h3>Progress</h3>
                 <Link href={ROUTES.GOALS.ROOT} onClick={() => setIsDrawerOpen(false)}>
@@ -332,15 +409,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className={styles.drawerSection}>
                 <h3>Groups</h3>
                 <Link href={ROUTES.GROUPS.MY} onClick={() => setIsDrawerOpen(false)}>
-                  My groups
-                </Link>
-                <Link href={ROUTES.GROUPS.ROOT} onClick={() => setIsDrawerOpen(false)}>
-                  Discover groups
+                  My Groups
                 </Link>
                 <Link href={ROUTES.GROUPS.CREATE} onClick={() => setIsDrawerOpen(false)}>
-                  Create group
+                  Create Group
                 </Link>
               </div>
+
+              {/* Notifications section (only for logged in users) */}
+              {user && (
+                <div className={styles.drawerSection}>
+                  <h3>Notifications</h3>
+                  <Link href={ROUTES.NOTIFICATIONS.ROOT} onClick={() => setIsDrawerOpen(false)}>
+                    View Notifications
+                    {unreadCount > 0 && <span className={styles.drawerBadge}>{unreadCount}</span>}
+                  </Link>
+                </div>
+              )}
 
               {/* Profile section */}
               {user && (
@@ -387,7 +472,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className={styles.mobileLabel}>Home</span>
           </Link>
 
-          {/* Revisions link added */}
           <Link
             href={ROUTES.REVISIONS.ROOT}
             className={clsx(styles.mobileNavItem, isActive(ROUTES.REVISIONS.ROOT) && styles.active)}
@@ -400,7 +484,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </Link>
 
-          {/* Quick Add */}
+          {/* Notifications (mobile) */}
+          {user && (
+            <Link
+              href={ROUTES.NOTIFICATIONS.ROOT}
+              className={clsx(styles.mobileNavItem, isActive(ROUTES.NOTIFICATIONS.ROOT) && styles.active)}
+              aria-label="Notifications"
+            >
+              <FiBell className={styles.mobileIcon} />
+              <span className={styles.mobileLabel}>Alerts</span>
+              {unreadCount > 0 && (
+                <span className={styles.mobileBadge}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           <Link
             href={ROUTES.QUESTIONS.CREATE}
             className={styles.quickAddButton}

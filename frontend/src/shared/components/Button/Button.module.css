@@ -104,12 +104,13 @@
   color: var(--primary-text-on-action);
   border-color: var(--error);
 }
+
 .error:hover:not(:disabled):not([aria-disabled="true"]) {
-  background-color: var(--error-soft);
-  border-color: var(--error);
+  filter: brightness(0.85);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px var(--shadow);
 }
+
 .error:active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(0);
   box-shadow: 0 2px 4px var(--shadow);
