@@ -74,7 +74,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  min-width: 0; /* truncation */
+  min-width: 0;
 }
 
 .displayName {
@@ -127,7 +127,7 @@
   transform: translateX(2px);
 }
 
-/* Empty state */
+/* Empty state with join button */
 .emptyState {
   text-align: center;
   padding: 2rem;
@@ -141,6 +141,14 @@
   font-size: 2rem;
   margin-bottom: 0.5rem;
   opacity: 0.7;
+}
+
+.emptyState p {
+  margin-bottom: 1rem;
+}
+
+.emptyState button {
+  margin-top: 0.5rem;
 }
 
 /* Loading skeleton */

@@ -217,7 +217,12 @@ export default function SheetDetailPage() {
       />
 
       <div className={styles.communityProgressSection}>
-        <ProgressChart slug={slug} />
+        <ProgressChart
+          slug={slug}
+          onJoinSheet={() => setJoinModalOpen(true)}
+          isJoining={joinMutation.isPending}
+          hasJoined={hasJoined}
+        />
       </div>
 
       <div ref={questionsSectionRef} className={styles.questionsSection}>
@@ -278,6 +283,8 @@ export default function SheetDetailPage() {
           participants={participantsData?.participants || []}
           sheetSlug={slug}
           isLoading={participantsLoading}
+          onJoinSheet={() => setJoinModalOpen(true)}
+          isJoining={joinMutation.isPending}
         />
         {participantsData?.pagination && participantsData.pagination.totalPages > 1 && (
           <div className={styles.paginationWrapper}>

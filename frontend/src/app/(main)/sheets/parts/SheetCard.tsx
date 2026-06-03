@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FiUsers, FiCalendar, FiExternalLink, FiTag, FiBookmark } from 'react-icons/fi';
+import { FiUsers, FiCalendar, FiExternalLink, FiTag, FiBookmark, FiLogIn } from 'react-icons/fi';
 import { FaBookmark } from 'react-icons/fa';
 import clsx from 'clsx';
 import Card from '@/shared/components/Card';
@@ -51,6 +51,7 @@ export default function SheetCard({
   } = sheet;
 
   const formattedDate = format(new Date(createdAt), 'MMM d, yyyy');
+
   const ownerParticipant = participants.find(p => p.userId === ownerId);
   const ownerName = ownerParticipant?.username || 'Anonymous User';
   const displayName = ownerParticipant?.displayName || ownerName;
@@ -64,6 +65,7 @@ export default function SheetCard({
   const showViewButton = isOwner || isJoined;
   const buttonText = showViewButton ? 'View' : 'Join';
   const buttonVariant = showViewButton ? 'outline' : 'primary';
+  const buttonIcon = buttonText === 'Join' ? <FiLogIn /> : undefined;
 
   const handleAction = () => {
     if (showViewButton) {
@@ -79,10 +81,9 @@ export default function SheetCard({
   const showMetadata = hasParticipants || hasTag || hasSource;
 
   // Participant count text (for accessibility and clarity)
-  const participantText =
-    participantCount === 1
-      ? '1 participant joined this sheet'
-      : `${participantCount} participants joined this sheet`;
+  const participantText = participantCount === 1
+    ? '1 participant joined this sheet'
+    : `${participantCount} participants joined this sheet`;
 
   return (
     <Card className={clsx(styles.card, className)} noHover>
@@ -100,6 +101,7 @@ export default function SheetCard({
               size="sm"
               onClick={handleAction}
               className={styles.actionButton}
+              leftIcon={buttonIcon}
             >
               {buttonText}
             </Button>
@@ -122,7 +124,11 @@ export default function SheetCard({
         {/* Owner + date row */}
         <div className={styles.ownerRow}>
           {ownerName !== 'Anonymous User' ? (
-            <Link href={ROUTES.SHEETS.PROGRESS(slug, ownerName)} className={styles.ownerLink} title={`View ${ownerName}'s progress`}>
+            <Link
+              href={ROUTES.SHEETS.PROGRESS(slug, ownerName)}
+              className={styles.ownerLink}
+              title={`View ${ownerName}'s progress`}
+            >
               <Avatar src={ownerAvatar} name={ownerName} size="xs" className={styles.ownerAvatar} />
               <span className={styles.ownerName}>{displayName}</span>
             </Link>

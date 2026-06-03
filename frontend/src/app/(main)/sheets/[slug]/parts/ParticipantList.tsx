@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { FiUsers, FiChevronRight } from 'react-icons/fi';
+import { FiUsers, FiChevronRight, FiLogIn } from 'react-icons/fi';
 import { Avatar } from '@/shared/components/Avatar';
+import Button from '@/shared/components/Button';
 import { ROUTES } from '@/shared/config';
 import styles from './ParticipantList.module.css';
 
@@ -19,9 +20,17 @@ interface ParticipantListProps {
   participants: Participant[];
   sheetSlug: string;
   isLoading?: boolean;
+  onJoinSheet: () => void;
+  isJoining?: boolean;
 }
 
-export default function ParticipantList({ participants, sheetSlug, isLoading }: ParticipantListProps) {
+export default function ParticipantList({
+  participants,
+  sheetSlug,
+  isLoading,
+  onJoinSheet,
+  isJoining = false,
+}: ParticipantListProps) {
   if (isLoading) {
     return (
       <div className={styles.loadingState}>
@@ -37,6 +46,15 @@ export default function ParticipantList({ participants, sheetSlug, isLoading }: 
       <div className={styles.emptyState}>
         <FiUsers className={styles.emptyIcon} />
         <p>No participants yet. Be the first to join!</p>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={onJoinSheet}
+          isLoading={isJoining}
+          leftIcon={<FiLogIn />}
+        >
+          Join Sheet
+        </Button>
       </div>
     );
   }
@@ -70,22 +88,14 @@ export default function ParticipantList({ participants, sheetSlug, isLoading }: 
                   <span className={styles.rankNumber}>#{participant.rank}</span>
                 </div>
                 <div className={styles.avatarWrapper}>
-                  <Avatar
-                    src={participant.avatarUrl}
-                    name={displayPrimary}
-                    size="md"
-                  />
+                  <Avatar src={participant.avatarUrl} name={displayPrimary} size="md" />
                 </div>
                 <div className={styles.userInfo}>
                   <span className={styles.displayName}>{displayPrimary}</span>
-                  {displaySecondary && (
-                    <span className={styles.username}>@{displaySecondary}</span>
-                  )}
+                  {displaySecondary && <span className={styles.username}>@{displaySecondary}</span>}
                 </div>
                 <div className={styles.stats}>
-                  <span className={styles.solvedCount}>
-                    {participant.totalQuestionsSolved} Solved
-                  </span>
+                  <span className={styles.solvedCount}>{participant.totalQuestionsSolved} Solved</span>
                 </div>
                 <FiChevronRight className={styles.chevron} />
               </div>

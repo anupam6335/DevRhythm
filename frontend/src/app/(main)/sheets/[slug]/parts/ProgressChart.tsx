@@ -12,25 +12,28 @@ import {
 } from 'chart.js';
 import { PolarArea } from 'react-chartjs-2';
 import { Avatar } from '@/shared/components/Avatar';
+import Button from '@/shared/components/Button';
 import { useAggregatedProgress, useSheetRank } from '@/features/sheets';
 import styles from './ProgressChart.module.css';
 import Link from 'next/link';
+import { FiLogIn } from 'react-icons/fi';
 
 ChartJS.register(PolarAreaController, ArcElement, RadialLinearScale, Tooltip, Legend);
 
 interface ProgressChartProps {
   slug: string;
+  onJoinSheet: () => void;
+  isJoining?: boolean;
+  hasJoined: boolean;
 }
 
-export default function ProgressChart({ slug }: ProgressChartProps) {
+export default function ProgressChart({ slug, onJoinSheet, isJoining = false, hasJoined }: ProgressChartProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  // Hooks called unconditionally at top level
   const { data: aggData, isLoading: aggLoading } = useAggregatedProgress(slug);
   const { data: rankData, isLoading: rankLoading } = useSheetRank(slug);
 
-  // Prepare chart data only when data is available
   const chartData = useMemo(() => {
     if (!aggData) return null;
     const { chart, metadata } = aggData;
@@ -38,7 +41,6 @@ export default function ProgressChart({ slug }: ProgressChartProps) {
     const dataset = chart.datasets[0];
     const [solvedCount, unsolvedCount, revisionCompletedCount, revisionPendingCount] = dataset.data;
     const totalQuestions = metadata.totalQuestions;
-
     return {
       labels,
       datasets: [
@@ -84,7 +86,6 @@ export default function ProgressChart({ slug }: ProgressChartProps) {
     };
   }, [chartData]);
 
-  // Loading state
   const isLoading = aggLoading || rankLoading;
   if (isLoading || !aggData || !rankData || !chartData) {
     return (
@@ -137,43 +138,62 @@ export default function ProgressChart({ slug }: ProgressChartProps) {
 
         {/* Leaderboard section */}
         <div className={styles.leaderboard}>
-        <h4 className={styles.leaderboardTitle}>🏆 Top Performers</h4>
-        <div className={styles.rankList}>
-          {topRanks.map((entry) => (
-            <div key={entry.userId} className={styles.rankItem}>
-              <span className={styles.rankNumber}>#{entry.rank}</span>
-              <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankLink}>
-                <Avatar src={entry.avatarUrl} name={entry.displayName || entry.username} size="sm" />
-              </Link>
-              <div className={styles.rankUserInfo}>
-                <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankNameLink}>
-                  <span className={styles.rankName}>{entry.displayName || entry.username}</span>
-                </Link>
-                <div className={styles.rankStats}>
-                  <span>✓ {entry.solvedCount}</span>
-                  <span>⟳ {entry.revisionCompletedCount}</span>
+          <h4 className={styles.leaderboardTitle}>🏆 Top Performers</h4>
+          {topRanks.length === 0 ? (
+            <div className={styles.noRankData}>No participants yet.</div>
+          ) : (
+            <div className={styles.rankList}>
+              {topRanks.map((entry) => (
+                <div key={entry.userId} className={styles.rankItem}>
+                  <span className={styles.rankNumber}>#{entry.rank}</span>
+                  <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankLink}>
+                    <Avatar src={entry.avatarUrl} name={entry.displayName || entry.username} size="sm" />
+                  </Link>
+                  <div className={styles.rankUserInfo}>
+                    <Link href={`/sheets/${slug}/progress/${entry.username}`} className={styles.rankNameLink}>
+                      <span className={styles.rankName}>{entry.displayName || entry.username}</span>
+                    </Link>
+                    <div className={styles.rankStats}>
+                      <span>✓ {entry.solvedCount}</span>
+                      <span>⟳ {entry.revisionCompletedCount}</span>
+                    </div>
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
+          <hr className={styles.divider} />
+          {currentUser ? (
+            <div className={styles.yourRank}>
+              <span className={styles.yourRankLabel}>Your Rank:</span>
+              <span className={styles.yourRankValue}>#{currentUser.rank}</span>
+              <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankLink}>
+                <Avatar src={currentUser.avatarUrl} name={currentUser.displayName || currentUser.username} size="sm" />
+              </Link>
+              <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankNameLink}>
+                <span className={styles.yourRankName}>{currentUser.displayName || currentUser.username}</span>
+              </Link>
+              <div className={styles.yourRankStats}>
+                <span>✓ {currentUser.solvedCount}</span>
+                <span>⟳ {currentUser.revisionCompletedCount}</span>
               </div>
             </div>
-          ))}
+          ) : !hasJoined ? (
+              <div className={styles.joinPrompt}>
+                <p>You have not joined this sheet. Join to see your rank.</p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={onJoinSheet}
+                  isLoading={isJoining}
+                  leftIcon={<FiLogIn />}
+                >
+                  Join Sheet
+                </Button>
+              </div>
+          ) : null}
         </div>
-        <hr className={styles.divider} />
-        <div className={styles.yourRank}>
-          <span className={styles.yourRankLabel}>Your Rank:</span>
-          <span className={styles.yourRankValue}>#{currentUser.rank}</span>
-          <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankLink}>
-            <Avatar src={currentUser.avatarUrl} name={currentUser.displayName || currentUser.username} size="sm" />
-          </Link>
-          <Link href={`/sheets/${slug}/progress/${currentUser.username}`} className={styles.rankNameLink}>
-            <span className={styles.yourRankName}>{currentUser.displayName || currentUser.username}</span>
-          </Link>
-          <div className={styles.yourRankStats}>
-            <span>✓ {currentUser.solvedCount}</span>
-            <span>⟳ {currentUser.revisionCompletedCount}</span>
-          </div>
-        </div>
-        </div>
-    </div>
+      </div>
 
       {/* Right column: polar area chart */}
       <div className={styles.chartWrapper}>

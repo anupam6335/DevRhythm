@@ -181,7 +181,31 @@
 .rankLink:hover {
   opacity: 0.9;
 }
+.noRankData {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
 
+.joinPrompt {
+  text-align: center;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+}
+
+.joinPrompt p {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.noRankData {
+  text-align: center;
+  padding: 0.5rem 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
