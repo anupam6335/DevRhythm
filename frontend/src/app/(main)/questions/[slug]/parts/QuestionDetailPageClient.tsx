@@ -17,7 +17,7 @@ import Button from '@/shared/components/Button';
 import Tabs from '@/shared/components/Tabs';
 import Modal from '@/shared/components/Modal';
 import { toast } from '@/shared/components/Toast';
-import { FiExternalLink, FiMaximize2, FiMinimize2 } from 'react-icons/fi';
+import { FiExternalLink, FiMaximize2, FiMinimize2, FiX } from 'react-icons/fi';
 import type { Question } from '@/shared/types';
 import { ProgressCard } from './ProgressCard';
 import { SimilarQuestionsGrid } from './SimilarQuestionsGrid';
@@ -32,6 +32,11 @@ import SkeletonLoader from '@/shared/components/SkeletonLoader';
 interface QuestionDetailPageClientProps {
   initialQuestion: Question;
   initialSimilarQuestions: Question[];
+}
+
+interface TestCase {
+  stdin: string;
+  expected: string;
 }
 
 function decodeEscapedString(str: string): string {
@@ -101,10 +106,29 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
   const [rightActiveTab, setRightActiveTab] = useState('code');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [persistedResults, setPersistedResults] = useState<any[] | undefined>(undefined);
+  const [executionError, setExecutionError] = useState<string | null>(null);
+  const [isWarningVisible, setIsWarningVisible] = useState(true);
 
   // Client-side fallback for similar questions
   const [similarQuestions, setSimilarQuestions] = useState(initialSimilarQuestions);
   const [shouldFetchSimilar, setShouldFetchSimilar] = useState(initialSimilarQuestions.length === 0);
+
+  // Warning banner dismissal (global, daily reset)
+  useEffect(() => {
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const dismissedDate = localStorage.getItem('codeRunnerWarningDismissedDate');
+    if (dismissedDate === today) {
+      setIsWarningVisible(false);
+    } else {
+      setIsWarningVisible(true);
+    }
+  }, []);
+
+  const dismissWarning = () => {
+    const today = new Date().toLocaleDateString('en-CA');
+    localStorage.setItem('codeRunnerWarningDismissedDate', today);
+    setIsWarningVisible(false);
+  };
 
   const {
     data: clientSimilarQuestions,
@@ -196,7 +220,9 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
     }
   }, [saveNotesMutation, queryClient, initialQuestion._id]);
 
-  const handleRunCode = useCallback(async (code: string, language: string, testCases: Array<{ stdin: string; expected: string }>) => {
+  const handleRunCode = useCallback(async (code: string, language: string, testCases: TestCase[]) => {
+    setExecutionError(null);
+    setPersistedResults(undefined);
     const sanitizedTestCases = testCases.map(({ stdin, expected }) => ({ stdin, expected }));
     try {
       await runCodeMutation.mutateAsync({
@@ -205,10 +231,13 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         language,
         testCases: sanitizedTestCases,
       });
+      setExecutionError(null);
       await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
       await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Run code error:', error);
+      const message = error.response?.data?.message || error.message || 'Code execution failed';
+      setExecutionError(message);
     }
   }, [initialQuestion._id, runCodeMutation, queryClient]);
 
@@ -298,52 +327,52 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
 
   return (
     <div className={isFullWindow ? styles.fullWindow : styles.page}>
-    {/* Header */}
-    <div className={styles.header}>
-      <div className={styles.titleSection}>
-        <h1 className={styles.title}>{initialQuestion.title}</h1>
-        {mounted && isAuthenticated && userStatus && (
-          <span className={`${styles.statusBadge} ${getStatusClass(userStatus)}`}>
-            {userStatus}
-          </span>
-        )}
-      </div>
-      <div className={styles.actionButtons}>
-        <div className={styles.fullWindowButtonWrapper}>
-          <div className={styles.rippleRing} />
-          <div className={styles.rippleRing} />
-          <div className={styles.rippleRing} />
-          <Button
-            className={styles.fullWindowButton}
-            variant="ghost"
-            size="sm"
-            onClick={toggleFullWindow}
-            leftIcon={isFullWindow ? <FiMinimize2 /> : <FiMaximize2 />}
-          >
-            {isFullWindow ? 'Exit' : 'Full'}
-          </Button>
+      {/* Header */}
+      <div className={styles.header}>
+        <div className={styles.titleSection}>
+          <h1 className={styles.title}>{initialQuestion.title}</h1>
+          {mounted && isAuthenticated && userStatus && (
+            <span className={`${styles.statusBadge} ${getStatusClass(userStatus)}`}>
+              {userStatus}
+            </span>
+          )}
         </div>
-        {mounted && isAuthenticated && isCreator && (
-          <>
-            <Button variant="outline" size="sm" onClick={handleEditQuestion}>
-              Edit
+        <div className={styles.actionButtons}>
+          <div className={styles.fullWindowButtonWrapper}>
+            <div className={styles.rippleRing} />
+            <div className={styles.rippleRing} />
+            <div className={styles.rippleRing} />
+            <Button
+              className={styles.fullWindowButton}
+              variant="ghost"
+              size="sm"
+              onClick={toggleFullWindow}
+              leftIcon={isFullWindow ? <FiMinimize2 /> : <FiMaximize2 />}
+            >
+              {isFullWindow ? 'Exit' : 'Full'}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDeleteClick}>
-              Delete
-            </Button>
-          </>
-        )}
+          </div>
+          {mounted && isAuthenticated && isCreator && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleEditQuestion}>
+                Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDeleteClick}>
+                Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
 
-    {/* Metadata bar  */}
-    <div className={styles.metadataBar}>
-      <Link href={`/questions?platform=${encodeURIComponent(initialQuestion.platform)}&page=1`} className={styles.metadataChip}>
-        {initialQuestion.platform}
-      </Link>
-      <Link href={`/questions?difficulty=${initialQuestion.difficulty}&page=1`} className={`${styles.metadataChip} ${styles.difficultyChip}`} data-difficulty={initialQuestion.difficulty.toLowerCase()}>
-        {initialQuestion.difficulty}
-      </Link>
+      {/* Metadata bar */}
+      <div className={styles.metadataBar}>
+        <Link href={`/questions?platform=${encodeURIComponent(initialQuestion.platform)}&page=1`} className={styles.metadataChip}>
+          {initialQuestion.platform}
+        </Link>
+        <Link href={`/questions?difficulty=${initialQuestion.difficulty}&page=1`} className={`${styles.metadataChip} ${styles.difficultyChip}`} data-difficulty={initialQuestion.difficulty.toLowerCase()}>
+          {initialQuestion.difficulty}
+        </Link>
         {initialQuestion.tags.map(tag => {
           const slug = slugify(tag);
           return (
@@ -352,23 +381,38 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             </Link>
           );
         })}
-      <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.metadataChip}>
-        Solve on {initialQuestion.platform} <FiExternalLink size={10} />
-      </a>
-      {initialQuestion.solutionLinks && initialQuestion.solutionLinks.length > 0 && (
-        <div className={styles.solutionDropdown}>
-          <span className={styles.metadataChip}>
-            🔗 Solutions
-            <select className={styles.solutionSelect} onChange={(e) => window.open(e.target.value, '_blank')} value="">
-              <option value="" disabled>Select solution</option>
-              {initialQuestion.solutionLinks.map((link, idx) => (
-                <option key={idx} value={link}>Solution {idx + 1}</option>
-              ))}
-            </select>
-          </span>
+        <a href={initialQuestion.problemLink} target="_blank" rel="noopener noreferrer" className={styles.metadataChip}>
+          Solve on {initialQuestion.platform} <FiExternalLink size={10} />
+        </a>
+        {/* {initialQuestion.solutionLinks && initialQuestion.solutionLinks.length > 0 && (
+          <div className={styles.solutionDropdown}>
+            <span className={styles.metadataChip}>
+              🔗 Solutions
+              <select className={styles.solutionSelect} onChange={(e) => window.open(e.target.value, '_blank')} value="">
+                <option value="" disabled>Select solution</option>
+                {initialQuestion.solutionLinks.map((link, idx) => (
+                  <option key={idx} value={link}>Solution {idx + 1}</option>
+                ))}
+              </select>
+            </span>
+          </div>
+        )} */}
+      </div>
+
+      {/* Warning Banner */}
+      {isWarningVisible && (
+        <div className={styles.warningBanner}>
+          <div className={styles.warningContent}>
+            <span className={styles.warningIcon}>⚠️</span>
+            <span>
+              This code runner currently supports LeetCode problems only. In some cases, the code runner may not work correctly. If you encounter any issues, please use the &quot;Solve on {initialQuestion.platform}&quot; button and submit your solution directly on the original platform.
+            </span>
+          </div>
+          <button className={styles.warningCloseButton} onClick={dismissWarning} aria-label="Close">
+            <FiX />
+          </button>
         </div>
       )}
-    </div>
 
       {/* Progress Card */}
       {mounted && isAuthenticated && (
@@ -427,6 +471,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
             onRun={handleRunCode}
             isRunning={runCodeMutation.isPending}
             results={persistedResults}
+            executionError={executionError}
             onCodeChange={setEditorCode}
             initialHistory={codeHistory}
             activeTab={rightActiveTab}

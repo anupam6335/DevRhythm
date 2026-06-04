@@ -16,8 +16,30 @@ class PythonMetadataExtractor {
     }
   }
 
+  _getPythonExecutable() {
+    // Allow override via environment variable
+    if (process.env.PYTHON_EXECUTABLE) {
+      return process.env.PYTHON_EXECUTABLE;
+    }
+
+    // Try python3 first (modern Linux), then fall back to python
+    const candidates = ['python3', 'python'];
+    for (const cmd of candidates) {
+      try {
+        execSync(`${cmd} --version`, { stdio: 'ignore' });
+        return cmd;
+      } catch {
+        // continue to next candidate
+      }
+    }
+
+    throw new Error('No Python interpreter found (tried python3 and python). Please install Python 3 or set PYTHON_EXECUTABLE environment variable.');
+  }
+
   _extractWithAST(starterCode) {
+    const pythonCmd = this._getPythonExecutable();
     const tempScriptPath = path.join(os.tmpdir(), `_ast_extractor_${Date.now()}.py`);
+
     const analysisScript = `
 import ast
 import json
@@ -211,9 +233,10 @@ if __name__ == "__main__":
         sys.exit(1)
 `;
     fs.writeFileSync(tempScriptPath, analysisScript, { encoding: 'utf8', mode: 0o600 });
+
     let output;
     try {
-      output = execSync(`python "${tempScriptPath}"`, {
+      output = execSync(`${pythonCmd} "${tempScriptPath}"`, {
         input: starterCode,
         encoding: 'utf-8',
         timeout: 5000,
@@ -222,7 +245,7 @@ if __name__ == "__main__":
     } catch (execError) {
       let errorMessage = execError.message;
       if (execError.stderr) errorMessage += `\n${execError.stderr}`;
-      throw new Error(`Python AST extraction failed: ${errorMessage}`);
+      throw new Error(`Python AST extraction failed using command "${pythonCmd}": ${errorMessage}`);
     } finally {
       if (fs.existsSync(tempScriptPath)) {
         fs.unlinkSync(tempScriptPath);

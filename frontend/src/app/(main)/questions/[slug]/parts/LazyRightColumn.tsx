@@ -20,6 +20,7 @@ interface LazyRightColumnProps {
   onRun: (code: string, language: string, testCases: any[]) => Promise<void>;
   isRunning: boolean;
   results?: any[];
+  executionError?: string | null;
   onCodeChange: (code: string) => void;
   initialHistory: any[];
   activeTab: string;
@@ -29,13 +30,12 @@ interface LazyRightColumnProps {
 export const LazyRightColumn: React.FC<LazyRightColumnProps> = (props) => {
   const { ref, inView } = useInView({
     triggerOnce: true,
-    rootMargin: '200px', // start loading 200px before entering viewport
+    rootMargin: '200px',
     threshold: 0,
   });
 
-  // Preload the editor bundle on hover (improves perceived performance)
   const handlePreload = () => {
-    import('./CodeExecutionArea'); // triggers webpack code splitting prefetch
+    import('./CodeExecutionArea');
   };
 
   return (

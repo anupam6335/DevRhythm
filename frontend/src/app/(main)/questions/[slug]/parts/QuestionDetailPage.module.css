@@ -1,3 +1,74 @@
+/* ===== Warning Banner ===== */
+.warningBanner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background-color: #fff3e0;
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.warningContent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.warningIcon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.warningCloseButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.warningCloseButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+/* Dark mode adjustments */
+.dark .warningBanner {
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.dark .warningCloseButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .warningBanner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .warningCloseButton {
+    align-self: flex-end;
+  }
+}
+
 /* Skeleton specific styles */
 .progressCardSkeleton {
   border: 1px solid var(--border);

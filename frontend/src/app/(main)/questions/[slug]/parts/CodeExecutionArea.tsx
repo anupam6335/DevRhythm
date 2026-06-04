@@ -6,7 +6,7 @@ import Select from '@/shared/components/Select';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, keymap, Decoration } from '@codemirror/view';
 import { StateEffect, StateField, RangeSet, Range, RangeValue } from '@codemirror/state';
 import { indentUnit } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
@@ -33,6 +33,7 @@ import styles from './CodeExecutionArea.module.css';
 import { SiCplusplus } from 'react-icons/si';
 import { FaPython } from 'react-icons/fa';
 import { PartyPopper, PartyPopperRef } from '@/shared/components/PartyPopper';
+import { parseErrorLineNumber, getErrorType } from './errorParser';
 
 interface TestCase {
   stdin: string;
@@ -56,6 +57,7 @@ interface CodeExecutionAreaProps {
   onRun: (code: string, language: string, testCases: TestCase[]) => Promise<void>;
   isRunning: boolean;
   results?: ExecutionResult[];
+  executionError?: string | null;
   onCodeChange?: (code: string) => void;
   initialHistory: any[];
   activeTab: string;
@@ -200,6 +202,35 @@ function replaceAll(view: EditorView, searchText: string, replaceText: string) {
   }
 }
 
+// ========== Error Line Highlighting Extension ==========
+const errorLineEffect = StateEffect.define<{ from: number; to: number } | null>();
+
+const errorLineField = StateField.define<RangeSet<Decoration>>({
+  create() {
+    return RangeSet.empty;
+  },
+  update(value, tr) {
+    for (let effect of tr.effects) {
+      if (effect.is(errorLineEffect)) {
+        if (!effect.value) return RangeSet.empty;
+        const { from, to } = effect.value;
+        const decoration = Decoration.line({
+          attributes: { class: styles.errorLine },
+        }).range(from, to);
+        return RangeSet.of([decoration]);
+      }
+    }
+    return value;
+  },
+});
+
+const errorLineExtension = [
+  errorLineField,
+  EditorView.decorations.compute([errorLineField], (state) => {
+    return state.field(errorLineField);
+  }),
+];
+
 // ========== Theme & Indentation ==========
 const createCustomTheme = (isDark: boolean): Extension => {
   const backgroundColor = isDark ? 'var(--code-bg)' : 'var(--code-bg)';
@@ -274,6 +305,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   onRun,
   isRunning,
   results,
+  executionError,
   onCodeChange,
   initialHistory,
   activeTab,
@@ -287,6 +319,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const [customTestCases, setCustomTestCases] = useState<TestCase[]>(initialCustomTestCases);
   const [testCasesCollapsed, setTestCasesCollapsed] = useState(isMobile);
   const [isCodeModified, setIsCodeModified] = useState(false);
+  const [errorLine, setErrorLine] = useState<number | null>(null);
   const skipStarterLoad = useRef(false);
   const autoSwitched = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
@@ -294,7 +327,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   const hasLoadedInitialHistory = useRef(false);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDone = useRef(false);
-  const prevIsRunning = useRef(isRunning);
+  const prevIsRunningRef = useRef(isRunning);
   const lastPartyTrigger = useRef<string>('');
 
   // Find/Replace UI state
@@ -348,11 +381,18 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     setCode(val);
     onCodeChange?.(val);
     checkIfModified(val);
+    // Clear error highlight when code changes
+    if (errorLine !== null) {
+      setErrorLine(null);
+      if (editorViewRef.current) {
+        editorViewRef.current.dispatch({ effects: errorLineEffect.of(null) });
+      }
+    }
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       persistCode(val, language);
     }, 500);
-  }, [onCodeChange, checkIfModified, persistCode, language]);
+  }, [onCodeChange, checkIfModified, persistCode, language, errorLine]);
 
   // Initial load: restore language and code
   useEffect(() => {
@@ -427,26 +467,119 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
     }
   }, [initialHistory, initialLanguage, onCodeChange, getPersistedCode, persistCode, persistLanguage]);
 
-  // Auto-switch to results tab
+  // Auto-switch to results tab when results or executionError appear
   useEffect(() => {
-    if (results && results.length > 0 && !autoSwitched.current) {
-      autoSwitched.current = true;
-      onTabChange('results');
-      setTimeout(() => { autoSwitched.current = false; }, 500);
+    if ((results && results.length > 0) || executionError) {
+      if (!autoSwitched.current) {
+        autoSwitched.current = true;
+        onTabChange('results');
+        setTimeout(() => { autoSwitched.current = false; }, 500);
+      }
     }
-  }, [results, onTabChange]);
+  }, [results, executionError, onTabChange]);
 
-  // Party popper: only when run completes and all tests pass
+  // ========== Party Popper – FIXED with transition detection ==========
   useEffect(() => {
-    if (prevIsRunning.current === true && isRunning === false && results && results.length > 0 && results.every(r => r.passed)) {
+    // Detect transition: we were running (prevIsRunningRef.current === true) and now finished (isRunning === false)
+    const wasRunning = prevIsRunningRef.current;
+    const justFinished = wasRunning && !isRunning;
+
+    if (justFinished && !executionError && results && results.length > 0 && results.every(r => r.passed)) {
       const key = `${results.length}-${results.filter(r => r.passed).length}`;
       if (lastPartyTrigger.current !== key) {
         lastPartyTrigger.current = key;
         partyPopperRef.current?.fire();
       }
     }
-    prevIsRunning.current = isRunning;
-  }, [isRunning, results]);
+    // Update ref after the check
+    prevIsRunningRef.current = isRunning;
+  }, [isRunning, results, executionError]);
+
+  // Parse errors from test case results and highlight line
+  useEffect(() => {
+    if (!results || results.length === 0) {
+      // Clear error line if no results, but executionError may set it later
+      // Do not clear here unconditionally; let executionError effect handle it.
+      if (!executionError) setErrorLine(null);
+      return;
+    }
+    // Find first failed test case with an error message
+    const failedWithError = results.find(r => !r.passed && r.error);
+    if (failedWithError && failedWithError.error) {
+      const line = parseErrorLineNumber(failedWithError.error, language);
+      setErrorLine(line);
+      if (line !== null && editorViewRef.current) {
+        setTimeout(() => {
+          const view = editorViewRef.current;
+          if (view) {
+            try {
+              const lineInfo = view.state.doc.lineAt(line);
+              view.dispatch({
+                effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }),
+              });
+            } catch (e) {
+              // Line number out of range – ignore
+            }
+          }
+        }, 100);
+      }
+    } else {
+      setErrorLine(null);
+    }
+  }, [results, language, executionError]);
+
+  // Parse error line from executionError (global compilation/runtime error)
+  useEffect(() => {
+    if (executionError) {
+      console.log('[Highlight] executionError:', executionError);
+      const line = parseErrorLineNumber(executionError, language);
+      console.log('[Highlight] Parsed line number:', line);
+      if (line !== null) {
+        setErrorLine(line);
+        if (editorViewRef.current) {
+          setTimeout(() => {
+            const view = editorViewRef.current;
+            if (view) {
+              try {
+                const lineInfo = view.state.doc.lineAt(line);
+                console.log('[Highlight] Scrolling to line:', line, 'from:', lineInfo.from);
+                view.dispatch({
+                  effects: EditorView.scrollIntoView(lineInfo.from, { y: 'center' }),
+                });
+              } catch (e) {
+                console.warn('[Highlight] Invalid line number:', line, e);
+              }
+            }
+          }, 200);
+        }
+      } else {
+        setErrorLine(null);
+      }
+    } else {
+      if (!results || results.length === 0) {
+        setErrorLine(null);
+      }
+    }
+  }, [executionError, language, results]);
+
+  // Apply error line decoration
+  useEffect(() => {
+    if (!editorViewRef.current) return;
+    const view = editorViewRef.current;
+    if (errorLine !== null) {
+      try {
+        const line = view.state.doc.lineAt(errorLine);
+        console.log('[Highlight] Applying decoration to line:', errorLine);
+        view.dispatch({
+          effects: errorLineEffect.of({ from: line.from, to: line.to }),
+        });
+      } catch (e) {
+        console.warn('Invalid line number for error highlight:', errorLine);
+      }
+    } else {
+      view.dispatch({ effects: errorLineEffect.of(null) });
+    }
+  }, [errorLine]);
 
   // ========== Custom Find/Replace Handlers ==========
   const handleFindNext = useCallback(() => {
@@ -539,12 +672,11 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
   // Custom extensions for 4‑space indentation and Tab key behavior
   const indentExtensions = useMemo(() => {
     return [
-      indentUnit.of('    '), // 4 spaces
+      indentUnit.of('    '),
       keymap.of([
         {
           key: 'Tab',
           run: (view) => {
-            // Insert 4 spaces at cursor
             view.dispatch({
               changes: { from: view.state.selection.main.head, insert: '    ' },
               selection: { anchor: view.state.selection.main.head + 4 },
@@ -556,7 +688,6 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
         {
           key: 'Shift-Tab',
           run: (view) => {
-            // Unindent (remove up to 4 spaces before cursor)
             const pos = view.state.selection.main.head;
             const line = view.state.doc.lineAt(pos);
             const lineStart = line.from;
@@ -581,6 +712,19 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
       ]),
     ];
   }, []);
+
+  const editorExtensions = useMemo(() => [
+    getLanguageExtension(language),
+    customTheme,
+    searchHighlightTheme,
+    searchMatchField,
+    indentExtensions,
+    errorLineExtension,
+    keymap.of([
+      { key: 'Ctrl-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
+      { key: 'Cmd-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
+    ]),
+  ], [language, customTheme, indentExtensions]);
 
   return (
     <div className={styles.container}>
@@ -633,17 +777,7 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
               value={code}
               onChange={handleCodeChange}
               height={isMobile ? '300px' : '500px'}
-              extensions={[
-                getLanguageExtension(language),
-                customTheme,
-                searchHighlightTheme,
-                searchMatchField,
-                indentExtensions,
-                keymap.of([
-                  { key: 'Ctrl-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
-                  { key: 'Cmd-f', run: () => { setShowFindPanel(true); return true; }, preventDefault: true },
-                ]),
-              ]}
+              extensions={editorExtensions}
               basicSetup={{
                 lineNumbers: true,
                 highlightActiveLineGutter: true,
@@ -857,7 +991,19 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
 
       {activeTab === 'results' && (
         <div className={styles.resultsPanel}>
-          {!results || results.length === 0 ? (
+          {executionError ? (
+            <div className={styles.resultCard}>
+              <div className={styles.resultHeader}>
+                <span className={styles.resultFailedIcon}>
+                  <FiXCircle />
+                </span>
+                <span className={styles.resultLabel}>Compilation / Runtime Error</span>
+              </div>
+              <div className={styles.resultError}>
+                <pre className={styles.resultErrorValue}>{executionError}</pre>
+              </div>
+            </div>
+          ) : !results || results.length === 0 ? (
             <div className={styles.resultsEmpty}>Run your code to see results here.</div>
           ) : (
             <>
@@ -865,34 +1011,41 @@ export const CodeExecutionArea: React.FC<CodeExecutionAreaProps> = ({
                 {passedCount} / {totalCount} passed
               </div>
               <div className={styles.resultsList}>
-                {results.map((res, idx) => (
-                  <div key={idx} className={styles.resultCard}>
-                    <div className={styles.resultHeader}>
-                      <span className={res.passed ? styles.resultPassedIcon : styles.resultFailedIcon}>
-                        {res.passed ? <FiCheckCircle /> : <FiXCircle />}
-                      </span>
-                      <span className={styles.resultLabel}>Test Case {idx + 1}</span>
-                    </div>
-                    <div className={styles.resultDetail}>
-                      <div className={styles.resultDetailLabel}>Input:</div>
-                      <pre className={styles.resultDetailValue}>{res.input}</pre>
-                    </div>
-                    <div className={styles.resultDetail}>
-                      <div className={styles.resultDetailLabel}>Expected:</div>
-                      <pre className={styles.resultDetailValue}>{res.expected}</pre>
-                    </div>
-                    <div className={styles.resultDetail}>
-                      <div className={styles.resultDetailLabel}>Output:</div>
-                      <pre className={styles.resultDetailValue}>{res.output}</pre>
-                    </div>
-                    {res.error && (
-                      <div className={styles.resultError}>
-                        <div className={styles.resultDetailLabel}>Error:</div>
-                        <pre className={styles.resultErrorValue}>{res.error}</pre>
+                {results.map((res, idx) => {
+                  const errorType = res.error ? getErrorType(res.error) : null;
+                  const isCompilationError = errorType === 'compilation';
+                  const isRuntimeError = errorType === 'runtime';
+                  return (
+                    <div key={idx} className={styles.resultCard}>
+                      <div className={styles.resultHeader}>
+                        <span className={res.passed ? styles.resultPassedIcon : styles.resultFailedIcon}>
+                          {res.passed ? <FiCheckCircle /> : <FiXCircle />}
+                        </span>
+                        <span className={styles.resultLabel}>Test Case {idx + 1}</span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <div className={styles.resultDetail}>
+                        <div className={styles.resultDetailLabel}>Input:</div>
+                        <pre className={styles.resultDetailValue}>{res.input}</pre>
+                      </div>
+                      <div className={styles.resultDetail}>
+                        <div className={styles.resultDetailLabel}>Expected:</div>
+                        <pre className={styles.resultDetailValue}>{res.expected}</pre>
+                      </div>
+                      <div className={styles.resultDetail}>
+                        <div className={styles.resultDetailLabel}>Output:</div>
+                        <pre className={styles.resultDetailValue}>{res.output}</pre>
+                      </div>
+                      {res.error && (
+                        <div className={styles.resultError}>
+                          <div className={styles.resultDetailLabel}>
+                            {isCompilationError ? 'Compilation Error:' : isRuntimeError ? 'Runtime Error:' : 'Error:'}
+                          </div>
+                          <pre className={styles.resultErrorValue}>{res.error}</pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}

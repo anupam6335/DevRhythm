@@ -44,6 +44,49 @@ const normalizeLanguage = (lang) => {
 const normalizeForCompare = (str) => (str || '').replace(/\s+/g, ' ').trim();
 
 /**
+ * Validate Python code syntax using the Python interpreter.
+ * Returns an error message if syntax is invalid, otherwise null.
+ */
+const validatePythonSyntax = (code) => {
+  const { execSync } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+
+  // Determine Python executable (same logic as in pythonExtractor)
+  let pythonCmd = process.env.PYTHON_EXECUTABLE;
+  if (!pythonCmd) {
+    try {
+      execSync('python3 --version', { stdio: 'ignore' });
+      pythonCmd = 'python3';
+    } catch {
+      try {
+        execSync('python --version', { stdio: 'ignore' });
+        pythonCmd = 'python';
+      } catch {
+        return 'Python interpreter not found. Please ensure Python 3 is installed or set PYTHON_EXECUTABLE.';
+      }
+    }
+  }
+
+  const tempFile = path.join(os.tmpdir(), `_syntax_check_${Date.now()}.py`);
+  try {
+    fs.writeFileSync(tempFile, code, 'utf8');
+    execSync(`${pythonCmd} -m py_compile "${tempFile}"`, { stdio: 'pipe' });
+    return null; // No syntax error
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : err.message;
+    // Extract the actual error message (e.g., "IndentationError: expected an indented block")
+    const lines = stderr.split('\n');
+    let errorMsg = lines.find(line => line.includes('Error:') || line.includes('SyntaxError') || line.includes('IndentationError'));
+    if (!errorMsg) errorMsg = stderr.substring(0, 200);
+    return `Python syntax error: ${errorMsg}`;
+  } finally {
+    try { fs.unlinkSync(tempFile); } catch(e) {}
+  }
+};
+
+/**
  * Build the complete set of test cases to run (default + custom + request).
  * Normalizes each test case's stdin to JSON format.
  */
@@ -137,6 +180,14 @@ const executeCodeCore = async (userId, body, timeZone = 'UTC') => {
     throw new AppError('Code cannot be empty', 400);
   }
   if (!questionId) throw new AppError('questionId is required', 400);
+
+  // Validate Python syntax early
+  if (language === 'python') {
+    const syntaxError = validatePythonSyntax(code);
+    if (syntaxError) {
+      throw new AppError(syntaxError, 400);
+    }
+  }
 
   const [question, userProgress] = await Promise.all([
     Question.findById(questionId).lean(),
@@ -480,6 +531,14 @@ const executeCodeAsync = async (req, res, next) => {
       throw new AppError('Code cannot be empty', 400);
     }
     if (!questionId) throw new AppError('questionId is required', 400);
+
+    // Validate Python syntax early for async execution as well
+    if (normalizedLang === 'python') {
+      const syntaxError = validatePythonSyntax(code);
+      if (syntaxError) {
+        throw new AppError(syntaxError, 400);
+      }
+    }
 
     const question = await Question.findById(questionId).select('_id');
     if (!question) throw new AppError('Question not found', 404);

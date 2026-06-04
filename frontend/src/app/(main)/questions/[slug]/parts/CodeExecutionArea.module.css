@@ -645,3 +645,8 @@
     width: 100%;
   }
 }
+
+.errorLine {
+  background-color: rgba(var(--error-rgb), 0.15);
+  border-left: 3px solid var(--error);
+}

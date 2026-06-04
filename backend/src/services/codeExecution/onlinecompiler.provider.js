@@ -29,8 +29,6 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
       throw new Error('OnlineCompiler API URL or API key not configured');
     }
 
-    // No extra wrapping for any language – the language‑specific generator
-    // already produces a fully runnable program with its own entry point.
     const finalCode = code;
     const compiler = this.mapLanguage(language);
     const payload = {
@@ -63,26 +61,46 @@ class OnlineCompilerProvider extends BaseCodeExecutionProvider {
         exitCode: data.exit_code !== undefined ? data.exit_code : (data.error ? 1 : 0),
       };
     } catch (error) {
+      // Log full error details for debugging
       console.error('[OnlineCompilerProvider] Execution error:', {
+        language,
+        url,
         message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: url,
+        responseStatus: error.response?.status,
+        responseData: error.response?.data,
+        requestError: error.request ? 'Request made but no response received' : undefined,
       });
 
-      let stderr = 'Execution service error';
-      if (error.response) {
-        const apiMsg = error.response.data?.message || error.response.data?.error || error.response.statusText;
-        stderr = `API error (${error.response.status}): ${apiMsg}`;
+      let stderr = '';
+      let exitCode = 1;
+
+      // Try to extract meaningful error from API response
+      if (error.response && error.response.data) {
+        const apiData = error.response.data;
+        if (typeof apiData === 'object') {
+          stderr = apiData.message || apiData.error || apiData.stderr || apiData.output;
+          if (apiData.details) stderr += `\nDetails: ${apiData.details}`;
+        } else if (typeof apiData === 'string') {
+          stderr = apiData;
+        }
+        if (!stderr) {
+          stderr = `API error (${error.response.status}): ${error.response.statusText}`;
+        }
       } else if (error.request) {
         stderr = `Network error: ${error.message}`;
       } else {
         stderr = `Unexpected error: ${error.message}`;
       }
+
+      // Clean up stderr to avoid extremely long strings
+      if (stderr.length > 2000) {
+        stderr = stderr.substring(0, 2000) + '... (truncated)';
+      }
+
       return {
         stdout: '',
-        stderr,
-        exitCode: 1,
+        stderr: stderr || 'Execution service error',
+        exitCode,
       };
     }
   }
