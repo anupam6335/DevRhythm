@@ -91,6 +91,12 @@ const getQuestions = async (req, res, next) => {
     limit = Math.min(parseInt(limit) || 20, 100);
     const skip = (page - 1) * limit;
 
+    // ========== FIX: Normalize tags to array ==========
+    if (tags && !Array.isArray(tags)) {
+      tags = [tags];
+    }
+    // =================================================
+
     let query = { isActive: true };
 
     // Platform filter
@@ -114,7 +120,7 @@ const getQuestions = async (req, res, next) => {
       query.pattern = patternName;
     }
 
-    // Tags filter
+    // Tags filter (now normalized)
     if (tags && Array.isArray(tags) && tags.length) {
       query.tags = { $in: tags };
     }
