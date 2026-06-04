@@ -56,6 +56,9 @@ const jobQueue = new Bull('devrhythm-jobs', {
   },
 });
 
+// Increase max listeners to avoid MaxListenersExceededWarning
+jobQueue.setMaxListeners(50);
+
 // ========== HEARTBEAT: keep Redis connection alive ==========
 let heartbeatInterval = null;
 const startHeartbeat = () => {
@@ -88,8 +91,13 @@ jobQueue.on('error', (error) => {
   console.error('Queue error:', error);
 });
 
+// Custom failed handler: treat 'Missing key' as warning (job already cleaned up)
 jobQueue.on('failed', (job, err) => {
-  console.error(`Job ${job.id} (${job.name}) failed:`, err);
+  if (err && err.message && err.message.includes('Missing key for job')) {
+    console.warn(`Job ${job.id} (${job.name}) failed (likely already removed):`, err.message);
+  } else {
+    console.error(`Job ${job.id} (${job.name}) failed:`, err);
+  }
 });
 
 // ========== IMPORT HANDLERS ==========
