@@ -421,7 +421,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
       userId,
       questionId,
       now,
-      (body.timeSpent || 0)
+      body.timeSpent || 0
     );
 
     if (isFirstSolve) {
@@ -430,26 +430,7 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
 
     await updateUserActivity(userId, now, timeZone);
 
-    // ========== HEATMAP UPDATE – use incrementDailyActivityDirect ==========
-    const increments = {
-      totalActivities: 1,
-      totalSubmissions: 1,
-      totalTimeSpentMinutes: body.timeSpent || 0,
-      ...(isFirstSolve ? { newProblemsSolved: 1 } : {}),
-      testCaseExecutions: totalCount,
-      passedCount: passedCount,
-      failedCount: totalCount - passedCount,
-    };
-    await incrementDailyActivityDirect(userId, now, timeZone, increments, isFirstSolve, question.difficulty, question.platform);
-    // ========== END HEATMAP UPDATE ==========
-
-    // Increment confidence
-    const progressDoc = await UserQuestionProgress.findOne({ userId, questionId });
-    const newConfidence = Math.min(5, (progressDoc?.confidenceLevel || 0) + 0.25);
-    await UserQuestionProgress.updateOne(
-      { userId, questionId },
-      { $set: { confidenceLevel: newConfidence } }
-    );
+    // REMOVED: heatmap increment block – no longer called here
 
     await ActivityLog.create({
       userId,
@@ -470,27 +451,18 @@ async function executeCodeCore(userId, body, timeZone = 'UTC') {
 
     await invalidateProgressCache(userId);
 
-    const dateStr = DateTime.fromJSDate(now, { zone: timeZone }).toFormat('yyyy-MM-dd');
-    await invalidateCache(`activity:day:user:${userId}:*/activity/day/${dateStr}*`);
-    await invalidateCache(`activity:today:user:${userId}:*`);
-
     if (jobQueue) {
-      try {
-        await jobQueue.add('question.solved', {
-          userId,
-          questionId,
-          progressId: updatedProgress?._id,
-          timeSpent: body.timeSpent || 0,
-          solvedAt: now,
-          source: 'test_case',
-        });
-      } catch (queueErr) {
-        console.error('Failed to queue question.solved job:', queueErr.message);
-      }
+      await jobQueue.add('question.solved', {
+        userId,
+        questionId,
+        progressId: updatedProgress?._id,
+        timeSpent: body.timeSpent || 0,
+        solvedAt: now,
+        source: 'test_case',
+      });
     }
 
     await revisionActivityService.recordCodeSubmission(userId, questionId, now);
-
     const revisionResult = await revisionActivityService.checkAndCompleteRevision(
       userId,
       questionId,

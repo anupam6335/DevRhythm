@@ -2,13 +2,14 @@
  * src/routes/v1/codeExecution.routes.js
  *
  * Code execution routes.
- * Modified to use the new rate limiters from middleware/rateLimiter.js.
+ * Modified to include attachUserTimeZone middleware for correct timezone handling.
  */
 
 const express = require('express');
 const router = express.Router();
 const codeExecutionController = require('../../controllers/codeExecution.controller');
 const { auth } = require('../../middleware/auth');
+const { attachUserTimeZone } = require('../../middleware/timezone');
 const validate = require('../../middleware/validator');
 const Joi = require('joi');
 const CodeExecutionHistory = require('../../models/CodeExecutionHistory');
@@ -39,7 +40,8 @@ const executeAsyncSchema = executeSchema;
 // ==============================
 router.post('/execute',
   auth,
-  rateLimiters.codeExecuteAsyncLimiter,  
+  attachUserTimeZone,
+  rateLimiters.codeExecuteAsyncLimiter,
   validate(executeSchema),
   codeExecutionController.runCode
 );
@@ -51,7 +53,8 @@ router.post('/execute',
 // Submit code for async execution
 router.post('/execute-async',
   auth,
-  rateLimiters.codeExecuteAsyncLimiter,  
+  attachUserTimeZone,
+  rateLimiters.codeExecuteAsyncLimiter,
   validate(executeAsyncSchema),
   codeExecutionController.executeCodeAsync
 );
@@ -59,7 +62,7 @@ router.post('/execute-async',
 // Poll for result
 router.get('/result/:jobId',
   auth,
-  rateLimiters.codeResultPollLimiter,    
+  rateLimiters.codeResultPollLimiter,
   validate(Joi.object({ jobId: Joi.string().required() }), 'params'),
   codeExecutionController.getCodeResult
 );

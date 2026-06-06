@@ -95,7 +95,6 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     return { completed: false, message: 'No active revision schedule found', skippedCount: 0 };
   }
 
-  // Determine target index (default current, or specified date)
   let targetIndex = null;
   if (targetDate) {
     const targetDayStart = getStartOfDay(targetDate, timeZone);
@@ -112,45 +111,32 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
     targetIndex = revision.currentRevisionIndex;
   }
 
-  // Check if already completed
+  const scheduledDate = revision.schedule[targetIndex];
   const alreadyCompleted = revision.completedRevisions.some(cr =>
-    getStartOfDay(cr.date, timeZone).getTime() === getStartOfDay(revision.schedule[targetIndex], timeZone).getTime()
+    getStartOfDay(cr.date, timeZone).getTime() === getStartOfDay(scheduledDate, timeZone).getTime()
   );
+
   if (alreadyCompleted) {
     return { completed: true, message: 'Revision already completed', skippedCount: 0, overdueCompleted: false };
   }
 
-  const revisionDate = revision.schedule[targetIndex];
-  const isFuture = revisionDate > todayEnd;
-  const isOverdue = revisionDate < todayStart;
+  const isFuture = scheduledDate > todayEnd;
+  const isOverdue = scheduledDate < todayStart;
 
   if (isFuture) {
-    return {
-      completed: false,
-      message: 'Cannot complete a revision scheduled for a future date.',
-      skippedCount: 0
-    };
+    return { completed: false, message: 'Cannot complete a revision scheduled for a future date.', skippedCount: 0 };
   }
 
-  // For manual completion, enforce activity conditions (only for pending/overdue)
   if (source === 'manual' && targetIndex === revision.currentRevisionIndex && !isFuture) {
     const activity = await getRevisionActivity(userId, questionId, date);
     const conditionsMet = activity.timeSpent >= 20 || activity.codeSubmitted;
     if (!conditionsMet) {
-      return {
-        completed: false,
-        message: 'Please spend at least 20 minutes or submit passing code before marking this revision as complete.',
-        skippedCount: 0
-      };
+      return { completed: false, message: 'Please spend at least 20 minutes or submit passing code before marking this revision as complete.', skippedCount: 0 };
     }
   }
 
   if (isOverdue && !allowOverdue) {
-    return {
-      completed: false,
-      message: 'This revision is overdue. Please add ?overdue=true to complete it.',
-      skippedCount: 0
-    };
+    return { completed: false, message: 'This revision is overdue. Please add ?overdue=true to complete it.', skippedCount: 0 };
   }
 
   const progress = await UserQuestionProgress.findOne({ userId, questionId });
@@ -231,6 +217,8 @@ const checkAndCompleteRevision = async (userId, questionId, date, source = 'auto
   // ========== END SYNC UPDATES ==========
 
   await invalidateCache(`revisions:*:user:${userId}:*`);
+
+  console.log(`[DEBUG] Revision completed successfully. overdueCompleted=${isOverdue}, outOfOrder=${targetIndex !== revision.currentRevisionIndex}`);
 
   return {
     completed: true,
