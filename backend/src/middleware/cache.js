@@ -22,6 +22,10 @@ const cache = (duration = 60, keyPrefix = '') => {
     try {
       if (req.user && req.user._id) {
         cacheKey = `devrhythm:cache:${keyPrefix}:user:${req.user._id}:${req.originalUrl}`;
+        // Append timezone to cache key for timezone-sensitive data
+        if (req.userTimeZone) {
+          cacheKey += `:tz:${req.userTimeZone}`;
+        }
       } else {
         cacheKey = `devrhythm:cache:${keyPrefix}:${req.originalUrl}`;
       }
@@ -61,7 +65,6 @@ const invalidateUserCache = async (userId) => {
   await invalidateCache(`notifications:${userId}:`);
   await invalidateCache(`progress-snapshots:${userId}:`);
   await invalidateCache(`leaderboards:user:${userId}:`);
-  // NEW: Invalidate goal chart caches for this user
   await invalidateCache(`goal-chart:user:${userId}:*`);
 };
 

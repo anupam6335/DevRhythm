@@ -2,13 +2,15 @@ const express = require('express');
 const router = express.Router();
 const heatmapController = require('../../controllers/heatmap.controller');
 const { auth } = require('../../middleware/auth');
+const { attachUserTimeZone } = require('../../middleware/timezone');
 const validate = require('../../middleware/validator');
 const Joi = require('joi');
 const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
 
-router.get('/', 
-  auth, 
+router.get('/',
+  auth,
+  attachUserTimeZone,
   rateLimiters.heatmapGetLimiter,
   cache(15 * 60, 'heatmap:current'),
   validate(Joi.object({
@@ -18,8 +20,9 @@ router.get('/',
   heatmapController.getHeatmap
 );
 
-router.get('/stats', 
-  auth, 
+router.get('/stats',
+  auth,
+  attachUserTimeZone,
   rateLimiters.heatmapStatsLimiter,
   cache(10 * 60, 'heatmap:stats'),
   validate(Joi.object({
@@ -28,8 +31,9 @@ router.get('/stats',
   heatmapController.getHeatmapStats
 );
 
-router.get('/filter', 
-  auth, 
+router.get('/filter',
+  auth,
+  attachUserTimeZone,
   rateLimiters.heatmapFilterLimiter,
   cache(15 * 60, 'heatmap:filter'),
   validate(Joi.object({
@@ -44,8 +48,9 @@ router.get('/filter',
   heatmapController.getFilteredHeatmap
 );
 
-router.get('/:year', 
-  auth, 
+router.get('/:year',
+  auth,
+  attachUserTimeZone,
   rateLimiters.heatmapGetLimiter,
   cache(15 * 60, 'heatmap:year'),
   validate(Joi.object({
@@ -57,8 +62,8 @@ router.get('/:year',
   heatmapController.getHeatmapByYear
 );
 
-router.post('/refresh', 
-  auth, 
+router.post('/refresh',
+  auth,
   rateLimiters.heatmapRefreshLimiter,
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -67,8 +72,8 @@ router.post('/refresh',
   heatmapController.refreshHeatmap
 );
 
-router.post('/export', 
-  auth, 
+router.post('/export',
+  auth,
   rateLimiters.heatmapExportLimiter,
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
@@ -78,7 +83,7 @@ router.post('/export',
   heatmapController.exportHeatmap
 );
 
-router.get('/export/:exportId', 
+router.get('/export/:exportId',
   auth,
   rateLimiters.heatmapExportLimiter,
   validate(Joi.object({

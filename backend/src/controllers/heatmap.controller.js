@@ -13,76 +13,32 @@ const AppError = require('../utils/errors/AppError');
 const { invalidateCache } = require('../middleware/cache');
 const config = require('../config');
 const { client: redisClient } = require('../config/redis');
-const { calculateIntensityLevel } = heatmapService;
-
-// ========== HELPER: Zero out future dates based on user timezone ==========
-function zeroFutureDates(dailyData, timeZone) {
-  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
-  return dailyData.map(day => {
-    let dateStr;
-    if (day.date && typeof day.date === 'object' && day.date.toISOString) {
-      dateStr = day.date.toISOString().split('T')[0];
-    } else if (typeof day.date === 'string') {
-      dateStr = day.date.split('T')[0];
-    } else {
-      dateStr = String(day.date);
-    }
-    if (dateStr > todayLocal) {
-      return { ...day, totalActivities: 0, intensityLevel: 0 };
-    }
-    return day;
-  });
-}
-// ========== END HELPER ==========
 
 /**
- * Convert a UTC date to user's local ISO string with offset.
- * Returns a string like "2026-05-30T00:00:00+05:30".
- * Always returns a string (never null).
+ * Convert dailyData array to local dates and compute intensityLevel.
+ * Future dates are filtered out.
  */
-const toLocalISOString = (utcDate, timeZone) => {
-  if (!utcDate) return '';
-  if (!timeZone) timeZone = 'UTC';
-  const dt = DateTime.fromJSDate(new Date(utcDate), { zone: 'UTC' });
-  return dt.setZone(timeZone).toISO({ includeOffset: true }) || '';
-};
-
-/**
- * Convert dailyData array to local dates and recompute dayOfWeek.
- * Ensures date field is a string.
- */
-const convertDailyDataToLocal = (dailyData, timeZone) => {
+const prepareLocalDailyData = (dailyData, timeZone) => {
   if (!dailyData) return [];
-  return dailyData.map(day => {
-    const localDateStr = toLocalISOString(day.date, timeZone);
-    const localDateObj = DateTime.fromISO(localDateStr);
-    return {
+  const localData = heatmapService.convertDailyDataToLocal(dailyData, timeZone);
+  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
+  return localData
+    .map(day => ({
       ...day,
-      date: localDateStr,
-      dayOfWeek: localDateObj.weekday % 7,
-    };
-  });
+      intensityLevel: heatmapService.calculateIntensityLevel(day.totalActivities || 0),
+    }))
+    .filter(day => day.date <= todayLocal);
 };
 
 /**
- * Safe tooltip generator – works with both Date objects and strings.
+ * Generate tooltip data from daily data (same as before)
  */
 const generateTooltipData = (dailyData) => {
-  return dailyData.map(day => {
-    let dateStr;
-    if (day.date && typeof day.date.toISOString === 'function') {
-      dateStr = day.date.toISOString();
-    } else if (typeof day.date === 'string') {
-      dateStr = day.date;
-    } else {
-      dateStr = String(day.date);
-    }
-    return {
-      date: dateStr,
-      summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${dateStr.split('T')[0]}`,
-      details: `New: ${day.newProblemsSolved}, Revisions: ${day.revisionProblems}, Submissions: ${day.totalSubmissions}, Study: ${day.studyGroupActivity}, Time: ${day.totalTimeSpent}min`
-    };
-  });
+  return dailyData.map(day => ({
+    date: day.date,
+    summary: `${day.totalActivities} submission${day.totalActivities !== 1 ? 's' : ''} on ${day.date}`,
+    details: `New: ${day.newProblemsSolved || 0}, Revisions: ${day.revisionProblems || 0}, Submissions: ${day.totalSubmissions || 0}, Study: ${day.studyGroupActivity || 0}, Time: ${day.totalTimeSpent || 0}min`
+  }));
 };
 
 const getHeatmap = async (req, res, next) => {
@@ -99,14 +55,8 @@ const getHeatmap = async (req, res, next) => {
       throw new AppError('Heatmap data not found', 404);
     }
 
-    // Convert dates to local strings
-    let localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
-    localDailyData = zeroFutureDates(localDailyData, timeZone);
-
-    localDailyData = localDailyData.map(day => ({
-      ...day,
-      intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
-    }));
+    // Use shared conversion and filter future dates
+    const localDailyData = prepareLocalDailyData(heatmap.dailyData, timeZone);
 
     const response = {
       year: heatmap.year,
@@ -116,17 +66,17 @@ const getHeatmap = async (req, res, next) => {
       dailyData: localDailyData,
       performance: heatmap.performance,
       consistency: heatmap.consistency,
-      statsPanel: heatmap.statsPanel
+      statsPanel: heatmap.statsPanel,
     };
 
+    // Build cached render data (same as before)
     const colorScale = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
     const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
     let currentDayIndex = -1;
     for (let i = 0; i < localDailyData.length; i++) {
-      const datePart = localDailyData[i].date.split('T')[0];
-      if (datePart === todayLocal) {
+      if (localDailyData[i].date === todayLocal) {
         currentDayIndex = i;
         break;
       }
@@ -142,7 +92,7 @@ const getHeatmap = async (req, res, next) => {
         colorScale,
         monthLabels,
         weekLabels,
-        currentDayIndex
+        currentDayIndex,
       };
     }
 
@@ -168,13 +118,7 @@ const getHeatmapByYear = async (req, res, next) => {
       throw new AppError('Heatmap data not found for year ' + year, 404);
     }
 
-    let localDailyData = convertDailyDataToLocal(heatmap.dailyData, timeZone);
-    localDailyData = zeroFutureDates(localDailyData, timeZone);
-
-    localDailyData = localDailyData.map(day => ({
-      ...day,
-      intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
-    }));
+    const localDailyData = prepareLocalDailyData(heatmap.dailyData, timeZone);
 
     const response = {
       year: heatmap.year,
@@ -184,7 +128,7 @@ const getHeatmapByYear = async (req, res, next) => {
       dailyData: localDailyData,
       performance: heatmap.performance,
       consistency: heatmap.consistency,
-      statsPanel: heatmap.statsPanel
+      statsPanel: heatmap.statsPanel,
     };
 
     const colorScale = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
@@ -193,8 +137,7 @@ const getHeatmapByYear = async (req, res, next) => {
     const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
     let currentDayIndex = -1;
     for (let i = 0; i < localDailyData.length; i++) {
-      const datePart = localDailyData[i].date.split('T')[0];
-      if (datePart === todayLocal) {
+      if (localDailyData[i].date === todayLocal) {
         currentDayIndex = i;
         break;
       }
@@ -210,7 +153,7 @@ const getHeatmapByYear = async (req, res, next) => {
         colorScale,
         monthLabels,
         weekLabels,
-        currentDayIndex
+        currentDayIndex,
       };
     }
 
@@ -320,19 +263,14 @@ const getFilteredHeatmap = async (req, res, next) => {
       filteredData = heatmap.dailyData.map((day, index) => ({
         ...day,
         totalActivities: heatmap.filterViews[viewType][index] || 0,
-        intensityLevel: calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
+        intensityLevel: heatmapService.calculateIntensityLevel(heatmap.filterViews[viewType][index] || 0)
       }));
     } else {
       filteredData = await heatmapService.calculateFilteredData(req.user._id, year, viewType, timeZone);
     }
 
-    // Convert to local timezone and zero out future dates
-    let localFilteredData = convertDailyDataToLocal(filteredData, timeZone);
-    localFilteredData = zeroFutureDates(localFilteredData, timeZone);
-    localFilteredData = localFilteredData.map(day => ({
-      ...day,
-      intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
-    }));
+    // Convert to local and filter future dates
+    const localFilteredData = prepareLocalDailyData(filteredData, timeZone);
 
     localFilteredData.forEach(day => {
       totalActivities += day.totalActivities;
@@ -483,43 +421,38 @@ const getPublicUserHeatmap = async (req, res, next) => {
     let heatmap = await heatmapService.getOrCreateHeatmap(userId, parsedYear, userTimeZone);
     if (!heatmap) throw new AppError('Heatmap data not found', 404);
 
-    // Convert to local timezone and zero out future dates
-    if (heatmap.dailyData) {
-      let localDailyData = convertDailyDataToLocal(heatmap.dailyData, userTimeZone);
-      localDailyData = zeroFutureDates(localDailyData, userTimeZone);
-      heatmap.dailyData = localDailyData.map(day => ({
-        ...day,
-        intensityLevel: calculateIntensityLevel(day.totalActivities || 0)
-      }));
-    }
+    // Use shared conversion
+    const localDailyData = prepareLocalDailyData(heatmap.dailyData, userTimeZone);
 
     let response;
     if (simple) {
-      response = heatmapService.extractMinimalHeatmap(heatmap);
+      const dates = localDailyData.map(day => day.date);
+      const intensities = localDailyData.map(day => day.intensityLevel);
+      response = { year: heatmap.year, dates, intensities };
     } else {
       response = {
         year: heatmap.year,
         weekCount: heatmap.weekCount,
         firstDate: heatmap.firstDate,
         lastDate: heatmap.lastDate,
-        dailyData: heatmap.dailyData,
+        dailyData: localDailyData,
         performance: heatmap.performance,
         consistency: heatmap.consistency,
         statsPanel: heatmap.statsPanel,
       };
-      const freshTooltipData = generateTooltipData(heatmap.dailyData);
+      const tooltipData = generateTooltipData(localDailyData);
       if (includeCache && heatmap.cachedRenderData) {
         response.cachedRenderData = {
           ...heatmap.cachedRenderData,
-          tooltipData: freshTooltipData
+          tooltipData,
         };
       } else {
         response.cachedRenderData = {
-          tooltipData: freshTooltipData,
+          tooltipData,
           colorScale: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'],
           monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
           weekLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-          currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1
+          currentDayIndex: heatmap.cachedRenderData?.currentDayIndex ?? -1,
         };
       }
     }
@@ -541,5 +474,5 @@ module.exports = {
   getFilteredHeatmap,
   exportHeatmap,
   downloadExport,
-  getPublicUserHeatmap
+  getPublicUserHeatmap,
 };

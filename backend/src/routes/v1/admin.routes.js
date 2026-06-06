@@ -14,12 +14,8 @@ const requireApiKey = (req, res, next) => {
 
 router.post('/leetcode/refresh', requireApiKey, async (req, res, next) => {
   try {
-    // 1. Refresh new problems
     const refreshResult = await refreshNewLeetCodeProblems();
-    
-    // 2. Repair incomplete questions
     const repairResult = await repairIncompleteQuestions();
-    
     res.json({
       success: true,
       message: 'LeetCode refresh and repair completed',
@@ -66,6 +62,23 @@ router.post('/leetcode/repair-missing', requireApiKey, async (req, res, next) =>
       data: { queued, slugs: missing.map(m => m.platformQuestionId) },
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ========== NEW: Heatmap rebuild endpoint ==========
+router.post('/heatmap/rebuild', requireApiKey, async (req, res, next) => {
+  try {
+    const { dryRun = false, userId = null } = req.body;
+    const { rebuildHeatmap } = require('../../scripts/rebuildHeatmap');
+    const result = await rebuildHeatmap(dryRun, userId);
+    res.json({
+      success: true,
+      message: dryRun ? 'Heatmap rebuild dry run completed' : 'Heatmap rebuild completed successfully',
+      data: result,
+    });
+  } catch (error) {
+    console.error('[Admin] Heatmap rebuild error:', error);
     next(error);
   }
 });

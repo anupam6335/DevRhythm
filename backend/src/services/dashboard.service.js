@@ -13,6 +13,7 @@ const { calculateIntensityLevel } = require('./heatmap.service');
 const { getStartOfDay, getEndOfDay, getStartOfWeek, getEndOfWeek, getStartOfMonth, getEndOfMonth, formatDate } = require('../utils/helpers/date');
 const { slugify } = require('../utils/helpers/string');
 const { computeUserStats, computeUserStreak } = require('./userStats.service');
+const heatmapService = require('./heatmap.service');
 
 const computeConfidence = (solvedCount) => Math.min(5, 1 + Math.floor((solvedCount || 0) / 5));
 
@@ -715,57 +716,30 @@ const getCurrentMonthHeatmap = async (userId, timeZone) => {
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth();
-  const startOfMonth = getStartOfDay(new Date(Date.UTC(year, month, 1)), timeZone);
-  const endOfMonth = getEndOfDay(new Date(Date.UTC(year, month + 1, 0)), timeZone);
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
-  const heatmap = await HeatmapData.findOne({ userId, year }).select('dailyData').lean();
-  if (!heatmap?.dailyData) {
-    const result = [];
-    for (let d = 1; d <= daysInMonth; d++) {
-      const localDate = new Date(Date.UTC(year, month, d));
-      const dateStr = localDate.toISOString().split('T')[0];
-      result.push({ date: dateStr, activityCount: 0, intensityLevel: 0 });
-    }
-    return result;
-  }
-
+  // Get local daily data for the year (or years if month crosses year boundary)
+  const localDailyData = await heatmapService.getLocalDailyDataForYear(userId, year, timeZone);
+  // Create a map for quick lookup: date string -> totalActivities
   const activityMap = new Map();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const localDate = new Date(Date.UTC(year, month, d));
-    const localDateStr = localDate.toISOString().split('T')[0];
-    const dayStartUTC = getStartOfDay(localDate, timeZone);
-    const dayEndUTC = getEndOfDay(localDate, timeZone);
-    let total = 0;
-    for (const day of heatmap.dailyData) {
-      const dayDate = new Date(day.date);
-      if (dayDate >= dayStartUTC && dayDate <= dayEndUTC) {
-        total += day.totalActivities || 0;
-      }
-    }
-    activityMap.set(localDateStr, total);
+  for (const day of localDailyData) {
+    activityMap.set(day.date, day.totalActivities);
   }
 
-  const result = [];
+  // Build result for each day of the current month
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const fullMonth = [];
+
   for (let d = 1; d <= daysInMonth; d++) {
-    const localDate = new Date(Date.UTC(year, month, d));
-    const localDateStr = localDate.toISOString().split('T')[0];
-    const activityCount = activityMap.get(localDateStr) || 0;
-    result.push({
-      date: localDateStr,
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const activityCount = activityMap.get(dateStr) || 0;
+    fullMonth.push({
+      date: dateStr,
       activityCount,
-      intensityLevel: calculateIntensityLevel(activityCount)
+      intensityLevel: heatmapService.calculateIntensityLevel(activityCount),
     });
   }
 
-  const todayLocal = DateTime.now().setZone(timeZone).toFormat('yyyy-MM-dd');
-  for (const day of result) {
-    if (day.date > todayLocal) {
-      day.activityCount = 0;
-      day.intensityLevel = 0;
-    }
-  }
-  return result;
+  return fullMonth;
 };
 
 const getDailyTrend = async (userId, days = 30, timeZone = 'UTC') => {

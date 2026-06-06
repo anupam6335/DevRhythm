@@ -19,8 +19,9 @@ const {
 } = require('../utils/helpers/date');
 const { DateTime } = require('luxon');
 const { invalidateDashboardCache } = require('../middleware/cache');
+const { invalidateCache } = require('../middleware/cache');
 
-// ========== Helper functions (unchanged from original) ==========
+// ========== Helper functions ==========
 const calculateIntensityLevel = (activityCount) => {
   if (activityCount === 0) return 0;
   if (activityCount <= 2) return 1;
@@ -523,7 +524,6 @@ const recalculateConsistency = async (userId, year) => {
         },
       }
     );
-    const { invalidateCache } = require('../middleware/cache');
     await invalidateCache(`user:${userId}:profile`);
   }
 };
@@ -534,7 +534,7 @@ const ensureDayExists = async (userId, year, localDate, timeZone) => {
   if (!heatmap) {
     heatmap = await generateHeatmapData(userId, year, timeZone);
   }
-  const dayExists = heatmap.dailyData.some((d) => isSameDay(d.date, dayStartUTC, timeZone));
+  const dayExists = heatmap.dailyData.some((d) => isSameDay(d.date, dayStartUTC, 'UTC'));
   if (!dayExists) {
     const newDay = {
       date: dayStartUTC,
@@ -561,29 +561,13 @@ const ensureDayExists = async (userId, year, localDate, timeZone) => {
   }
 };
 
-// ========== CORE FUNCTION: Direct heatmap increment (production version) ==========
-/**
- * Directly increment heatmap activity using MongoDB $inc.
- * Eliminates dependency on Redis and cron jobs.
- *
- * @param {string} userId - User ObjectId
- * @param {Date} date - Date of activity (will be converted to UTC day start)
- * @param {string} timeZone - User's timezone for day boundary calculation
- * @param {object} increments - Fields to increment: totalActivities, totalSubmissions, totalTimeSpentMinutes,
- *                               newProblemsSolved, revisionProblems, studyGroupActivity,
- *                               testCaseExecutions, passedCount, failedCount, timeSpentEvents
- * @param {boolean} isFirstSolve - Whether this solve is the first time for this question
- * @param {string|null} difficulty - Difficulty of the question ('Easy', 'Medium', 'Hard')
- * @param {string|null} platform - Platform of the question ('LeetCode', 'HackerRank', etc.)
- * @returns {Promise<void>}
- */
+// ========== CORE FUNCTION: Direct heatmap increment (event‑based counting) ==========
 const incrementDailyActivityDirect = async (userId, date, timeZone, increments, isFirstSolve = true, difficulty = null, platform = null) => {
   const dayStart = getStartOfDay(date, timeZone);
   const year = dayStart.getUTCFullYear();
 
-  const update = { $inc: {} };
+  const incFields = {};
 
-  // Map frontend increments to actual database field names
   const fieldMapping = {
     totalActivities: 'dailyData.$.totalActivities',
     totalSubmissions: 'dailyData.$.totalSubmissions',
@@ -600,21 +584,15 @@ const incrementDailyActivityDirect = async (userId, date, timeZone, increments, 
   for (const [field, delta] of Object.entries(increments)) {
     const mongoField = fieldMapping[field];
     if (mongoField && delta && delta !== 0) {
-      // Special handling for newProblemsSolved: only increment if isFirstSolve is true
-      if (field === 'newProblemsSolved' && !isFirstSolve) {
-        continue;
-      }
-      update.$inc[mongoField] = delta;
+      if (field === 'newProblemsSolved' && !isFirstSolve) continue;
+      incFields[mongoField] = delta;
     }
   }
 
-  // Handle difficulty breakdown
   if (difficulty && increments.totalActivities) {
     const diffField = `dailyData.$.difficultyBreakdown.${difficulty.toLowerCase()}`;
-    update.$inc[diffField] = increments.totalActivities;
+    incFields[diffField] = increments.totalActivities;
   }
-
-  // Handle platform breakdown
   if (platform && increments.totalActivities) {
     let platformKey = platform.toLowerCase();
     if (platformKey === 'leetcode') platformKey = 'leetcode';
@@ -622,19 +600,19 @@ const incrementDailyActivityDirect = async (userId, date, timeZone, increments, 
     else if (platformKey === 'codeforces') platformKey = 'codeforces';
     else platformKey = 'other';
     const platformField = `dailyData.$.platformBreakdown.${platformKey}`;
-    update.$inc[platformField] = increments.totalActivities;
+    incFields[platformField] = increments.totalActivities;
   }
 
-  if (Object.keys(update.$inc).length === 0) return;
+  if (Object.keys(incFields).length === 0) return;
 
-  // Ensure the day exists in the heatmap document
+  const update = { $inc: incFields };
+
   const result = await HeatmapData.updateOne(
     { userId, year, 'dailyData.date': dayStart },
     update
   );
 
   if (result.matchedCount === 0) {
-    // Day does not exist – create the daily entry with default values
     const newDay = {
       date: dayStart,
       dayOfWeek: dayStart.getUTCDay(),
@@ -657,7 +635,6 @@ const incrementDailyActivityDirect = async (userId, date, timeZone, increments, 
       timeSpentEvents: 0,
     };
 
-    // Apply increments manually
     for (const [field, delta] of Object.entries(increments)) {
       if (field === 'newProblemsSolved' && !isFirstSolve) continue;
       switch (field) {
@@ -693,11 +670,13 @@ const incrementDailyActivityDirect = async (userId, date, timeZone, increments, 
     );
   }
 
-  // After updating, recalculate consistency and stats for this user/year (async)
   recalculateConsistency(userId, year).catch(err => console.error('Error recalculating consistency:', err));
+
+  // Invalidate all heatmap cache keys for this user
+  const pattern = `heatmap:*:user:${userId}:*`;
+  await invalidateCache(pattern);
 };
 
-// ========== DEPRECATED: kept for backward compatibility ==========
 const incrementDailyActivity = async ({ userId, date, timeZone, increments }) => {
   return incrementDailyActivityDirect(userId, date, timeZone, increments, true, null, null);
 };
@@ -715,7 +694,7 @@ const getDayData = async (userId, date, timeZone = 'UTC') => {
     heatmap = await generateHeatmapData(userId, year, timeZone);
   }
 
-  const dayEntry = heatmap.dailyData.find((day) => isSameDay(day.date, targetDate, timeZone));
+  const dayEntry = heatmap.dailyData.find((day) => isSameDay(day.date, targetDate, 'UTC'));
   if (!dayEntry) return null;
 
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDate.getUTCDay()];
@@ -745,6 +724,73 @@ const getDayData = async (userId, date, timeZone = 'UTC') => {
   };
 };
 
+async function getHeatmapDataForDateRange(userId, startDate, endDate, timeZone) {
+  const { DateTime } = require('luxon');
+  const years = new Set();
+  let d = new Date(startDate);
+  while (d <= endDate) {
+    years.add(d.getUTCFullYear());
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
+  }
+
+  const heatmaps = await Promise.all(
+    Array.from(years).map(year => getOrCreateHeatmap(userId, year, timeZone))
+  );
+
+  const localActivityMap = new Map();
+  for (const heatmap of heatmaps) {
+    for (const day of heatmap.dailyData) {
+      const localDateStr = DateTime.fromJSDate(day.date, { zone: 'UTC' })
+        .setZone(timeZone)
+        .toFormat('yyyy-MM-dd');
+      const current = localActivityMap.get(localDateStr) || 0;
+      localActivityMap.set(localDateStr, current + (day.totalActivities || 0));
+    }
+  }
+
+  const result = [];
+  let current = new Date(startDate);
+  while (current <= endDate) {
+    const localDateStr = DateTime.fromJSDate(current, { zone: 'UTC' })
+      .setZone(timeZone)
+      .toFormat('yyyy-MM-dd');
+    const activityCount = localActivityMap.get(localDateStr) || 0;
+    result.push({
+      date: localDateStr,
+      activityCount,
+      intensityLevel: calculateIntensityLevel(activityCount)
+    });
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return result;
+}
+
+function convertDailyDataToLocal(dailyData, timeZone = 'UTC') {
+  if (!dailyData) return [];
+  const localMap = new Map();
+
+  for (const day of dailyData) {
+    const utcDate = new Date(day.date);
+    const localDateStr = DateTime.fromJSDate(utcDate, { zone: 'UTC' })
+      .setZone(timeZone)
+      .toFormat('yyyy-MM-dd');
+    const current = localMap.get(localDateStr) || 0;
+    localMap.set(localDateStr, current + (day.totalActivities || 0));
+  }
+
+  const result = [];
+  for (const [date, totalActivities] of localMap.entries()) {
+    result.push({ date, totalActivities });
+  }
+  result.sort((a, b) => a.date.localeCompare(b.date));
+  return result;
+}
+
+async function getLocalDailyDataForYear(userId, year, timeZone) {
+  const heatmap = await getOrCreateHeatmap(userId, year, timeZone);
+  return convertDailyDataToLocal(heatmap.dailyData, timeZone);
+}
+
 module.exports = {
   calculateIntensityLevel,
   generateHeatmapData,
@@ -759,4 +805,7 @@ module.exports = {
   flushDailyActivitiesToMongoDB,
   getDayData,
   generateCachedRenderData,
+  getHeatmapDataForDateRange,
+  convertDailyDataToLocal,
+  getLocalDailyDataForYear,
 };

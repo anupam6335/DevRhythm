@@ -5,7 +5,6 @@ const PatternMastery = require("../../models/PatternMastery");
 const RevisionSchedule = require("../../models/RevisionSchedule");
 const Goal = require("../../models/Goal");
 const ActivityLog = require("../../models/ActivityLog");
-const HeatmapData = require("../../models/HeatmapData");
 const Notification = require("../../models/Notification");
 const UserQuestionProgress = require("../../models/UserQuestionProgress");
 const {
@@ -359,25 +358,10 @@ const handleQuestionSolved = async (job) => {
       timestamp: solvedDate,
     });
 
-    const year = solvedDate.getUTCFullYear();
-    let heatmap = await HeatmapData.findOne({ userId, year });
-    if (!heatmap) {
-      heatmap = await heatmapService.generateHeatmapData(userId, year, userTimeZone);
-    }
-    if (heatmap) {
-      const activityDateStr = solvedDate.toISOString().split("T")[0];
-      const dayEntry = heatmap.dailyData.find((d) => d.date.toISOString().split("T")[0] === activityDateStr);
-      if (dayEntry) {
-        dayEntry.totalActivities += 1;
-        dayEntry.totalSubmissions += 1;
-        dayEntry.totalTimeSpent += timeSpent;
-        if (isFirstSolve) dayEntry.newProblemsSolved += 1;
-        dayEntry.intensityLevel = Math.min(4, Math.floor(dayEntry.totalActivities / 3));
-      }
-      heatmap.lastUpdated = new Date();
-      await heatmap.save();
-      await invalidateCache(`heatmap:*:user:${userId}:*`);
-    }
+    // ========== HEATMAP UPDATE REMOVED ==========
+    // The core execution (executeCodeCore) already updates the heatmap.
+    // Do NOT increment again here to avoid double counting.
+    // ============================================
 
     if (isFirstSolve) {
       await Notification.create({
