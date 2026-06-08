@@ -10,14 +10,14 @@ const rateLimiters = require('../../middleware/rateLimiter');
  * Returns aggregated dashboard data.
  * Authentication required.
  * Rate limited to 250 requests per 15 minutes (userLimiter).
- * Cached for 30 seconds (dashboardCache).
+ * Cached for 15 seconds (reduced from 30 to optimize memory on free Redis tier).
  */
 router.get(
   '/',
   auth,
   attachUserTimeZone,       
   rateLimiters.userLimiter,
-  dashboardCache,
+  dashboardCache,   // duration is set inside the cache middleware (15 seconds)
   getDashboard
 );
 

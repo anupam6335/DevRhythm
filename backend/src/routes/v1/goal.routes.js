@@ -11,11 +11,11 @@ const Joi = require("joi");
 
 // ========== STATIC ROUTES (must come before /:id) ==========
 
-// Goal chart data (new)
+// Goal chart data
 router.get("/chart-data",
   auth,
   rateLimiters.userLimiter,
-  cache(3600, "goal-chart"),
+  cache(600, "goal-chart"),
   validate(Joi.object({
     periodType: Joi.string().valid('monthly', 'yearly').default('monthly'),
     range: Joi.string().pattern(/^(last12months|year=\d{4})$/).default('last12months'),
@@ -24,7 +24,7 @@ router.get("/chart-data",
   goalChartController.getGoalChartData
 );
 
-// Manually refresh snapshots (new)
+// Manually refresh snapshots
 router.post("/refresh-snapshots",
   auth,
   rateLimiters.progressUpdateLimiter,

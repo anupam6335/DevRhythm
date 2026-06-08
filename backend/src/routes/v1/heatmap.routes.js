@@ -8,11 +8,16 @@ const Joi = require('joi');
 const { cache } = require('../../middleware/cache');
 const rateLimiters = require('../../middleware/rateLimiter');
 
+// TTL constants for clarity
+const HEATMAP_CACHE_TTL = 5 * 60;      
+const HEATMAP_FILTER_TTL = 5 * 60;     
+const HEATMAP_STATS_TTL = 10 * 60;
+
 router.get('/',
   auth,
   attachUserTimeZone,
   rateLimiters.heatmapGetLimiter,
-  cache(15 * 60, 'heatmap:current'),
+  cache(HEATMAP_CACHE_TTL, 'heatmap:current'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     includeCache: Joi.boolean().default(true)
@@ -24,7 +29,7 @@ router.get('/stats',
   auth,
   attachUserTimeZone,
   rateLimiters.heatmapStatsLimiter,
-  cache(10 * 60, 'heatmap:stats'),
+  cache(HEATMAP_STATS_TTL, 'heatmap:stats'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional()
   }), 'query'),
@@ -35,7 +40,7 @@ router.get('/filter',
   auth,
   attachUserTimeZone,
   rateLimiters.heatmapFilterLimiter,
-  cache(15 * 60, 'heatmap:filter'),
+  cache(HEATMAP_FILTER_TTL, 'heatmap:filter'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).optional(),
     viewType: Joi.string().valid(
@@ -52,7 +57,7 @@ router.get('/:year',
   auth,
   attachUserTimeZone,
   rateLimiters.heatmapGetLimiter,
-  cache(15 * 60, 'heatmap:year'),
+  cache(HEATMAP_CACHE_TTL, 'heatmap:year'),
   validate(Joi.object({
     year: Joi.number().integer().min(2000).max(2100).required()
   }), 'params'),

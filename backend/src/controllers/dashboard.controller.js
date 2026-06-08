@@ -101,8 +101,8 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
-// Apply cache middleware (30 seconds) with user-specific key pattern
-const dashboardCache = cache(30, 'dashboard:user');
+// Apply cache middleware (15 seconds) with user-specific key pattern
+const dashboardCache = cache(15, 'dashboard:user');
 
 module.exports = {
   getDashboard,

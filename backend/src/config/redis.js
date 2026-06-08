@@ -6,24 +6,39 @@ let heartbeatInterval = null;
 
 const createRedisClient = () => {
   try {
+    const url = config.redis.url;
+    if (!url) {
+      throw new Error('REDIS_URL is not defined in environment');
+    }
+
+    const isTLS = url.startsWith('rediss://');
+    const socketOptions = {
+      reconnectStrategy: (retries) => {
+        if (retries > 50) {
+          console.error('Redis: Too many reconnect attempts, stopping.');
+          return new Error('Too many retries');
+        }
+        const delay = Math.min(Math.pow(2, retries) * 100, 10000);
+        console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
+        return delay;
+      },
+      keepAlive: true,
+      keepAliveInitialDelay: 5000,
+      connectTimeout: 10000,
+    };
+
+    // Only add TLS options if using rediss:// and certificate validation is required
+    if (isTLS) {
+      // Use environment variable to control certificate validation (default: true)
+      const rejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED !== 'false';
+      socketOptions.tls = { rejectUnauthorized };
+    }
+
     const client = redis.createClient({
       url: config.redis.url,
       password: config.redis.password,
       database: config.redis.db,
-      socket: {
-        reconnectStrategy: (retries) => {
-          if (retries > 50) {
-            console.error('Redis: Too many retries, stopping.');
-            return new Error('Too many retries');
-          }
-          const delay = Math.min(Math.pow(2, retries) * 100, 10000);
-          console.log(`Redis reconnect attempt ${retries}, waiting ${delay}ms`);
-          return delay;
-        },
-        keepAlive: true,
-        keepAliveInitialDelay: 5000,
-        connectTimeout: 10000,
-      }
+      socket: socketOptions,
     });
 
     client.on('error', (err) => {
@@ -32,11 +47,12 @@ const createRedisClient = () => {
         redisErrorLogged = true;
       }
     });
-    
+
     client.on('connect', () => console.log('Redis client connected'));
     client.on('ready', () => {
       console.log('Redis client ready');
       if (heartbeatInterval) clearInterval(heartbeatInterval);
+      // Heartbeat every 30 seconds to keep connection alive
       heartbeatInterval = setInterval(async () => {
         try {
           if (client.isReady) {

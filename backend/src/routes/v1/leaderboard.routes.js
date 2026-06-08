@@ -17,10 +17,11 @@ const leaderboardQuery = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20)
 });
 
+// Reduced cache TTL from 300 seconds to 120 seconds (2 minutes)
 router.get('/:type',
   auth,
-  rateLimiters.leaderboardLimiter, // Redis-backed
-  cache(300, 'leaderboard'),
+  rateLimiters.leaderboardLimiter,
+  cache(120, 'leaderboard'),
   validate(leaderboardParams, 'params'),
   validate(leaderboardQuery, 'query'),
   leaderboardController.getLeaderboard
@@ -29,7 +30,7 @@ router.get('/:type',
 router.get('/:type/my-rank',
   auth,
   rateLimiters.leaderboardLimiter,
-  cache(60, 'leaderboard:my-rank'),
+  cache(60, 'leaderboard:my-rank'), 
   validate(leaderboardParams, 'params'),
   validate(Joi.object({ date: Joi.date().iso() }), 'query'),
   leaderboardController.getUserRank
@@ -37,7 +38,7 @@ router.get('/:type/my-rank',
 
 router.post('/:type/refresh',
   auth,
-  rateLimiters.createRedisLimiter(60 * 60 * 1000, 5, 'leaderboard:refresh'), // custom high‑limit
+  rateLimiters.createRedisLimiter(60 * 60 * 1000, 5, 'leaderboard:refresh'),
   validate(leaderboardParams, 'params'),
   validate(Joi.object({ date: Joi.date().iso() }), 'query'),
   leaderboardController.refreshLeaderboard

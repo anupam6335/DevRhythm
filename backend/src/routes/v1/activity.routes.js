@@ -25,10 +25,11 @@ const getActivityLogsSchema = Joi.object({
   goalLimit: Joi.number().integer().min(1).max(100).default(20)
 });
 
+// Reduced cache TTL from 30 to 15 seconds to optimize memory on free Redis tier
 router.get('/',
   auth,
   rateLimiters.userLimiter,
-  cache(30, 'activity:logs'),
+  cache(15, 'activity:logs'),
   validate(getActivityLogsSchema, 'query'),
   activityController.getActivityLogs
 );

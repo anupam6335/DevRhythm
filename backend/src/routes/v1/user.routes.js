@@ -20,18 +20,57 @@ router.put('/me/last-online', auth, userController.updateLastOnline);
 router.delete('/me', auth, userController.deleteCurrentUser);
 router.get('/count', rateLimiters.publicLimiter, cache(300, 'user:count'), userController.getTotalUsersCount);
 
-router.get('/search', auth, rateLimiters.userLimiter, validate(userValidator.searchUsers, 'query'), cache(300, 'user:search'), userController.searchUsers);
-router.get('/top/streaks', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, 'user:top:streaks'), userController.getTopStreaks);
-router.get('/top/solved', auth, rateLimiters.userLimiter, validate(userValidator.topUsers, 'query'), cache(300, 'user:top:solved'), userController.getTopSolved);
+router.get('/search', 
+  auth, 
+  rateLimiters.userLimiter, 
+  validate(userValidator.searchUsers, 'query'), 
+  cache(60, 'user:search'), 
+  userController.searchUsers
+);
 
-router.get('/:userId/following', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, 'user:public:following'), followController.getPublicFollowing);
-router.get('/:userId/followers', auth, rateLimiters.userLimiter, validate(userValidator.getPublicFollowing, 'params'), cache(300, 'user:public:followers'), followController.getPublicFollowers);
+router.get('/top/streaks', 
+  auth, 
+  rateLimiters.userLimiter, 
+  validate(userValidator.topUsers, 'query'), 
+  cache(60, 'user:top:streaks'), 
+  userController.getTopStreaks
+);
 
-router.get('/:userId/progress', validate(userValidator.getUserPublicProgress, 'params'), cache(30, 'user:public:progress'), userController.getUserPublicProgress);
+router.get('/top/solved', 
+  auth, 
+  rateLimiters.userLimiter, 
+  validate(userValidator.topUsers, 'query'), 
+  cache(60, 'user:top:solved'), 
+  userController.getTopSolved
+);
 
+router.get('/:userId/following', 
+  auth, 
+  rateLimiters.userLimiter, 
+  validate(userValidator.getPublicFollowing, 'params'), 
+  cache(300, 'user:public:following'), 
+  followController.getPublicFollowing
+);
+
+router.get('/:userId/followers', 
+  auth, 
+  rateLimiters.userLimiter, 
+  validate(userValidator.getPublicFollowing, 'params'), 
+  cache(300, 'user:public:followers'), 
+  followController.getPublicFollowers
+);
+
+// Reduced cache TTL from 30 to 15 seconds
+router.get('/:userId/progress', 
+  validate(userValidator.getUserPublicProgress, 'params'), 
+  cache(15, 'user:public:progress'), 
+  userController.getUserPublicProgress
+);
+
+// Reduced cache TTL from 300 to 120 seconds
 router.get('/:userId/heatmap/:year',
   rateLimiters.publicLimiter,
-  cache(300, 'user:heatmap:public'),
+  cache(120, 'user:heatmap:public'), 
   validate(Joi.object({
     userId: Joi.string().hex().length(24).required(),
     year: Joi.number().integer().min(2000).max(2100).required()
@@ -51,9 +90,23 @@ router.get('/:userId/groups',
   studyGroupController.getUserPublicGroups
 );
 
-router.get('/:username', validate(userValidator.getUserByUsername, 'params'), cache(600, 'user:public'), userController.getUserByUsername);
-router.get('/:username/availability', validate(userValidator.checkUsername, 'params'), cache(300, 'username:availability'), userController.checkUsernameAvailability);
-router.get('/:userId/pattern-mastery', optionalAuth, getUserPatternMastery);
+router.get('/:username', 
+  validate(userValidator.getUserByUsername, 'params'), 
+  cache(600, 'user:public'), 
+  userController.getUserByUsername
+);
+
+router.get('/:username/availability', 
+  validate(userValidator.checkUsername, 'params'), 
+  cache(300, 'username:availability'), 
+  userController.checkUsernameAvailability
+);
+
+router.get('/:userId/pattern-mastery', 
+  optionalAuth, 
+  getUserPatternMastery
+);
+
 router.put('/me/timezone',
   auth,
   rateLimiters.userLimiter,
@@ -64,15 +117,13 @@ router.put('/me/timezone',
   userController.changeTimezone
 );
 
-router.post(
-  '/welcome-shown',
+router.post('/welcome-shown',
   auth,
   rateLimiters.userLimiter,
   userController.markWelcomeShown
 );
 
-router.post(
-  '/welcome-back-shown',
+router.post('/welcome-back-shown',
   auth,
   rateLimiters.userLimiter,
   userController.markWelcomeBackShown
@@ -86,13 +137,13 @@ router.get(
   (req, res, next) => {
     // Use different cache keys and TTL based on authentication
     if (req.user) {
-      // Authenticated users: include mutual friends, shorter TTL
-      const ttl = config.userList?.cacheTtlAuth || 30;
+      // Authenticated users: include mutual friends, shorter TTL (reduced from 30 to 15 seconds)
+      const ttl = config.userList?.cacheTtlAuth || 15; 
       const cacheKey = `users:auth:${req.user._id}:${req.originalUrl}`;
       return cache(ttl, cacheKey)(req, res, next);
     }
-    // Unauthenticated users: no mutual friends, longer TTL
-    const ttl = config.userList?.cacheTtlPublic || 60;
+    // Unauthenticated users: no mutual friends, longer TTL (reduced from 60 to 30 seconds)
+    const ttl = config.userList?.cacheTtlPublic || 30;  
     const cacheKey = `users:public:${req.originalUrl}`;
     return cache(ttl, cacheKey)(req, res, next);
   },

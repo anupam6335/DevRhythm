@@ -94,27 +94,17 @@ module.exports = {
     },
   },
 
-  // ========== LOCAL CODE EXECUTION CONFIGURATION ==========
   localExecution: {
-    // Enable local execution (default: false)
     enabled: process.env.LOCAL_EXECUTION_ENABLED === 'true',
-    // Sandbox tool: 'isolate', 'nsjail', or 'none' (unsafe, development only)
     sandbox: process.env.LOCAL_EXECUTION_SANDBOX || 'isolate',
-    // CPU time limit in seconds (min: 0.1, max: 30)
     cpuTimeLimit: Math.min(30, Math.max(0.1, parseFloat(process.env.LOCAL_EXECUTION_CPU_LIMIT) || 2)),
-    // Memory limit in KB (min: 65536 = 64MB, max: 2097152 = 2GB)
     memoryLimitKB: Math.min(2097152, Math.max(65536, parseInt(process.env.LOCAL_EXECUTION_MEMORY_LIMIT) || 256000)),
-    // Wall-clock time limit in seconds (min: 1, max: 60)
     wallTimeLimit: Math.min(60, Math.max(1, parseInt(process.env.LOCAL_EXECUTION_TIMEOUT) || 5)),
-    // Output limit in KB (min: 1, max: 10240 = 10MB)
     outputLimitKB: Math.min(10240, Math.max(1, parseInt(process.env.LOCAL_EXECUTION_OUTPUT_LIMIT) || 1024)),
-    // C++ compiler command (default: 'g++')
     cxxCompiler: process.env.LOCAL_EXECUTION_CXX_COMPILER || 'g++',
-    // Python executable (default: 'python3')
     pythonExecutable: process.env.LOCAL_EXECUTION_PYTHON_EXECUTABLE || 'python3',
   },
 
-  // ========== DEDICATED QUEUE CONFIGURATION ==========
   fastCodeExecutionQueue: {
     concurrency: Math.min(20, Math.max(1, parseInt(process.env.FAST_CODE_EXECUTION_QUEUE_CONCURRENCY) || 15)),
     lockDuration: Math.min(120000, Math.max(10000, parseInt(process.env.FAST_CODE_EXECUTION_LOCK_DURATION) || 60000)),
@@ -129,12 +119,15 @@ module.exports = {
     maxStalledCount: Math.min(10, Math.max(1, parseInt(process.env.SLOW_CODE_EXECUTION_MAX_STALLED_COUNT) || 3)),
   },
 
-  // ========== USER LIST OPTIMIZATION CONSTANTS ==========
+  // Updated cache TTLs for user list (aligned with free tier optimization)
   userList: {
     maxPage: parseInt(process.env.USER_LIST_MAX_PAGE) || 100,
     maxLimit: parseInt(process.env.USER_LIST_MAX_LIMIT) || 100,
     defaultLimit: 20,
-    cacheTtlPublic: parseInt(process.env.USER_LIST_CACHE_TTL_PUBLIC) || 60,
-    cacheTtlAuth: parseInt(process.env.USER_LIST_CACHE_TTL_AUTH) || 30,
+    cacheTtlPublic: parseInt(process.env.USER_LIST_CACHE_TTL_PUBLIC) || 30,
+    cacheTtlAuth: parseInt(process.env.USER_LIST_CACHE_TTL_AUTH) || 15,
   },
+  cache: {
+    defaultTtl: Math.max(5, parseInt(process.env.CACHE_TTL_DEFAULT) || 30)
+  }
 };

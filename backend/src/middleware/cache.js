@@ -1,11 +1,13 @@
 const { client: redisClient } = require('../config/redis');
 
+// Default TTL in seconds – configurable via environment variable
+const DEFAULT_TTL = Math.max(5, parseInt(process.env.CACHE_TTL_DEFAULT) || 30);
+
 // Helper to get keys by pattern using KEYS command (use SCAN for production with many keys)
 const getKeys = async (pattern) => {
   if (!redisClient) return [];
   try {
     const result = await redisClient.sendCommand(['KEYS', pattern]);
-    // sendCommand returns an array of strings
     return result;
   } catch (err) {
     console.warn('Error getting keys:', err);
@@ -13,7 +15,7 @@ const getKeys = async (pattern) => {
   }
 };
 
-const cache = (duration = 60, keyPrefix = '') => {
+const cache = (duration = DEFAULT_TTL, keyPrefix = '') => {
   return async (req, res, next) => {
     if (!redisClient) return next();
     if (req.method !== 'GET') return next();
@@ -22,7 +24,6 @@ const cache = (duration = 60, keyPrefix = '') => {
     try {
       if (req.user && req.user._id) {
         cacheKey = `devrhythm:cache:${keyPrefix}:user:${req.user._id}:${req.originalUrl}`;
-        // Append timezone to cache key for timezone-sensitive data
         if (req.userTimeZone) {
           cacheKey += `:tz:${req.userTimeZone}`;
         }
@@ -109,5 +110,5 @@ module.exports = {
   invalidateProgressCache,
   invalidateGoalChartCache,
   invalidateDashboardCache,
-  invalidateSheetCache, 
+  invalidateSheetCache,
 };
