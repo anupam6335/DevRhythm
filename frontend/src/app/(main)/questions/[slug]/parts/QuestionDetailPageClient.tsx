@@ -232,6 +232,7 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         testCases: sanitizedTestCases,
       });
       setExecutionError(null);
+      
       // Invalidate and refetch question details
       await queryClient.invalidateQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
       await queryClient.refetchQueries({ queryKey: [...questionsKeys.detail(initialQuestion._id), 'details'] });
@@ -242,7 +243,6 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
         if (failedResult?.error) {
           setExecutionError(failedResult.error);
         } else if (result.results.some(r => !r.passed && r.error)) {
-          // fallback
           const firstError = result.results.find(r => r.error)?.error;
           if (firstError) setExecutionError(firstError);
         } else {
@@ -251,13 +251,10 @@ export const QuestionDetailPageClient: React.FC<QuestionDetailPageClientProps> =
       }
     } catch (error: any) {
       console.error('Run code error:', error);
-      // The mutation may throw a network error or a job failure.
-      // Extract the error message from the API response if available.
-      const apiMessage = error.response?.data?.message;
+      // Extract error message from the response
+      const apiMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
       if (apiMessage && typeof apiMessage === 'string') {
         setExecutionError(apiMessage);
-      } else if (error.message) {
-        setExecutionError(error.message);
       } else {
         setExecutionError('Code execution failed. Please try again.');
       }

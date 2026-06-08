@@ -94,27 +94,38 @@ module.exports = {
     },
   },
 
-  // ========== DEDICATED FAST CODE EXECUTION QUEUE (Python, JavaScript) ==========
+  // ========== LOCAL CODE EXECUTION CONFIGURATION ==========
+  localExecution: {
+    // Enable local execution (default: false)
+    enabled: process.env.LOCAL_EXECUTION_ENABLED === 'true',
+    // Sandbox tool: 'isolate', 'nsjail', or 'none' (unsafe, development only)
+    sandbox: process.env.LOCAL_EXECUTION_SANDBOX || 'isolate',
+    // CPU time limit in seconds (min: 0.1, max: 30)
+    cpuTimeLimit: Math.min(30, Math.max(0.1, parseFloat(process.env.LOCAL_EXECUTION_CPU_LIMIT) || 2)),
+    // Memory limit in KB (min: 65536 = 64MB, max: 2097152 = 2GB)
+    memoryLimitKB: Math.min(2097152, Math.max(65536, parseInt(process.env.LOCAL_EXECUTION_MEMORY_LIMIT) || 256000)),
+    // Wall-clock time limit in seconds (min: 1, max: 60)
+    wallTimeLimit: Math.min(60, Math.max(1, parseInt(process.env.LOCAL_EXECUTION_TIMEOUT) || 5)),
+    // Output limit in KB (min: 1, max: 10240 = 10MB)
+    outputLimitKB: Math.min(10240, Math.max(1, parseInt(process.env.LOCAL_EXECUTION_OUTPUT_LIMIT) || 1024)),
+    // C++ compiler command (default: 'g++')
+    cxxCompiler: process.env.LOCAL_EXECUTION_CXX_COMPILER || 'g++',
+    // Python executable (default: 'python3')
+    pythonExecutable: process.env.LOCAL_EXECUTION_PYTHON_EXECUTABLE || 'python3',
+  },
+
+  // ========== DEDICATED QUEUE CONFIGURATION ==========
   fastCodeExecutionQueue: {
-    // Number of parallel workers (default: 15, min: 1, max: 20)
     concurrency: Math.min(20, Math.max(1, parseInt(process.env.FAST_CODE_EXECUTION_QUEUE_CONCURRENCY) || 15)),
-    // Job lock duration in milliseconds
     lockDuration: Math.min(120000, Math.max(10000, parseInt(process.env.FAST_CODE_EXECUTION_LOCK_DURATION) || 60000)),
-    // How often to check for stalled jobs (milliseconds)
     stalledInterval: Math.min(120000, Math.max(5000, parseInt(process.env.FAST_CODE_EXECUTION_STALLED_INTERVAL) || 30000)),
-    // Maximum number of times a stalled job can be retried
     maxStalledCount: Math.min(10, Math.max(1, parseInt(process.env.FAST_CODE_EXECUTION_MAX_STALLED_COUNT) || 3)),
   },
 
-  // ========== DEDICATED SLOW CODE EXECUTION QUEUE (C++, Java) ==========
   slowCodeExecutionQueue: {
-    // Number of parallel workers (default: 5, min: 1, max: 20)
     concurrency: Math.min(20, Math.max(1, parseInt(process.env.SLOW_CODE_EXECUTION_QUEUE_CONCURRENCY) || 5)),
-    // Job lock duration in milliseconds
     lockDuration: Math.min(120000, Math.max(10000, parseInt(process.env.SLOW_CODE_EXECUTION_LOCK_DURATION) || 60000)),
-    // How often to check for stalled jobs (milliseconds)
     stalledInterval: Math.min(120000, Math.max(5000, parseInt(process.env.SLOW_CODE_EXECUTION_STALLED_INTERVAL) || 30000)),
-    // Maximum number of times a stalled job can be retried
     maxStalledCount: Math.min(10, Math.max(1, parseInt(process.env.SLOW_CODE_EXECUTION_MAX_STALLED_COUNT) || 3)),
   },
 

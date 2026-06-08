@@ -105,3 +105,22 @@
     margin: 0 0.05rem;
   }
 }
+
+/* Existing styles remain, add/modify these: */
+
+/* Rotating spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* For the processing step, use a spinning animation on the icon */
+.activeStep .icon svg {
+  animation: spin 1s linear infinite !important;
+}
+
+/* Optional: keep pulse for other steps if needed, but spin is more obvious for "processing" */

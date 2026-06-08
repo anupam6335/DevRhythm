@@ -1,7 +1,5 @@
-// frontend/src/features/codeExecution/components/ExecutionStatusIndicator.tsx
-
 import React, { useEffect, useState } from 'react';
-import { FiPackage, FiClock, FiLoader, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiPackage, FiLoader, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import styles from './ExecutionStatusIndicator.module.css';
 
 export type ExecutionStatus =
@@ -19,19 +17,29 @@ interface ExecutionStatusIndicatorProps {
 }
 
 interface Step {
-  id: ExecutionStatus;
+  id: string;
   label: string;
   icon: React.ReactNode;
 }
 
+// Define only three steps: Queued, Processing, Completed
+// Failed will replace Completed when needed
 const steps: Step[] = [
   { id: 'queued', label: 'Queued', icon: <FiPackage /> },
-  { id: 'pending', label: 'Pending', icon: <FiClock /> },
   { id: 'processing', label: 'Processing', icon: <FiLoader /> },
   { id: 'completed', label: 'Completed', icon: <FiCheckCircle /> },
 ];
 
 const failedStep: Step = { id: 'failed', label: 'Failed', icon: <FiXCircle /> };
+
+// Helper to map backend status to UI step index
+function getUIStepFromStatus(status: ExecutionStatus): { stepId: string; isFailed: boolean } {
+  if (status === 'failed') return { stepId: 'failed', isFailed: true };
+  if (status === 'completed') return { stepId: 'completed', isFailed: false };
+  if (status === 'queued') return { stepId: 'queued', isFailed: false };
+  // For 'pending' and 'processing', both map to 'processing' step
+  return { stepId: 'processing', isFailed: false };
+}
 
 export const ExecutionStatusIndicator: React.FC<ExecutionStatusIndicatorProps> = ({
   status,
@@ -58,18 +66,33 @@ export const ExecutionStatusIndicator: React.FC<ExecutionStatusIndicatorProps> =
 
   if (!visible || status === 'idle') return null;
 
-  const isFailed = status === 'failed';
-  const activeIndex = steps.findIndex(s => s.id === status);
+  const { stepId, isFailed } = getUIStepFromStatus(status);
+
+  // If failed, show only the failed step
+  if (isFailed) {
+    return (
+      <div className={`${styles.container} ${className}`}>
+        <div className={`${styles.step} ${styles.failedStep}`}>
+          <span className={styles.icon}>{failedStep.icon}</span>
+          <span className={styles.label}>{failedStep.label}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Find the index of the current step (queued, processing, or completed)
+  let activeIndex = steps.findIndex(s => s.id === stepId);
+  if (activeIndex === -1) activeIndex = 1; // fallback to processing
 
   return (
     <div className={`${styles.container} ${className}`}>
       {steps.map((step, idx) => {
-        const isActive = idx === activeIndex && !isFailed;
-        const isPast = idx < activeIndex && !isFailed;
-        const isFuture = idx > activeIndex && !isFailed;
+        const isActive = idx === activeIndex;
+        const isPast = idx < activeIndex;
+        const isFuture = idx > activeIndex;
+
         let stepClass = styles.step;
-        if (isFailed) stepClass = styles.step;
-        else if (isActive) stepClass = `${styles.step} ${styles.activeStep}`;
+        if (isActive) stepClass = `${styles.step} ${styles.activeStep}`;
         else if (isPast) stepClass = `${styles.step} ${styles.completedStep}`;
         else if (isFuture) stepClass = `${styles.step} ${styles.futureStep}`;
 
@@ -87,16 +110,6 @@ export const ExecutionStatusIndicator: React.FC<ExecutionStatusIndicatorProps> =
           </React.Fragment>
         );
       })}
-      {/* Show Failed step if status is failed */}
-      {isFailed && (
-        <>
-          {steps.length > 0 && <span className={styles.arrow}>→</span>}
-          <div className={`${styles.step} ${styles.failedStep}`}>
-            <span className={styles.icon}>{failedStep.icon}</span>
-            <span className={styles.label}>{failedStep.label}</span>
-          </div>
-        </>
-      )}
     </div>
   );
 };
