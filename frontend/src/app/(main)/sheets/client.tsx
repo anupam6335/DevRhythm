@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiPlus } from 'react-icons/fi';
@@ -43,28 +43,6 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  // Memoised derived values
-  const effectiveViewFilter = useMemo(() => (!isLoggedIn ? 'all' : viewFilter), [isLoggedIn, viewFilter]);
-  const useBookmarks = useMemo(() => effectiveViewFilter === 'bookmarked', [effectiveViewFilter]);
-  const useMySheets = useMemo(() => effectiveViewFilter === 'mine', [effectiveViewFilter]);
-
-  const useInitialData = useMemo(() => {
-    return !isLoggedIn && !useBookmarks && page === 1 && !search && sortBy === 'bookmarkCount' && sortOrder === 'desc';
-  }, [isLoggedIn, useBookmarks, page, search, sortBy, sortOrder]);
-
-  // Debounced search
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Reset page and scroll when filters change
-  useEffect(() => {
-    setPage(1);
-    scrollToTop();
-  }, [debouncedSearch, viewFilter, sortBy, sortOrder]);
-
   // Reset to default view when authentication changes
   useEffect(() => {
     setViewFilter('all');
@@ -73,48 +51,63 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
     setPage(1);
   }, [isLoggedIn]);
 
-  // Stabilised query parameters
-  const sheetsParams = useMemo(() => {
-    if (useBookmarks) return undefined;
-    return {
-      search: debouncedSearch || undefined,
-      mySheets: useMySheets ? true : undefined,
-      sortBy,
-      sortOrder,
-      page,
-      limit,
-    };
-  }, [useBookmarks, debouncedSearch, useMySheets, sortBy, sortOrder, page, limit]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const bookmarksParams = useMemo(() => {
-    if (!useBookmarks) return undefined;
-    return {
-      page,
-      limit,
-      search: debouncedSearch || undefined,
-    };
-  }, [useBookmarks, page, limit, debouncedSearch]);
+  useEffect(() => {
+    setPage(1);
+    scrollToTop();
+  }, [debouncedSearch, viewFilter, sortBy, sortOrder]);
 
-  // Data fetching hooks
+  // Unauthenticated users cannot use 'bookmarked' or 'mine' filters
+  const effectiveViewFilter = !isLoggedIn ? 'all' : viewFilter;
+  const useBookmarks = effectiveViewFilter === 'bookmarked';
+  const useMySheets = effectiveViewFilter === 'mine';
+
+  const params = useBookmarks
+    ? undefined
+    : {
+        search: debouncedSearch || undefined,
+        mySheets: useMySheets ? true : undefined,
+        sortBy,
+        sortOrder,
+        page,
+        limit,
+      };
+
+  // Only use initial data for unauthenticated users on default view
+  const useInitialData = !isLoggedIn && !useBookmarks && page === 1 && !debouncedSearch && sortBy === 'bookmarkCount' && sortOrder === 'desc';
+
   const {
     data: sheetsData,
     isLoading: sheetsLoading,
     error: sheetsError,
     refetch: refetchSheets,
-  } = useSheets(sheetsParams, { initialData: useInitialData ? initialData : undefined }, isLoggedIn);
+  } = useSheets(params, { initialData: useInitialData ? initialData : undefined }, isLoggedIn);
 
   const {
     data: bookmarksData,
     isLoading: bookmarksLoading,
     error: bookmarksError,
     refetch: refetchBookmarks,
-  } = useBookmarkedSheets(bookmarksParams);
+  } = useBookmarkedSheets(
+    useBookmarks
+      ? {
+          page,
+          limit,
+          search: debouncedSearch || undefined,
+        }
+      : undefined
+  );
 
-  const isLoading = useMemo(() => (useBookmarks ? bookmarksLoading : sheetsLoading), [useBookmarks, bookmarksLoading, sheetsLoading]);
-  const error = useMemo(() => (useBookmarks ? bookmarksError : sheetsError), [useBookmarks, bookmarksError, sheetsError]);
-  const data = useMemo(() => (useBookmarks ? bookmarksData : sheetsData), [useBookmarks, bookmarksData, sheetsData]);
-  const sheets = useMemo(() => data?.sheets || [], [data]);
-  const pagination = useMemo(() => data?.pagination, [data]);
+  const isLoading = (useBookmarks ? bookmarksLoading : sheetsLoading);
+  const error = useBookmarks ? bookmarksError : sheetsError;
+  const data = useBookmarks ? bookmarksData : sheetsData;
+  const sheets = data?.sheets || [];
+  const pagination = data?.pagination;
 
   const joinSheetMutation = useJoinSheet();
   const toggleBookmarkMutation = useToggleBookmark();
@@ -122,13 +115,12 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [selectedSheetSlug, setSelectedSheetSlug] = useState<string | null>(null);
 
-  // Memoised callbacks
-  const handleJoinClick = useCallback((slug: string) => {
+  const handleJoinClick = (slug: string) => {
     setSelectedSheetSlug(slug);
     setJoinModalOpen(true);
-  }, []);
+  };
 
-  const handleJoinConfirm = useCallback(async (targetDate: string) => {
+  const handleJoinConfirm = async (targetDate: string) => {
     if (!selectedSheetSlug) return;
     await joinSheetMutation.mutateAsync({ slug: selectedSheetSlug, targetDate });
     setJoinModalOpen(false);
@@ -136,49 +128,27 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
     refetchSheets();
     if (useBookmarks) refetchBookmarks();
     router.push(ROUTES.SHEETS.DETAIL(selectedSheetSlug));
-  }, [selectedSheetSlug, joinSheetMutation, refetchSheets, useBookmarks, refetchBookmarks, router]);
+  };
 
-  const handleToggleBookmark = useCallback(async (slug: string) => {
+  const handleToggleBookmark = async (slug: string) => {
     await toggleBookmarkMutation.mutateAsync(slug);
     if (useBookmarks) {
       refetchBookmarks();
     } else {
       refetchSheets();
     }
-  }, [toggleBookmarkMutation, useBookmarks, refetchBookmarks, refetchSheets]);
+  };
 
-  const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage);
-    scrollToTop();
-  }, []);
+  const breadcrumbItems: BreadcrumbItem[] = [
+    { label: 'Home', href: ROUTES.DASHBOARD },
+    { label: 'Sheets' },
+  ];
 
-  const renderLink = useCallback((item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
+  const renderLink = (item: BreadcrumbItem, props: { className: string; children: React.ReactNode }) => {
     if (!item.href) return <span {...props}>{props.children}</span>;
     return <Link href={item.href} className={props.className}>{props.children}</Link>;
-  }, []);
+  };
 
-  // Memoised sheet cards
-  const sheetCards = useMemo(() => {
-    if (!sheets.length) return null;
-    return sheets.map((sheet) => {
-      const isOwner = user ? sheet.ownerId === user._id : false;
-      const isJoined = user ? sheet.participants?.some(p => p.userId === user._id) : false;
-      return (
-        <SheetCard
-          key={sheet._id}
-          sheet={sheet}
-          isOwner={isOwner}
-          isJoined={isJoined}
-          onJoin={() => handleJoinClick(sheet.slug)}
-          onToggleBookmark={() => handleToggleBookmark(sheet.slug)}
-          isAuthenticated={isLoggedIn}
-          isBookmarkPending={toggleBookmarkMutation.isPending}
-        />
-      );
-    });
-  }, [sheets, user, handleJoinClick, handleToggleBookmark, isLoggedIn, toggleBookmarkMutation.isPending]);
-
-  // Sticky header observer with requestAnimationFrame
   const sentinelRef = useRef<HTMLDivElement>(null);
   const filterWrapperRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
@@ -187,21 +157,12 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        requestAnimationFrame(() => {
-          setIsSticky(!entry.isIntersecting);
-        });
-      },
+      ([entry]) => setIsSticky(!entry.isIntersecting),
       { threshold: [0] }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, []);
-
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { label: 'Home', href: ROUTES.DASHBOARD },
-    { label: 'Sheets' },
-  ];
 
   return (
     <div className={styles.container}>
@@ -235,13 +196,13 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
         />
       </div>
 
-      {isLoading && (
-        <div className={styles.sheetsList}>
-          {Array.from({ length: limit }).map((_, i) => (
-            <SheetCardSkeleton key={i} />
-          ))}
-        </div>
-      )}
+        {isLoading && (
+          <div className={styles.sheetsList}>
+            {Array.from({ length: limit }).map((_, i) => (
+              <SheetCardSkeleton key={i} />
+            ))}
+          </div>
+        )}
 
       {error && (
         <div className={styles.errorState}>
@@ -271,7 +232,22 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
 
       {!isLoading && !error && sheets.length > 0 && (
         <div className={styles.sheetsList}>
-          {sheetCards}
+          {sheets.map((sheet) => {
+            const isOwner = user ? sheet.ownerId === user._id : false;
+            const isJoined = user ? sheet.participants?.some(p => p.userId === user._id) : false;
+            return (
+              <SheetCard
+                key={sheet._id}
+                sheet={sheet}
+                isOwner={isOwner}
+                isJoined={isJoined}
+                onJoin={() => handleJoinClick(sheet.slug)}
+                onToggleBookmark={() => handleToggleBookmark(sheet.slug)}
+                isAuthenticated={isLoggedIn}
+                isBookmarkPending={toggleBookmarkMutation.isPending}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -280,7 +256,10 @@ export default function SheetsClient({ initialData }: SheetsClientProps) {
           <Pagination
             currentPage={page}
             totalPages={pagination.pages}
-            onPageChange={handlePageChange}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              scrollToTop();
+            }}
             showFirstLast
             showPrevNext
             size="md"

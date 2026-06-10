@@ -239,15 +239,4 @@ function SheetCard({
   );
 }
 
-function arePropsEqual(prevProps: SheetCardProps, nextProps: SheetCardProps): boolean {
-  return (
-    prevProps.sheet === nextProps.sheet &&
-    prevProps.isOwner === nextProps.isOwner &&
-    prevProps.isJoined === nextProps.isJoined &&
-    prevProps.isAuthenticated === nextProps.isAuthenticated &&
-    prevProps.isBookmarkPending === nextProps.isBookmarkPending &&
-    prevProps.className === nextProps.className
-  );
-}
-
-export default React.memo(SheetCard, arePropsEqual);
+export default React.memo(SheetCard);
