@@ -36,6 +36,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
   return (
     <html
       lang="en"
@@ -46,6 +48,7 @@ export default function RootLayout({
         <meta name="author" content="Anupam Debnath" />
         <link rel="author" href="/about/me" />
         <link rel="icon" href="/images/logos/dr-icon-dark-logo.png" type="image/png" />
+        {apiUrl && <link rel="preconnect" href={apiUrl} crossOrigin="anonymous" />}
       </head>
       <body>
         <RootLayoutClient>{children}</RootLayoutClient>
