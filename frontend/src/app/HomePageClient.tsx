@@ -354,7 +354,7 @@ function HomePageContent() {
             <p className={styles.heroSubtitle}>Watch how rhythm‑based practice transforms your coding consistency.</p>
           </div>
           <CustomYouTubePlayer
-            videoId="H46vC6Qp67U"  // Replace with actual demo video ID
+            videoId="euv8JzyIrMI"  // Devrhythm Video ID
             thumbnailSrc="images\logos\main-logo.png"
             title="DevRhythm Demo – Build your coding rhythm"
           />
