@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { SITE_URL } from '@/shared/config/seo';
 
-const FULL_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'https://api.devrhythm.space';
+const FULL_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ||
+                      process.env.API_BASE_URL ||
+                      'https://api.devrhythm.space';
 const API_ORIGIN = FULL_API_BASE.replace(/\/api\/v1\/?$/, '');
-const PER_PAGE = 50; // Must match backend's max limit
+const PER_PAGE = 15;
+
+// Prevent static generation – always fetch fresh data
+export const dynamic = 'force-dynamic';
 
 interface ApiResponse {
   meta?: {
@@ -24,47 +29,61 @@ async function getTotalSheets(): Promise<number> {
     if (!res.ok) return 0;
     const json: ApiResponse = await res.json();
     return json.meta?.pagination?.total || 0;
-  } catch (error) {
-    console.error('[Sheets Sitemap Index] Failed to fetch total count:', error);
-    return 0;
+  } catch {
+    return 0; // On any fetch error, treat as no sheets
   }
 }
 
-export async function GET() {
-  const total = await getTotalSheets();
-  const now = new Date().toISOString();
-
-  if (total === 0) {
-    const emptyXml = `<?xml version="1.0" encoding="UTF-8"?>
+function generateEmptySitemapIndex(): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 </sitemapindex>`;
-    return new NextResponse(emptyXml, {
+}
+
+export async function GET() {
+  try {
+    const total = await getTotalSheets();
+    const now = new Date().toISOString();
+
+    if (total === 0) {
+      const xml = generateEmptySitemapIndex();
+      return new NextResponse(xml, {
+        headers: {
+          'Content-Type': 'application/xml',
+          'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+        },
+      });
+    }
+
+    const pages = Math.ceil(total / PER_PAGE);
+    const entries = [];
+    for (let i = 1; i <= pages; i++) {
+      entries.push(`
+    <sitemap>
+      <loc>${SITE_URL}/sitemap.xml/sheets/page/${i}</loc>
+      <lastmod>${now}</lastmod>
+    </sitemap>`);
+    }
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.join('')}
+</sitemapindex>`;
+
+    return new NextResponse(xml, {
       headers: {
         'Content-Type': 'application/xml',
         'Cache-Control': 'public, max-age=3600, s-maxage=3600',
       },
     });
+  } catch (error) {
+    console.error('[Sheets Sitemap Index] Unexpected error:', error);
+    // Return an empty sitemap index on any error to avoid HTML error pages
+    const xml = generateEmptySitemapIndex();
+    return new NextResponse(xml, {
+      headers: {
+        'Content-Type': 'application/xml',
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+      },
+    });
   }
-
-  const pages = Math.ceil(total / PER_PAGE);
-  const sitemapEntries = [];
-
-  for (let i = 1; i <= pages; i++) {
-    sitemapEntries.push(`  <sitemap>
-    <loc>${SITE_URL}/sitemap.xml/sheets/page/${i}</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>`);
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${sitemapEntries.join('\n')}
-</sitemapindex>`;
-
-  return new NextResponse(xml, {
-    headers: {
-      'Content-Type': 'application/xml',
-      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
-    },
-  });
 }
