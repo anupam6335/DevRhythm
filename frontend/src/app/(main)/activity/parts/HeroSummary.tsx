@@ -3,13 +3,23 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, addDays, subDays } from 'date-fns';
-import { FiArrowLeft, FiArrowRight, FiCalendar, FiEye, FiStar } from 'react-icons/fi';
+import {
+  FiArrowLeft,
+  FiArrowRight,
+  FiCalendar,
+  FiEye,
+  FiStar,
+  FiCheckCircle,
+  FiRefreshCw,
+  FiClock,
+  FiTrendingUp,
+} from 'react-icons/fi';
 import { useTodayActivity, useDayActivity } from '@/features/activity/hooks/useActivityData';
 import Tooltip from '@/shared/components/Tooltip';
 import styles from './HeroSummary.module.css';
 
 interface HeroSummaryProps {
-  date?: string; // YYYY-MM-DD – if provided, fetch for that date; otherwise today
+  date?: string;
 }
 
 export default function HeroSummary({ date }: HeroSummaryProps) {
@@ -60,7 +70,6 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
           <div className={styles.skeletonStat} />
           <div className={styles.skeletonStat} />
           <div className={styles.skeletonStat} />
-          <div className={styles.skeletonStat} />
         </div>
         <div className={styles.skeletonProgress} />
       </div>
@@ -85,11 +94,49 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
 
   const formattedDate = format(new Date(data.date), 'EEEE, MMMM d, yyyy');
   const studyTime = formatStudyTime(data.studyTimeMinutes);
-  const goalPercent = data.goalCompletion || 0;
 
-  // Progress highlighting thresholds
   const isHighProblems = data.problemsSolved >= 5;
   const isHighStudyTime = data.studyTimeMinutes >= 120;
+
+  // Determine if we're viewing today or a past date
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isToday = isDayPage && data.date === todayStr;
+
+  // Insight logic – date‑aware
+  let insightIcon = <FiTrendingUp />;
+  let insightLabel = 'Keep going!';
+  let insightType: 'success' | 'warning' | 'danger' = 'success';
+
+  if (data.problemsSolved >= 5) {
+    insightIcon = <FiStar />;
+    insightLabel = '🌟 Great progress!';
+    insightType = 'success';
+  } else if (data.problemsSolved >= 3) {
+    insightIcon = <FiTrendingUp />;
+    insightLabel = 'Good start!';
+    insightType = 'warning';
+  } else if (data.problemsSolved === 0 && data.revisionsCompleted === 0) {
+    if (isToday) {
+      insightIcon = <FiClock />;
+      insightLabel = '📝 Start your day with a problem!';
+      insightType = 'warning';
+    } else {
+      insightIcon = <FiClock />;
+      insightLabel = 'No activity on this day';
+      insightType = 'danger';
+    }
+  } else {
+    // Some activity but not high – show neutral message for past days
+    if (!isToday) {
+      insightIcon = <FiCheckCircle />;
+      insightLabel = `✓ ${data.problemsSolved} problem${data.problemsSolved > 1 ? 's' : ''} solved`;
+      insightType = 'success';
+    } else {
+      insightIcon = <FiTrendingUp />;
+      insightLabel = 'Keep going!';
+      insightType = 'warning';
+    }
+  }
 
   return (
     <div className={styles.container}>
@@ -123,41 +170,55 @@ export default function HeroSummary({ date }: HeroSummaryProps) {
         </div>
       </div>
 
-      {/* Stats row (inline with separators) */}
+      {/* Stats row (inline with icons and tooltips) */}
       <div className={styles.statsRow}>
+        {/* Problems Solved */}
         <span className={styles.stat}>
-          <strong>{data.problemsSolved}</strong> problems solved
+          <FiCheckCircle className={styles.iconSolved} />
+          <strong>{data.problemsSolved}</strong>
+          <Tooltip content="Number of problems solved today">
+            <span className={styles.statLabel}>solved</span>
+          </Tooltip>
           {isHighProblems && (
             <Tooltip content="Great progress! 5+ problems solved today! 🎉">
               <FiStar className={styles.starIcon} />
             </Tooltip>
           )}
         </span>
+
         <span className={styles.separator}>•</span>
+
+        {/* Revisions Completed */}
         <span className={styles.stat}>
-          <strong>{data.revisionsCompleted}</strong> revisions completed
+          <FiRefreshCw className={styles.iconRevision} />
+          <strong>{data.revisionsCompleted}</strong>
+          <Tooltip content="Revisions completed today">
+            <span className={styles.statLabel}>revised</span>
+          </Tooltip>
         </span>
+
         <span className={styles.separator}>•</span>
+
+        {/* Study Time */}
         <span className={styles.stat}>
-          <strong>{studyTime}</strong> study time
+          <FiClock className={styles.iconTime} />
+          <strong>{studyTime}</strong>
+          <Tooltip content="Total study time spent today">
+            <span className={styles.statLabel}>studied</span>
+          </Tooltip>
           {isHighStudyTime && (
             <Tooltip content="Amazing focus! 2+ hours of study today! 💪">
               <FiStar className={styles.starIcon} />
             </Tooltip>
           )}
         </span>
-        {/* Goal percent is commented out as requested */}
-      </div>
 
-      {/* Progress bar (commented out – uncomment if needed) */}
-      {/* <div className={styles.progressWrapper}>
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: `${goalPercent}%` }} />
-        </div>
-        <span className={styles.progressLabel}>
-          {data.problemsSolved}/{data.goalTarget} problems completed today
+        {/* Insight Chip – date‑aware */}
+        <span className={`${styles.insightChip} ${styles[insightType]}`}>
+          {insightIcon}
+          <span>{insightLabel}</span>
         </span>
-      </div> */}
+      </div>
     </div>
   );
 }
