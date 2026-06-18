@@ -890,29 +890,75 @@ const getRevisionStats = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/v1/revisions/overdue
+ * Returns paginated list of overdue revisions (earliest overdue first).
+ * An overdue revision is any scheduled date < today that has not been completed.
+ */
 const getOverdueRevisions = async (req, res, next) => {
   try {
     const timeZone = getUserTimeZone(req);
     const { page, limit, skip } = getPaginationParams(req);
     const today = getStartOfDay(new Date(), timeZone);
     
-    const overdue = await RevisionSchedule.aggregate([
+    // Build the aggregation pipeline
+    const pipeline = [
+      // 1. Match active/overdue schedules for this user
       { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
+      
+      // 2. Extract completed dates as an array for easy checking
       {
         $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-          alreadyCompleted: {
-            $in: [
-              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-              '$completedRevisions.date'
-            ]
+          completedDates: {
+            $map: {
+              input: '$completedRevisions',
+              as: 'cr',
+              in: '$$cr.date'
+            }
           }
         }
       },
-      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
+      
+      // 3. Compute overdue dates: schedule dates < today and not completed
+      {
+        $addFields: {
+          overdueDates: {
+            $filter: {
+              input: '$schedule',
+              as: 'schedDate',
+              cond: {
+                $and: [
+                  { $lt: ['$$schedDate', today] },
+                  { $not: { $in: ['$$schedDate', '$completedDates'] } }
+                ]
+              }
+            }
+          }
+        }
+      },
+      
+      // 4. Keep only schedules that have at least one overdue date
+      {
+        $match: {
+          $expr: { $gt: [{ $size: '$overdueDates' }, 0] }
+        }
+      },
+      
+      // 5. Set pendingDue to the earliest overdue date
+      {
+        $addFields: {
+          pendingDue: { $arrayElemAt: ['$overdueDates', 0] }
+        }
+      },
+      
+      // 6. Sort by earliest overdue first
       { $sort: { pendingDue: 1 } },
+      
+      // 7. Pagination (skip & limit)
       { $skip: skip },
       { $limit: limit },
+      
+      // 8. Lookup question details
       {
         $lookup: {
           from: 'questions',
@@ -922,18 +968,31 @@ const getOverdueRevisions = async (req, res, next) => {
         }
       },
       { $unwind: { path: '$question', preserveNullAndEmptyArrays: true } },
+      
+      // 9. Lookup user progress for confidence and time
       {
         $lookup: {
           from: 'userquestionprogresses',
           let: { uid: '$userId', qid: '$questionId' },
           pipeline: [
-            { $match: { $expr: { $and: [ { $eq: ['$userId', '$$uid'] }, { $eq: ['$questionId', '$$qid'] } ] } } },
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$userId', '$$uid'] },
+                    { $eq: ['$questionId', '$$qid'] }
+                  ]
+                }
+              }
+            },
             { $limit: 1 }
           ],
           as: 'progress'
         }
       },
       { $unwind: { path: '$progress', preserveNullAndEmptyArrays: true } },
+      
+      // 10. Final projection
       {
         $project: {
           _id: 1,
@@ -951,30 +1010,22 @@ const getOverdueRevisions = async (req, res, next) => {
           attempts: { $ifNull: ['$progress.attempts.count', 0] }
         }
       }
-    ]);
+    ];
     
-    const convertedOverdue = overdue.map(rev => ({
+    // Execute the main pipeline
+    const overdueRevisions = await RevisionSchedule.aggregate(pipeline);
+    
+    // Convert dates to local timezone for response
+    const convertedOverdue = overdueRevisions.map(rev => ({
       ...rev,
       scheduledDate: toLocalISOString(rev.scheduledDate, timeZone)
     }));
     
-    const totalResult = await RevisionSchedule.aggregate([
-      { $match: { userId: req.user._id, status: { $in: ['active', 'overdue'] } } },
-      {
-        $addFields: {
-          pendingDue: { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-          alreadyCompleted: {
-            $in: [
-              { $arrayElemAt: ['$schedule', '$currentRevisionIndex'] },
-              '$completedRevisions.date'
-            ]
-          }
-        }
-      },
-      { $match: { pendingDue: { $lt: today }, alreadyCompleted: false } },
-      { $count: 'count' }
-    ]);
-    const totalCount = totalResult[0]?.count || 0;
+    // Count total overdue documents for pagination (without skip/limit)
+    const countPipeline = pipeline.slice(0, pipeline.length - 2); // remove $skip and $limit
+    countPipeline.push({ $count: 'count' });
+    const countResult = await RevisionSchedule.aggregate(countPipeline);
+    const totalCount = countResult[0]?.count || 0;
     
     res.json(formatResponse('Overdue revisions retrieved', {
       revisions: convertedOverdue,
