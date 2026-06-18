@@ -9,6 +9,13 @@ const rateLimit = require('express-rate-limit');
 const { client: redisClient } = require('../config/redis');
 const config = require('../config');
 
+const getRetryAfterSeconds = (windowMs) => Math.ceil(windowMs / 1000);
+
+const onLimitReached = (req, res, options) => {
+  const retryAfterSeconds = getRetryAfterSeconds(options.windowMs);
+  res.setHeader('Retry-After', String(retryAfterSeconds));
+};
+
 const createMemoryLimiter = (windowMs, max) => {
   return rateLimit({
     windowMs,
@@ -20,7 +27,8 @@ const createMemoryLimiter = (windowMs, max) => {
       data: null,
       meta: {},
       error: { code: 'RATE_LIMIT_EXCEEDED' }
-    }
+    },
+    onLimitReached
   });
 };
 
@@ -54,9 +62,7 @@ const createRedisLimiter = (windowMs, max, keyPrefix) => {
           meta: {},
           error: { code: 'RATE_LIMIT_EXCEEDED' }
         },
-        onLimitReached: (req, res, options) => {
-          res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
-        }
+        onLimitReached
       });
     } catch (error) {
       console.warn(`Redis limiter failed for ${keyPrefix}, using memory:`, error.message);

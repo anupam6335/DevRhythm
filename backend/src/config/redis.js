@@ -45,6 +45,11 @@ const createRedisClient = () => {
       if (!redisErrorLogged) {
         console.error('Redis Client Error:', err.message);
         redisErrorLogged = true;
+        // 🔥 Log a clear warning that rate limiters will fall back to memory
+        console.warn(
+          '⚠️ Redis is unavailable. Rate limiters will fall back to memory store. ' +
+          'Retry-After headers will still be sent (handled by the rate limiter logic).'
+        );
       }
     });
 
@@ -73,6 +78,10 @@ const createRedisClient = () => {
     return client;
   } catch (error) {
     console.error('Failed to create Redis client:', error);
+    console.warn(
+      '⚠️ Redis initialization failed. Rate limiters will fall back to memory store. ' +
+      'Retry-After headers will still be sent (handled by the rate limiter logic).'
+    );
     return null;
   }
 };
@@ -90,6 +99,11 @@ const waitForRedis = async () => {
     }
   } catch (err) {
     console.error('Redis connection error:', err);
+    // 🔥 Log fallback warning
+    console.warn(
+      '⚠️ Redis connection failed. Rate limiters will fall back to memory store. ' +
+      'Retry-After headers will still be sent (handled by the rate limiter logic).'
+    );
     throw err;
   }
 };

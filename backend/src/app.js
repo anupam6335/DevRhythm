@@ -9,7 +9,7 @@ const passport = require('./config/oauth');
 const config = require('./config');
 const middleware = require('./middleware');
 const routes = require('./routes');
-const { attachUserTimeZone } = require('./middleware/timezone'); 
+const { attachUserTimeZone } = require('./middleware/timezone');
 
 const app = express();
 
@@ -56,6 +56,10 @@ const limiter = rateLimit({
     data: null,
     meta: {},
     error: { code: 'RATE_LIMIT_EXCEEDED' }
+  },
+  onLimitReached: (req, res, options) => {
+    const retryAfterSeconds = Math.ceil(options.windowMs / 1000);
+    res.setHeader('Retry-After', String(retryAfterSeconds));
   }
 });
 app.use(limiter);
