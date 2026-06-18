@@ -88,7 +88,7 @@ const stopHeartbeat = () => {
 };
 
 fastCodeExecutionQueue.on('ready', () => {
-  console.log('[FastCodeExecQueue] Bull queue ready, starting heartbeat');
+  // console.log('[FastCodeExecQueue] Bull queue ready, starting heartbeat');
   startHeartbeat();
 });
 
@@ -148,7 +148,7 @@ async function cleanStaleFastCodeExecutionJobs(gracePeriodMs = null) {
  */
 function registerProcessor() {
   fastCodeExecutionQueue.process('code.execution', queueConcurrency, handleCodeExecution);
-  console.log(`[FastCodeExecQueue] Processor registered with concurrency: ${queueConcurrency}`);
+  // console.log(`[FastCodeExecQueue] Processor registered with concurrency: ${queueConcurrency}`);
 }
 
 /**
@@ -166,7 +166,7 @@ async function startFastCodeExecutionWorkers() {
   try {
     // Obliterate removes all jobs (active, waiting, delayed, completed, failed) and cleans up
     await fastCodeExecutionQueue.obliterate({ force: true });
-    console.log('[FastCodeExecQueue] Obliterated all jobs from the queue');
+    // console.log('[FastCodeExecQueue] Obliterated all jobs from the queue');
   } catch (err) {
     console.error('[FastCodeExecQueue] Failed to obliterate queue:', err.message);
   }
@@ -174,7 +174,7 @@ async function startFastCodeExecutionWorkers() {
   await fastCodeExecutionQueue.resume();
 
   registerProcessor();
-  console.log('[FastCodeExecQueue] Workers started');
+  // console.log('[FastCodeExecQueue] Workers started');
 }
 
 /**
@@ -184,7 +184,7 @@ async function stopFastCodeExecutionWorkers() {
   stopHeartbeat();
   if (fastCodeExecutionQueue) {
     await fastCodeExecutionQueue.close();
-    console.log('[FastCodeExecQueue] Workers stopped');
+    // console.log('[FastCodeExecQueue] Workers stopped');
   }
 }
 

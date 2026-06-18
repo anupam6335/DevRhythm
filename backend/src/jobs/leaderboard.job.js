@@ -56,7 +56,7 @@ const weeklyLeaderboardJob = new cron.CronJob('0 0 * * 0', async () => {
     const periodStart = getStartOfWeek();
     const periodEnd = getEndOfWeek();
     await calculateLeaderboard('weekly', periodStart, periodEnd);
-    console.log('Weekly leaderboard updated');
+    // console.log('Weekly leaderboard updated');
   } catch (error) {
     console.error('Weekly leaderboard job failed:', error);
   }
@@ -67,7 +67,7 @@ const monthlyLeaderboardJob = new cron.CronJob('0 0 1 * *', async () => {
     const periodStart = getStartOfMonth();
     const periodEnd = getEndOfMonth();
     await calculateLeaderboard('monthly', periodStart, periodEnd);
-    console.log('Monthly leaderboard updated');
+    // console.log('Monthly leaderboard updated');
   } catch (error) {
     console.error('Monthly leaderboard job failed:', error);
   }
@@ -76,13 +76,13 @@ const monthlyLeaderboardJob = new cron.CronJob('0 0 1 * *', async () => {
 const startLeaderboardJobs = () => {
   weeklyLeaderboardJob.start();
   monthlyLeaderboardJob.start();
-  console.log('Leaderboard jobs started');
+  // console.log('Leaderboard jobs started');
 };
 
 const stopLeaderboardJobs = () => {
   weeklyLeaderboardJob.stop();
   monthlyLeaderboardJob.stop();
-  console.log('Leaderboard jobs stopped');
+  // console.log('Leaderboard jobs stopped');
 };
 
 module.exports = {

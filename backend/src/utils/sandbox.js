@@ -30,10 +30,10 @@ async function detectSandbox() {
       });
     });
     detectedSandbox = 'isolate';
-    console.log('[Sandbox] Detected isolate');
+    // console.log('[Sandbox] Detected isolate');
   } catch (e) {
     detectedSandbox = 'none';
-    console.warn('[Sandbox] No sandbox tool found. Running without sandbox.');
+    // console.warn('[Sandbox] No sandbox tool found. Running without sandbox.');
   }
   return detectedSandbox;
 }

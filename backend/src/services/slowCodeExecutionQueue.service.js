@@ -88,7 +88,7 @@ const stopHeartbeat = () => {
 };
 
 slowCodeExecutionQueue.on('ready', () => {
-  console.log('[SlowCodeExecQueue] Bull queue ready, starting heartbeat');
+  // console.log('[SlowCodeExecQueue] Bull queue ready, starting heartbeat');
   startHeartbeat();
 });
 
@@ -148,7 +148,7 @@ async function cleanStaleSlowCodeExecutionJobs(gracePeriodMs = null) {
  */
 function registerProcessor() {
   slowCodeExecutionQueue.process('code.execution', queueConcurrency, handleCodeExecution);
-  console.log(`[SlowCodeExecQueue] Processor registered with concurrency: ${queueConcurrency}`);
+  // console.log(`[SlowCodeExecQueue] Processor registered with concurrency: ${queueConcurrency}`);
 }
 
 /**
@@ -164,14 +164,14 @@ async function startSlowCodeExecutionWorkers() {
   await slowCodeExecutionQueue.pause();
   try {
     await slowCodeExecutionQueue.obliterate({ force: true });
-    console.log('[SlowCodeExecQueue] Obliterated all jobs from the queue');
+    // console.log('[SlowCodeExecQueue] Obliterated all jobs from the queue');
   } catch (err) {
     console.error('[SlowCodeExecQueue] Failed to obliterate queue:', err.message);
   }
   await slowCodeExecutionQueue.resume();
 
   registerProcessor();
-  console.log('[SlowCodeExecQueue] Workers started');
+  // console.log('[SlowCodeExecQueue] Workers started');
 }
 
 /**
@@ -181,7 +181,7 @@ async function stopSlowCodeExecutionWorkers() {
   stopHeartbeat();
   if (slowCodeExecutionQueue) {
     await slowCodeExecutionQueue.close();
-    console.log('[SlowCodeExecQueue] Workers stopped');
+    // console.log('[SlowCodeExecQueue] Workers stopped');
   }
 }
 
@@ -189,5 +189,5 @@ module.exports = {
   slowCodeExecutionQueue,
   startSlowCodeExecutionWorkers,
   stopSlowCodeExecutionWorkers,
-  cleanStaleSlowCodeExecutionJobs, // exported for manual admin use
+  cleanStaleSlowCodeExecutionJobs,
 };

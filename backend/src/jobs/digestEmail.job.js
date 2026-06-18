@@ -48,7 +48,7 @@ const sendDailyDigests = async () => {
         // Update last digest time
         user.lastDigestSentAt = new Date();
         await user.save();
-        console.log(`Digest email sent to user ${user._id} with ${notifications.length} notifications`);
+        // console.log(`Digest email sent to user ${user._id} with ${notifications.length} notifications`);
       } catch (emailError) {
         console.error(`Failed to send digest email for user ${user._id}:`, emailError);
       }
@@ -57,7 +57,7 @@ const sendDailyDigests = async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
 
-    console.log('Daily digest job completed');
+    // console.log('Daily digest job completed');
   } catch (error) {
     console.error('Daily digest job failed:', error);
   }
@@ -68,12 +68,12 @@ const digestJob = new cron.CronJob('0 17 * * *', sendDailyDigests);
 
 const startDigestJob = () => {
   digestJob.start();
-  console.log('Daily digest email job started (5 PM)');
+  // console.log('Daily digest email job started (5 PM)');
 };
 
 const stopDigestJob = () => {
   digestJob.stop();
-  console.log('Daily digest email job stopped');
+  // console.log('Daily digest email job stopped');
 };
 
 module.exports = {

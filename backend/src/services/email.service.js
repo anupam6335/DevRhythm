@@ -52,7 +52,7 @@ const sendBatchEmail = async (userId, notifications) => {
 
   try {
     await sendEmail({ to: user.email, subject, html, text });
-    console.log(`Batch email sent to user ${userId} with ${notifications.length} notifications`);
+    // console.log(`Batch email sent to user ${userId} with ${notifications.length} notifications`);
   } catch (error) {
     console.error(`Batch email failed for user ${userId}:`, error);
     throw error;

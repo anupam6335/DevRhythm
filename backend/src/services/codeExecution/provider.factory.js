@@ -24,7 +24,7 @@ class CodeExecutionProviderFactory {
           config.codeExecution.onlineCompiler.timeout,
         );
       }
-      console.log('[ProviderFactory] Using local execution provider (sandboxed)');
+      // console.log('[ProviderFactory] Using local execution provider (sandboxed)');
       return new LocalProvider({
         sandbox: localConfig.sandbox || 'isolate',
         cpuTimeLimit: localConfig.cpuTimeLimit || 2,
@@ -37,7 +37,7 @@ class CodeExecutionProviderFactory {
     }
 
     if (provider === 'judge0') {
-      console.log('[ProviderFactory] Using Judge0 provider');
+      // console.log('[ProviderFactory] Using Judge0 provider');
       return new Judge0Provider(
         config.codeExecution.judge0.apiUrl,
         config.codeExecution.judge0.cpuTimeLimit,
@@ -46,7 +46,7 @@ class CodeExecutionProviderFactory {
     }
 
     // Default: onlinecompiler (also handles 'onlinecompiler' case)
-    console.log('[ProviderFactory] Using OnlineCompiler provider');
+    // console.log('[ProviderFactory] Using OnlineCompiler provider');
     return new OnlineCompilerProvider(
       config.codeExecution.onlineCompiler.apiUrl,
       config.codeExecution.onlineCompiler.apiKey,
