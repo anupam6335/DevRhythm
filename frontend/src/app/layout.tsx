@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Commissioner, Outfit, Patrick_Hand } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { RootLayoutClient } from '@/providers/RootLayoutClient';
 import '@/shared/styles/globals.css';
 
@@ -69,6 +70,7 @@ export default function RootLayout({
       </head>
       <body>
         <RootLayoutClient>{children}</RootLayoutClient>
+        <Analytics />
       </body>
     </html>
   );
