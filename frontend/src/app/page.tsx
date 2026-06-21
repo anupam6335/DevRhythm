@@ -9,7 +9,7 @@ const OG_IMAGE = `${SITE_URL}/images/dr-logo.png`;
 const LOGO_URL = `${SITE_URL}/images/logos/dr-icon-light-logo.png`;
 
 // Replace with actual demo video details
-const DEMO_VIDEO_ID = 'euv8JzyIrMI'; //  Devrhythm Video ID
+const DEMO_VIDEO_ID = 'ihQ5MP0M-e8'; //  Devrhythm Video ID
 const DEMO_THUMBNAIL_URL = `${SITE_URL}/images/demo-thumbnail.jpg`;
 const DEMO_VIDEO_URL = `https://www.youtube.com/watch?v=${DEMO_VIDEO_ID}`;
 const DEMO_EMBED_URL = `https://www.youtube.com/embed/${DEMO_VIDEO_ID}`;

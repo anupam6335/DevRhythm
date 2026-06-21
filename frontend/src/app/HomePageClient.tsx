@@ -46,6 +46,7 @@ import {
   FiHeart,
   FiAlertCircle,
   FiX,
+  FiExternalLink,
 } from 'react-icons/fi';
 import OAuthButton from '@/shared/components/OAuthButton';
 import { useSession } from '@/features/auth/hooks/useSession';
@@ -931,18 +932,31 @@ function HomePageContent() {
         {/* REVISION SECTION */}
         <RevisionSection />
 
-        {/* VIDEO DEMO */}
-        <section className={`${styles.sectionContainer} ${styles.reveal}`} style={{ marginTop: '2rem', marginBottom: '2rem' }}>
-          <div className={styles.videoSectionHeader}>
-            <h2 className={styles.journeyHeading}>See DevRhythm in action</h2>
-            <p className={styles.heroSubtitle}>Watch how rhythm‑based practice transforms your coding consistency.</p>
-          </div>
-          <CustomYouTubePlayer
-            videoId="euv8JzyIrMI"
-            thumbnailSrc="images/logos/main-logo.png"
-            title="DevRhythm Demo – Build your coding rhythm"
-          />
-        </section>
+          {/* VIDEO DEMO */}
+          <section className={`${styles.sectionContainer} ${styles.reveal} ${styles.videoSection}`}>
+            <div className={styles.videoSectionHeader}>
+              <h2 className={styles.journeyHeading}>Watch DevRhythm in Action</h2>
+              <p className={styles.heroSubtitle}>
+                Learn how rhythm‑based practice transforms coding consistency. 
+                Watch the full walkthrough below.
+              </p>
+            </div>
+            <div className={styles.videoWrapper}>
+              <CustomYouTubePlayer
+                videoId="ihQ5MP0M-e8"
+                thumbnailSrc="images/logos/main-logo.png"
+                title="DevRhythm – Build Your Coding Rhythm"
+              />
+            </div>
+            <a
+              href="https://youtu.be/ihQ5MP0M-e8"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.videoLink}
+            >
+              Or watch directly on YouTube →
+            </a>
+          </section>
 
         {/* JOURNEY SECTION */}
         <section className={`${styles.journeySection} ${styles.reveal}`} id="journeySection">
