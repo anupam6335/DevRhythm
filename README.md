@@ -448,7 +448,7 @@ Live demo: [https://devrhythm.space](https://devrhythm.space) (requires login)
 
 ## 📄 License
 
-[MIT](LICENSE)
+[Apache](LICENSE)
 
 ---
 
